@@ -51,7 +51,7 @@ type UserMenuItem = MenuItemType;
 
 const HeaderBar: React.FC = () => {
     // 从上下文获取侧边栏折叠状态和修改方法（添加非空断言，或根据实际情况处理 null）
-    const { collapsed, setCollapsed } = useContext(configContext);
+    const { collapsed, setCollapsed, searchKeyword, setSearchKeyword } = useContext(configContext);
 
     // 模拟用户信息
     const [userInfo] = useState<UserInfo>({
@@ -108,6 +108,7 @@ const HeaderBar: React.FC = () => {
 
     // 控制搜索框显示/隐藏的状态
     const [showSearch, setShowSearch] = useState(false);
+    const [inputValue, setInputValue] = useState(searchKeyword);
     // 搜索框容器的 ref
     const searchRef = useRef<HTMLDivElement>(null);
 
@@ -132,9 +133,15 @@ const HeaderBar: React.FC = () => {
     // 处理搜索框的搜索事件
     const handleSearch = (value: string) => {
         console.log('搜索内容：', value);
-        // 可添加搜索逻辑，搜索后可选择收起搜索框
-        // setShowSearch(false);
+        const trimmedValue = value.trim();
+        if(!trimmedValue) return;
+        setSearchKeyword(trimmedValue);
+        setShowSearch(false);
+        setInputValue(''); // 清空搜索框内容
     };
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setInputValue(e.target.value);
+    }
 
     // 处理点击外部关闭搜索框
     useEffect(() => {
@@ -347,18 +354,18 @@ const HeaderBar: React.FC = () => {
                                 <Button
                                     type="text"
                                     icon={<SearchOutlined />}
-
                                     className="border-0 bg-transparent text-black rounded-none"
                                 />
                             }
                             size="middle"
+                            value={inputValue}
+                            onChange={handleInputChange}
                             onSearch={handleSearch}
                             onFocus={() => setShowSearch(true)}
                             className="w-full border border-gray-200 rounded-md"
                         />
                     </div>
                 </div>
-
                 {/* 消息通知 */}
                 <Popover
                     content={messageContent}

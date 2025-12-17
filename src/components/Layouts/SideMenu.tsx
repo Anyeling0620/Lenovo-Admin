@@ -14,6 +14,7 @@ import {
 } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import { configContext } from './ConfigContext';
+import { hasPermission, type UserRole } from '../../utils/permission';
 
 const { Sider } = Layout;
 
@@ -27,7 +28,7 @@ interface MenuItem {
 }
 
 // 菜单数据（多级结构）
-const menuItems: MenuItem[] = [
+const _menuItems: MenuItem[] = [
     {
         key: '1',
         label: '数据总览',
@@ -51,7 +52,7 @@ const menuItems: MenuItem[] = [
             { key: '3-4', label: '商品管理', path: '/goods/manage' },
             { key: '3-5', label: '首页管理', path: '/goods/home' },
             { key: '3-6', label: '新品专区', path: '/goods/new' },
-            { key: '3-7', label: '商品秒杀专场', path: '/goods/seckill' },
+            { key: '3-7', label: '秒杀专场', path: '/goods/seckill' },
         ],
     },
     {
@@ -80,10 +81,10 @@ const menuItems: MenuItem[] = [
         label: '用户管理',
         icon: <UserOutlined />,
         children: [
-            { key: '7-1', label: '客户端用户管理', path: '/user/client' },
+            { key: '7-1', label: '客户端管理', path: '/user/client' },
             {
                 key: '7-2',
-                label: '后台管理员管理',
+                label: '后台端管理',
                 children: [
                     { key: '7-2-1', label: '用户列表', path: '/user/admin/list' },
                     { key: '7-2-2', label: '权限管理', path: '/user/admin/permission' },
@@ -94,7 +95,7 @@ const menuItems: MenuItem[] = [
     },
     {
         key: '8',
-        label: '售后管理',
+        label: '售后中心',
         icon: <CustomerServiceOutlined />,
         path: '/after-sales',
     },
@@ -113,17 +114,37 @@ const menuItems: MenuItem[] = [
         icon: <SettingOutlined />,
         children: [
             { key: '10-1', label: '个人信息', path: '/account/info' },
-            { key: '10-2', label: '个人权限详情', path: '/account/permission' },
+            { key: '10-2', label: '权限详情', path: '/account/permission' },
             { key: '10-3', label: '账号安全', path: '/account/security' },
         ],
     },
 ];
 
+const filterMenuItems = (items: MenuItem[], userRole: UserRole): MenuItem[] => {
+    return items.filter(item => {
+    // 1. 有路径的菜单项：检查权限
+    if (item.path) {
+      const hasPerm = hasPermission(item.path, userRole);
+      // 如果有子项，递归过滤子项
+      if (hasPerm && item.children) {
+        item.children = filterMenuItems(item.children, userRole);
+      }
+      return hasPerm;
+    }
+    // 2. 无路径的父菜单项（仅包含子项）：递归过滤子项，若子项为空则隐藏
+    if (item.children) {
+      item.children = filterMenuItems(item.children, userRole);
+      return item.children.length > 0;
+    }
+    // 3. 无路径无子项的菜单项：默认隐藏
+    return false;
+  });
+};
+
 const SideMenu: React.FC = () => {
-    const { collapsed } = useContext(configContext);
+    const { collapsed, triggerRefresh } = useContext(configContext);
     // 控制菜单展开的key（受控状态）
     const [openKeys, setOpenKeys] = useState<string[]>([]);
-
     // 工具函数：获取key的一级父级（顶级）key，如5-2-1 → 5，5-2 → 5，3 → 3
     const getRootKey = (key: string): string => {
         return key.split('-')[0];
@@ -138,6 +159,8 @@ const SideMenu: React.FC = () => {
     const isChildKey = (key: string, parentKey: string): boolean => {
         return key.startsWith(`${parentKey}-`) || key === parentKey;
     };
+    const userRole = 'admin'
+    const menuItems = filterMenuItems([..._menuItems], userRole);
 
     // 处理菜单展开/收起事件
     const handleOpenChange = (newOpenKeys: string[]) => {
@@ -185,7 +208,7 @@ const SideMenu: React.FC = () => {
             return {
                 key: item.key,
                 icon: item.icon,
-                label: <Link to={item.path || '#'} className="ml-1">{item.label}</Link>,
+                label: <Link onClick={() => item.path&&triggerRefresh(item.path)} to={`${item.path}` || 'not-found'} className="ml-1">{item.label}</Link>,
             };
         });
     };
