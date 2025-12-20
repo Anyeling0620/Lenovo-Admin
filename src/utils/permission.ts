@@ -41,3 +41,41 @@ export const hasPermission = (path: string, userRole: UserRole): boolean => {
   // 3. 无配置的路径：默认无权限
   return false;
 };
+
+
+
+export enum AdminRole {
+  /** 超级管理员（最高权限） */
+  SUPER_ADMIN = "SUPER_ADMIN",
+  /** 系统管理员（系统配置管理） */
+  SYSTEM_ADMIN = "SYSTEM_ADMIN",
+  /** 产品经理（商品/品类管理） */
+  PRODUCT_MANAGER = "PRODUCT_MANAGER",
+  /** 订单管理员（订单处理/管理） */
+  ORDER_MANAGER = "ORDER_MANAGER",
+  /** 客服人员（客户咨询/回复） */
+  CUSTOMER_SERVICE = "CUSTOMER_SERVICE",
+  /** 售后人员（售后处理/维权） */
+  AFTER_SALES = "AFTER_SALES",
+  /** 财务人员（财务结算/对账） */
+  FINANCE = "FINANCE",
+  /** 仓库管理员（库存/发货管理） */
+  WAREHOUSE_MANAGER = "WAREHOUSE_MANAGER",
+  /** 营销人员（营销活动/推广） */
+  MARKETING = "MARKETING",
+}
+
+export enum CSTEGORY {
+  /** 笔记本电脑 */
+  LAPTOP = "LAPTOP",
+  /** 台式电脑 */
+  DESKTOP = "DESKTOP",
+  /** 显示器 */
+  MONITOR = "MONITOR",
+  /** 平板电脑 */
+  TABLET = "TABLET",
+  /** 手机 */
+  PHONE = "PHONE",
+  /** 服务类（如售后、技术支持等） */
+  SERVICE = "SERVICE",
+}

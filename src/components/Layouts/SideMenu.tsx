@@ -41,71 +41,88 @@ const _menuItems: MenuItem[] = [
         icon: <DesktopOutlined />,
         path: '/workbench',
     },
-    {
+        {
         key: '3',
-        label: '商品管理',
-        icon: <ShoppingOutlined />,
-        children: [
-            { key: '3-1', label: '商品总览', path: '/goods/overview' },
-            { key: '3-2', label: '品牌管理', path: '/goods/brand' },
-            { key: '3-3', label: '专区管理', path: '/goods/zone' },
-            { key: '3-4', label: '商品管理', path: '/goods/manage' },
-            { key: '3-5', label: '首页管理', path: '/goods/home' },
-            { key: '3-6', label: '新品专区', path: '/goods/new' },
-            { key: '3-7', label: '秒杀专场', path: '/goods/seckill' },
-        ],
-    },
-    {
-        key: '4',
-        label: '福利中心',
-        icon: <GiftOutlined />,
-        children: [
-            { key: '4-1', label: '优惠券管理', path: '/coupon/manage' },
-            { key: '4-2', label: '代金券管理', path: '/coupon/cash' },
-        ],
-    },
-    {
-        key: '5',
         label: '广播通知',
         icon: <BellOutlined />,
         path: '/broadcast',
     },
     {
-        key: '6',
-        label: '账单管理',
-        icon: <FileTextOutlined />,
-        path: '/bill',
-    },
-    {
-        key: '7',
-        label: '用户管理',
-        icon: <UserOutlined />,
+        key: '4',
+        label: '商品管理',
+        icon: <ShoppingOutlined />,
         children: [
-            { key: '7-1', label: '客户端管理', path: '/user/client' },
-            {
-                key: '7-2',
-                label: '后台端管理',
-                children: [
-                    { key: '7-2-1', label: '用户列表', path: '/user/admin/list' },
-                    { key: '7-2-2', label: '权限管理', path: '/user/admin/permission' },
-                    { key: '7-2-3', label: '在线管理', path: '/user/admin/online' },
-                ],
-            },
+            { key: '4-1', label: '商品总览', path: '/goods/overview' },
+            { key: '4-2', label: '品牌·专区', path: '/goods/brand-zone' },
+            { key: '4-3', label: '商品管理', path: '/goods/manage' },
+            { key: '4-4', label: '库存管理', path: '/goods/category' }
         ],
     },
     {
+        key: '5',
+        label: '商城管理',
+        icon: <ShoppingOutlined />,
+        children: [
+            { key: '5-1', label: '上架商品管理', path: '/mall/goods' },
+            { key: '5-2', label: '售货专区管理', path: '/mall/zone' },
+            { key: '5-3', label: '首页展示管理', path: '/mall/home' },
+            { key: '5-4', label: '新品展示管理', path: '/mall/new' },
+        ]
+    },
+    {
+        key: '6', label: '营销管理', icon: <GiftOutlined />,
+        children: [
+            {
+                key: '6-1', label: '福利中心', children: [
+                    { key: '6-1-1', label: '优惠券管理', path: '/coupon/manage' },
+                    { key: '6-1-2', label: '代金券管理', path: '/coupon/cash' },
+                ]
+            },
+            {
+                key: '6-2', label: '秒杀活动', path: '/mall/seckill'
+            },
+            {
+                key: '6-3', label: '通知推送', path: '/notice-push'
+            }
+        ]
+    },
+    {
+        key: '7',
+        label: '售货管理',
+        icon: <ShoppingOutlined />,
+        children: [
+            { key: '7-1', label: '订单管理', path: '/order/manage' },
+            { key: '7-2', label: '售后管理', path: '/after-sale' },
+            { key: '7-3', label: '投诉管理', path: '/complaint' },
+
+        ]
+    },
+
+    {
         key: '8',
-        label: '售后中心',
-        icon: <CustomerServiceOutlined />,
-        path: '/after-sales',
+        label: '用户管理',
+        icon: <UserOutlined />,
+        children: [
+            { key: '8-1', label: '客户端管理', path: '/user/client' },
+            {
+                key: '8-2',
+                label: '后台管理',
+                children: [
+                    { key: '8-2-1', label: '用户列表', path: '/user/admin/list' },
+                    { key: '8-2-2', label: '权限管理', path: '/user/admin/permission' },
+                    { key: '8-2-3', label: '在线管理', path: '/user/admin/online' },
+                ],
+            },
+        ],
     },
     {
         key: '9',
         label: '客服中心',
         icon: <PhoneOutlined />,
         children: [
-            { key: '7-1', label: '服务总览', path: '/customer-service/overview' },
-            { key: '7-2', label: '会话中心', path: '/customer-service/session' },
+            { key: '9-1', label: '服务总览', path: '/customer-service/overview' },
+            { key: '9-2', label: '会话中心', path: '/customer-service/session' },
+            { key: '9-3', label: '评价管理', path: '/customer-service/evaluation' },
         ],
     },
     {
@@ -120,25 +137,27 @@ const _menuItems: MenuItem[] = [
     },
 ];
 
+
+// 权限过滤函数：根据用户角色过滤菜单项
 const filterMenuItems = (items: MenuItem[], userRole: UserRole): MenuItem[] => {
     return items.filter(item => {
-    // 1. 有路径的菜单项：检查权限
-    if (item.path) {
-      const hasPerm = hasPermission(item.path, userRole);
-      // 如果有子项，递归过滤子项
-      if (hasPerm && item.children) {
-        item.children = filterMenuItems(item.children, userRole);
-      }
-      return hasPerm;
-    }
-    // 2. 无路径的父菜单项（仅包含子项）：递归过滤子项，若子项为空则隐藏
-    if (item.children) {
-      item.children = filterMenuItems(item.children, userRole);
-      return item.children.length > 0;
-    }
-    // 3. 无路径无子项的菜单项：默认隐藏
-    return false;
-  });
+        // 1. 有路径的菜单项：检查权限
+        if (item.path) {
+            const hasPerm = hasPermission(item.path, userRole);
+            // 如果有子项，递归过滤子项
+            if (hasPerm && item.children) {
+                item.children = filterMenuItems(item.children, userRole);
+            }
+            return hasPerm;
+        }
+        // 2. 无路径的父菜单项（仅包含子项）：递归过滤子项，若子项为空则隐藏
+        if (item.children) {
+            item.children = filterMenuItems(item.children, userRole);
+            return item.children.length > 0;
+        }
+        // 3. 无路径无子项的菜单项：默认隐藏
+        return false;
+    });
 };
 
 const SideMenu: React.FC = () => {
@@ -159,8 +178,9 @@ const SideMenu: React.FC = () => {
     const isChildKey = (key: string, parentKey: string): boolean => {
         return key.startsWith(`${parentKey}-`) || key === parentKey;
     };
-    const userRole = 'admin'
-    const menuItems = filterMenuItems([..._menuItems], userRole);
+    // 暂时不处理权限
+    // const userRole = 'admin'
+    // const menuItems = filterMenuItems([..._menuItems], userRole);
 
     // 处理菜单展开/收起事件
     const handleOpenChange = (newOpenKeys: string[]) => {
@@ -208,7 +228,7 @@ const SideMenu: React.FC = () => {
             return {
                 key: item.key,
                 icon: item.icon,
-                label: <Link onClick={() => item.path&&triggerRefresh(item.path)} to={`${item.path}` || 'not-found'} className="ml-1">{item.label}</Link>,
+                label: <Link onClick={() => item.path && triggerRefresh(item.path)} to={`${item.path}` || 'not-found'} className="ml-1">{item.label}</Link>,
             };
         });
     };
@@ -223,7 +243,7 @@ const SideMenu: React.FC = () => {
         >
             <Menu
                 mode="inline"
-                items={renderMenuItems(menuItems)}
+                items={renderMenuItems(_menuItems)}  // 暂时关闭权限控制
                 className="border-none pt-2! bg-[#fafafa]!"
                 openKeys={openKeys}
                 onOpenChange={handleOpenChange}

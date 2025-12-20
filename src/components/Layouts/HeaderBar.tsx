@@ -1,6 +1,6 @@
 // src/components/HeaderBar.tsx
 import React, { useState, useContext, useRef, useEffect } from 'react';
-import { Layout, Button, Typography, Avatar, Dropdown, Input, Badge, Popover, Space, Tag } from 'antd';
+import { Layout, Button, Typography, Avatar, Dropdown, Input, Badge, Popover, Space, Tag, message } from 'antd';
 import {
     MenuFoldOutlined, // 收起图标
     MenuUnfoldOutlined, // 展开图标
@@ -17,6 +17,10 @@ import {
 import { Link } from 'react-router-dom';
 import type { MenuItemType } from 'antd/es/menu/interface';
 import { configContext } from './ConfigContext';
+import { useNavigate } from 'react-router-dom';
+import { logout } from '../../services/auth';
+import globalErrorHandler from '../../utils/globalAxiosErrorHandler';
+import { globalMessage } from '../../utils/globalMessage';
 
 const { Header } = Layout;
 const { Text, Title } = Typography;
@@ -52,6 +56,7 @@ type UserMenuItem = MenuItemType;
 const HeaderBar: React.FC = () => {
     // 从上下文获取侧边栏折叠状态和修改方法（添加非空断言，或根据实际情况处理 null）
     const { collapsed, setCollapsed, searchKeyword, setSearchKeyword } = useContext(configContext);
+    const navigate = useNavigate();
 
     // 模拟用户信息
     const [userInfo] = useState<UserInfo>({
@@ -118,11 +123,13 @@ const HeaderBar: React.FC = () => {
     };
 
     // 退出登录处理函数
-    const handleLogout = () => {
-        console.log('退出登录');
-        // 此处可添加退出登录的逻辑，如清除token、跳转登录页等
-        // localStorage.removeItem('token');
-        // window.location.href = '/login';
+    const handleLogout = async () => {
+        try {
+            await logout();
+            window.dispatchEvent(new CustomEvent('logout'));
+        } catch (error) {
+            globalErrorHandler.handle(error, globalMessage.error);
+        }
     };
 
     // 切换搜索框显示/隐藏
@@ -134,7 +141,7 @@ const HeaderBar: React.FC = () => {
     const handleSearch = (value: string) => {
         console.log('搜索内容：', value);
         const trimmedValue = value.trim();
-        if(!trimmedValue) return;
+        if (!trimmedValue) return;
         setSearchKeyword(trimmedValue);
         setShowSearch(false);
         setInputValue(''); // 清空搜索框内容
@@ -309,6 +316,11 @@ const HeaderBar: React.FC = () => {
         </div>
     );
 
+    function handleMessageClick(event: React.MouseEvent<HTMLDivElement, MouseEvent>): void {
+        event.stopPropagation(); // 阻止事件冒泡，避免触发其他点击事件
+        navigate('/messages')
+    }
+
     return (
         <Header className="flex fixed w-full  min-w-[800px] items-center justify-between  pl-2! shadow-sm  z-10 ">
             {/* 左侧：折叠按钮 + 系统名称 */}
@@ -375,7 +387,7 @@ const HeaderBar: React.FC = () => {
                     arrow
                 >
                     <Badge count={messageList.filter(item => !item.read).length} size='small' dot={false}>
-                        <Button type="text" icon={<BellOutlined />} className="text-xl" />
+                        <Button type="text" icon={<BellOutlined />} onClick={handleMessageClick} className="text-xl" />
                     </Badge>
                 </Popover>
 

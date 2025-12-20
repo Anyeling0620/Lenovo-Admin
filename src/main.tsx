@@ -4,6 +4,7 @@ import './index.css'
 import App from './App.tsx'
 import { BrowserRouter } from 'react-router-dom'
 import { ConfigProvider, theme } from 'antd'
+import GlobalMessageProvider from './components/GlobalMessageProvider'
 
 createRoot(document.getElementById('root')!).render(
   <BrowserRouter>
@@ -29,10 +30,9 @@ createRoot(document.getElementById('root')!).render(
           },
         },
       }}>
+        {/* 全局消息 */}
+        <GlobalMessageProvider />
         <App />
-        <div className='text-[#cccccc]'>
-
-        </div>
       </ConfigProvider>
     </StrictMode>
   </BrowserRouter>,

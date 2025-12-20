@@ -20,6 +20,9 @@ const service: AxiosInstance = axios.create({
 })
 service.interceptors.request.use(
     (config: InternalAxiosRequestConfig) => {
+        if(!config.url?.startsWith('http')){
+            config.url = '/admin' + config.url
+        }
         return config
     },
     (error) => Promise.reject(error)
