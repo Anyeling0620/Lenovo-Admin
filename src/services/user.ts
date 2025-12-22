@@ -2,11 +2,22 @@ import request from "../utils/request";
 import { API_PATHS } from "./api-paths";
 import { mockApi, mockUsers, mockAdmins, mockPermissions, mockIdentities, mockOnlineUsers, mockOnlineAdmins, mockLoginRecords, mockUserStatistics } from "./mock-data";
 
-// 检查是否使用模拟数据
+/**
+ * 检查是否使用模拟数据
+ * 优先级：
+ * 1. 环境变量 VITE_USE_MOCK_DATA 为 'true'
+ * 2. 开发环境 (import.meta.env.DEV)
+ * 用途：在开发阶段使用模拟数据，避免依赖真实后端服务
+ */
 const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA === 'true' || import.meta.env.DEV;
 
 // ==================== 客户端用户管理 ====================
 
+/**
+ * 客户端用户实体接口
+ * 包含用户的基本信息、会员类型、状态等
+ * 用于前端用户管理页面的数据展示和操作
+ */
 export interface User {
   id: string;
   email: string;
@@ -24,6 +35,11 @@ export interface User {
   totalSpent: number;
 }
 
+/**
+ * 客户端用户列表查询参数接口
+ * 支持分页、关键词搜索、会员类型筛选、状态筛选、时间范围筛选
+ * 用于用户管理页面的数据查询和过滤
+ */
 export interface UserListParams {
   page?: number;
   pageSize?: number;
@@ -34,6 +50,11 @@ export interface UserListParams {
   endDate?: string;
 }
 
+/**
+ * 客户端用户列表响应接口
+ * 包含用户列表数据、分页信息、总数统计
+ * 用于前端用户管理页面的数据展示和操作
+ */
 export interface UserListResponse {
   list: User[];
   total: number;
@@ -50,7 +71,11 @@ export interface UserStatistics {
   averageOrderValue: number;
 }
 
-// 获取客户端用户列表
+/**
+ * 获取客户端用户列表
+ * @param params 查询参数，包含分页、关键词、会员类型、状态等
+ * @returns 用户列表响应数据
+ */
 export const getClientUsers = async (params: UserListParams): Promise<UserListResponse> => {
   if (USE_MOCK_DATA) {
     return mockApi.getClientUsers(params);
@@ -59,7 +84,11 @@ export const getClientUsers = async (params: UserListParams): Promise<UserListRe
   return response;
 };
 
-// 获取客户端用户详情
+/**
+ * 获取客户端用户详情
+ * @param userId 用户ID
+ * @returns 用户详情数据
+ */
 export const getClientUserDetail = async (userId: string): Promise<User> => {
   if (USE_MOCK_DATA) {
     const user = mockUsers.find(u => u.id === userId);
@@ -70,7 +99,12 @@ export const getClientUserDetail = async (userId: string): Promise<User> => {
   return response;
 };
 
-// 更新客户端用户信息
+/**
+ * 更新客户端用户信息
+ * @param userId 用户ID
+ * @param data 更新的用户数据
+ * @returns Promise<void>
+ */
 export const updateClientUser = async (userId: string, data: Partial<User>): Promise<void> => {
   if (USE_MOCK_DATA) {
     console.log('Mock update user:', userId, data);
@@ -79,7 +113,11 @@ export const updateClientUser = async (userId: string, data: Partial<User>): Pro
   await request.put(`${API_PATHS.USER.CLIENT_UPDATE}/${userId}`, data);
 };
 
-// 删除客户端用户
+/**
+ * 删除客户端用户
+ * @param userId 用户ID
+ * @returns Promise<void>
+ */
 export const deleteClientUser = async (userId: string): Promise<void> => {
   if (USE_MOCK_DATA) {
     console.log('Mock delete user:', userId);
@@ -88,7 +126,10 @@ export const deleteClientUser = async (userId: string): Promise<void> => {
   await request.delete(`${API_PATHS.USER.CLIENT_DELETE}/${userId}`);
 };
 
-// 获取客户端用户统计
+/**
+ * 获取客户端用户统计信息
+ * @returns 用户统计数据，包括总用户数、活跃用户数、今日新增用户数、VIP用户数、SVIP用户数、平均订单价值等
+ */
 export const getClientUserStatistics = async (): Promise<UserStatistics> => {
   if (USE_MOCK_DATA) {
     return Promise.resolve(mockUserStatistics);
@@ -99,6 +140,11 @@ export const getClientUserStatistics = async (): Promise<UserStatistics> => {
 
 // ==================== 后台管理员管理 ====================
 
+/**
+ * 后台管理员实体接口
+ * 包含管理员的基本信息、身份信息、商品专区权限等
+ * 用于后台管理员管理页面的数据展示和操作
+ */
 export interface Admin {
   id: string;
   account: string;
@@ -130,7 +176,11 @@ export interface AdminListResponse {
   pageSize: number;
 }
 
-// 获取管理员列表
+/**
+ * 获取管理员列表
+ * @param params 查询参数，包含分页、关键词、状态、身份ID等
+ * @returns 管理员列表响应数据
+ */
 export const getAdminList = async (params: AdminListParams): Promise<AdminListResponse> => {
   if (USE_MOCK_DATA) {
     return mockApi.getAdminList(params);
@@ -139,7 +189,11 @@ export const getAdminList = async (params: AdminListParams): Promise<AdminListRe
   return response;
 };
 
-// 获取管理员详情
+/**
+ * 获取管理员详情
+ * @param adminId 管理员ID
+ * @returns 管理员详情数据
+ */
 export const getAdminDetail = async (adminId: string): Promise<Admin> => {
   if (USE_MOCK_DATA) {
     const admin = mockAdmins.find(a => a.id === adminId);
@@ -150,7 +204,11 @@ export const getAdminDetail = async (adminId: string): Promise<Admin> => {
   return response;
 };
 
-// 创建管理员
+/**
+ * 创建管理员参数接口
+ * 包含管理员的基本信息、密码、身份ID列表、商品分类ID列表等
+ * 用于创建管理员页面的数据提交和操作
+ */
 export interface CreateAdminParams {
   account: string;
   password: string;
@@ -162,6 +220,11 @@ export interface CreateAdminParams {
   categoryIds?: string[];
 }
 
+/**
+ * 创建管理员
+ * @param data 创建管理员参数
+ * @returns 新创建的管理员数据
+ */
 export const createAdmin = async (data: CreateAdminParams): Promise<Admin> => {
   if (USE_MOCK_DATA) {
     console.log('Mock create admin:', data);
@@ -183,7 +246,12 @@ export const createAdmin = async (data: CreateAdminParams): Promise<Admin> => {
   return response;
 };
 
-// 更新管理员
+/**
+ * 更新管理员信息
+ * @param adminId 管理员ID
+ * @param data 更新的管理员数据
+ * @returns Promise<void>
+ */
 export const updateAdmin = async (adminId: string, data: Partial<CreateAdminParams>): Promise<void> => {
   if (USE_MOCK_DATA) {
     console.log('Mock update admin:', adminId, data);
@@ -192,7 +260,11 @@ export const updateAdmin = async (adminId: string, data: Partial<CreateAdminPara
   await request.put(`${API_PATHS.USER.ADMIN_UPDATE}/${adminId}`, data);
 };
 
-// 删除管理员
+/**
+ * 删除管理员
+ * @param adminId 管理员ID
+ * @returns Promise<void>
+ */
 export const deleteAdmin = async (adminId: string): Promise<void> => {
   if (USE_MOCK_DATA) {
     console.log('Mock delete admin:', adminId);
@@ -201,7 +273,12 @@ export const deleteAdmin = async (adminId: string): Promise<void> => {
   await request.delete(`${API_PATHS.USER.ADMIN_DELETE}/${adminId}`);
 };
 
-// 重置管理员密码
+/**
+ * 重置管理员密码
+ * @param adminId 管理员ID
+ * @param newPassword 新密码
+ * @returns Promise<void>
+ */
 export const resetAdminPassword = async (adminId: string, newPassword: string): Promise<void> => {
   if (USE_MOCK_DATA) {
     console.log('Mock reset password:', adminId, newPassword);
@@ -212,6 +289,11 @@ export const resetAdminPassword = async (adminId: string, newPassword: string): 
 
 // ==================== 权限管理 ====================
 
+/**
+ * 权限实体接口
+ * 包含权限的基本信息、类型、所属模块、父子关系等
+ * 用于权限管理页面的数据展示和操作
+ */
 export interface Permission {
   id: string;
   name: string;
@@ -229,7 +311,11 @@ export interface PermissionListParams {
   status?: string;
 }
 
-// 获取权限列表
+/**
+ * 获取权限列表
+ * @param params 查询参数，包含类型、模块、状态等
+ * @returns 权限列表数据
+ */
 export const getPermissionList = async (params?: PermissionListParams): Promise<Permission[]> => {
   if (USE_MOCK_DATA) {
     return mockApi.getPermissionList();
@@ -238,7 +324,10 @@ export const getPermissionList = async (params?: PermissionListParams): Promise<
   return response;
 };
 
-// 获取权限树
+/**
+ * 获取权限树结构
+ * @returns 权限树结构数据，包含父子关系
+ */
 export const getPermissionTree = async (): Promise<Permission[]> => {
   if (USE_MOCK_DATA) {
     return mockApi.getPermissionTree();
@@ -247,7 +336,11 @@ export const getPermissionTree = async (): Promise<Permission[]> => {
   return response;
 };
 
-// 创建权限
+/**
+ * 创建权限参数接口
+ * 包含权限的基本信息、类型、所属模块、父级ID等
+ * 用于创建权限页面的数据提交和操作
+ */
 export interface CreatePermissionParams {
   name: string;
   code?: string;
@@ -256,6 +349,11 @@ export interface CreatePermissionParams {
   parentId?: string;
 }
 
+/**
+ * 创建权限
+ * @param data 创建权限参数
+ * @returns 新创建的权限数据
+ */
 export const createPermission = async (data: CreatePermissionParams): Promise<Permission> => {
   if (USE_MOCK_DATA) {
     console.log('Mock create permission:', data);
@@ -274,7 +372,12 @@ export const createPermission = async (data: CreatePermissionParams): Promise<Pe
   return response;
 };
 
-// 更新权限
+/**
+ * 更新权限信息
+ * @param permissionId 权限ID
+ * @param data 更新的权限数据
+ * @returns Promise<void>
+ */
 export const updatePermission = async (permissionId: string, data: Partial<CreatePermissionParams>): Promise<void> => {
   if (USE_MOCK_DATA) {
     console.log('Mock update permission:', permissionId, data);
@@ -283,7 +386,11 @@ export const updatePermission = async (permissionId: string, data: Partial<Creat
   await request.put(`${API_PATHS.USER.PERMISSION_UPDATE}/${permissionId}`, data);
 };
 
-// 删除权限
+/**
+ * 删除权限
+ * @param permissionId 权限ID
+ * @returns Promise<void>
+ */
 export const deletePermission = async (permissionId: string): Promise<void> => {
   if (USE_MOCK_DATA) {
     console.log('Mock delete permission:', permissionId);
@@ -294,6 +401,11 @@ export const deletePermission = async (permissionId: string): Promise<void> => {
 
 // ==================== 身份（角色）管理 ====================
 
+/**
+ * 身份（角色）实体接口
+ * 包含身份的基本信息、权限列表、系统标识等
+ * 用于身份管理页面的数据展示和操作
+ */
 export interface Identity {
   id: string;
   name: string;
@@ -322,7 +434,11 @@ export interface IdentityListResponse {
   pageSize: number;
 }
 
-// 获取身份列表
+/**
+ * 获取身份列表
+ * @param params 查询参数，包含分页、关键词、状态、系统标识等
+ * @returns 身份列表响应数据
+ */
 export const getIdentityList = async (params: IdentityListParams): Promise<IdentityListResponse> => {
   if (USE_MOCK_DATA) {
     return mockApi.getIdentityList(params);
@@ -331,7 +447,11 @@ export const getIdentityList = async (params: IdentityListParams): Promise<Ident
   return response;
 };
 
-// 获取身份详情
+/**
+ * 获取身份详情
+ * @param identityId 身份ID
+ * @returns 身份详情数据
+ */
 export const getIdentityDetail = async (identityId: string): Promise<Identity> => {
   if (USE_MOCK_DATA) {
     const identity = mockIdentities.find(i => i.id === identityId);
@@ -342,7 +462,11 @@ export const getIdentityDetail = async (identityId: string): Promise<Identity> =
   return response;
 };
 
-// 创建身份
+/**
+ * 创建身份参数接口
+ * 包含身份的基本信息、权限ID列表等
+ * 用于创建身份页面的数据提交和操作
+ */
 export interface CreateIdentityParams {
   name: string;
   code: string;
@@ -350,6 +474,11 @@ export interface CreateIdentityParams {
   permissionIds?: string[];
 }
 
+/**
+ * 创建身份
+ * @param data 创建身份参数
+ * @returns 新创建的身份数据
+ */
 export const createIdentity = async (data: CreateIdentityParams): Promise<Identity> => {
   if (USE_MOCK_DATA) {
     console.log('Mock create identity:', data);
@@ -359,19 +488,24 @@ export const createIdentity = async (data: CreateIdentityParams): Promise<Identi
       code: data.code,
       description: data.description,
       isSystem: false,
-      status: 'ACTIVE',
-      createdAt: new Date().toISOString(),
-      creatorId: 'admin_1',
-      creatorName: '超级管理员',
-      permissions: [],
-    };
-    return Promise.resolve(newIdentity);
-  }
-  const response = await request.post<Identity>(API_PATHS.USER.IDENTITY_CREATE, data);
-  return response;
+  status: 'ACTIVE',
+  createdAt: new Date().toISOString(),
+  creatorId: 'admin_1',
+  creatorName: '超级管理员',
+  permissions: [],
+};
+return Promise.resolve(newIdentity);
+}
+const response = await request.post<Identity>(API_PATHS.USER.IDENTITY_CREATE, data);
+return response;
 };
 
-// 更新身份
+/**
+ * 更新身份信息
+ * @param identityId 身份ID
+ * @param data 更新的身份数据
+ * @returns Promise<void>
+ */
 export const updateIdentity = async (identityId: string, data: Partial<CreateIdentityParams>): Promise<void> => {
   if (USE_MOCK_DATA) {
     console.log('Mock update identity:', identityId, data);
@@ -380,7 +514,11 @@ export const updateIdentity = async (identityId: string, data: Partial<CreateIde
   await request.put(`${API_PATHS.USER.IDENTITY_UPDATE}/${identityId}`, data);
 };
 
-// 删除身份
+/**
+ * 删除身份
+ * @param identityId 身份ID
+ * @returns Promise<void>
+ */
 export const deleteIdentity = async (identityId: string): Promise<void> => {
   if (USE_MOCK_DATA) {
     console.log('Mock delete identity:', identityId);
@@ -389,7 +527,12 @@ export const deleteIdentity = async (identityId: string): Promise<void> => {
   await request.delete(`${API_PATHS.USER.IDENTITY_DELETE}/${identityId}`);
 };
 
-// 为身份分配权限
+/**
+ * 为身份分配权限
+ * @param identityId 身份ID
+ * @param permissionIds 权限ID列表
+ * @returns Promise<void>
+ */
 export const assignPermissionsToIdentity = async (identityId: string, permissionIds: string[]): Promise<void> => {
   if (USE_MOCK_DATA) {
     console.log('Mock assign permissions:', identityId, permissionIds);
@@ -398,7 +541,12 @@ export const assignPermissionsToIdentity = async (identityId: string, permission
   await request.post(API_PATHS.USER.IDENTITY_PERMISSION_ASSIGN, { identityId, permissionIds });
 };
 
-// 从身份撤销权限
+/**
+ * 从身份撤销权限
+ * @param identityId 身份ID
+ * @param permissionIds 权限ID列表
+ * @returns Promise<void>
+ */
 export const revokePermissionsFromIdentity = async (identityId: string, permissionIds: string[]): Promise<void> => {
   if (USE_MOCK_DATA) {
     console.log('Mock revoke permissions:', identityId, permissionIds);
@@ -409,7 +557,12 @@ export const revokePermissionsFromIdentity = async (identityId: string, permissi
 
 // ==================== 管理员-身份关联 ====================
 
-// 为管理员分配身份
+/**
+ * 为管理员分配身份
+ * @param adminId 管理员ID
+ * @param identityId 身份ID
+ * @returns Promise<void>
+ */
 export const assignIdentityToAdmin = async (adminId: string, identityId: string): Promise<void> => {
   if (USE_MOCK_DATA) {
     console.log('Mock assign identity to admin:', adminId, identityId);
@@ -418,7 +571,12 @@ export const assignIdentityToAdmin = async (adminId: string, identityId: string)
   await request.post(API_PATHS.USER.ADMIN_IDENTITY_ASSIGN, { adminId, identityId });
 };
 
-// 从管理员撤销身份
+/**
+ * 从管理员撤销身份
+ * @param adminId 管理员ID
+ * @param identityId 身份ID
+ * @returns Promise<void>
+ */
 export const revokeIdentityFromAdmin = async (adminId: string, identityId: string): Promise<void> => {
   if (USE_MOCK_DATA) {
     console.log('Mock revoke identity from admin:', adminId, identityId);
@@ -429,6 +587,11 @@ export const revokeIdentityFromAdmin = async (adminId: string, identityId: strin
 
 // ==================== 在线管理 ====================
 
+/**
+ * 在线用户实体接口
+ * 包含在线用户的基本信息、登录设备信息、会话信息等
+ * 用于在线管理页面的数据展示和操作
+ */
 export interface OnlineUser {
   id: string;
   userId: string;
@@ -462,7 +625,10 @@ export interface OnlineListResponse {
   totalAdmins: number;
 }
 
-// 获取在线用户列表
+/**
+ * 获取在线用户列表
+ * @returns 在线用户列表响应数据
+ */
 export const getOnlineList = async (): Promise<OnlineListResponse> => {
   if (USE_MOCK_DATA) {
     return mockApi.getOnlineList();
@@ -471,7 +637,12 @@ export const getOnlineList = async (): Promise<OnlineListResponse> => {
   return response;
 };
 
-// 强制下线
+/**
+ * 强制下线
+ * @param sessionId 会话ID
+ * @param userType 用户类型
+ * @returns Promise<void>
+ */
 export const forceLogout = async (sessionId: string, userType: 'USER' | 'ADMIN'): Promise<void> => {
   if (USE_MOCK_DATA) {
     console.log('Mock force logout:', sessionId, userType);
@@ -482,6 +653,11 @@ export const forceLogout = async (sessionId: string, userType: 'USER' | 'ADMIN')
 
 // ==================== 登录记录 ====================
 
+/**
+ * 登录记录实体接口
+ * 包含用户登录的基本信息、设备信息、登录状态等
+ * 用于登录记录管理页面的数据展示和操作
+ */
 export interface LoginRecord {
   id: string;
   userId: string;
@@ -513,7 +689,11 @@ export interface LoginRecordResponse {
   pageSize: number;
 }
 
-// 获取登录记录
+/**
+ * 获取登录记录
+ * @param params 查询参数，包含分页、账号、设备类型、时间范围、用户类型等
+ * @returns 登录记录响应数据
+ */
 export const getLoginRecords = async (params: LoginRecordParams): Promise<LoginRecordResponse> => {
   if (USE_MOCK_DATA) {
     return mockApi.getLoginRecords(params);
@@ -524,6 +704,11 @@ export const getLoginRecords = async (params: LoginRecordParams): Promise<LoginR
 
 // ==================== 商品专区 ====================
 
+/**
+ * 商品分类实体接口
+ * 包含商品分类的基本信息、父子关系、状态等
+ * 用于商品分类管理页面的数据展示和操作
+ */
 export interface ProductCategory {
   id: string;
   name: string;
