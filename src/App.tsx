@@ -14,7 +14,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/not-permission" element={<NotAuthorized />} />
-        <Route path="/" element={<MainLayout />}>
+        <Route path="/" element={<PrivateRoute><MainLayout /></PrivateRoute>}>
           <Route index element={<Index />} />
           <Route path="*" element={<NotFound />} />
           {/* 请在这里注册路由 */}
