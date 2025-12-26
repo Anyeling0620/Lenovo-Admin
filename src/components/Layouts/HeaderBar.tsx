@@ -1,6 +1,6 @@
 // src/components/HeaderBar.tsx
 import React, { useState, useContext, useRef, useEffect } from 'react';
-import { Layout, Button, Typography, Avatar, Dropdown, Input, Badge, Popover, Space, Tag, message } from 'antd';
+import { Layout, Button, Typography, Avatar, Dropdown, Input, Badge, Popover, Space, Tag } from 'antd';
 import {
     MenuFoldOutlined, // 收起图标
     MenuUnfoldOutlined, // 展开图标

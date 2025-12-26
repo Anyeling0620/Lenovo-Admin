@@ -1,6 +1,7 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { hasPermission } from '../utils/permission';
+import useAuthStore from '../store/auth';
+// import { hasPermission } from '../utils/permission';
 
 interface PrivateRouteProps {
   children: React.ReactNode;
@@ -11,17 +12,17 @@ interface PrivateRouteProps {
  */
 const PrivateRoute: React.FC<PrivateRouteProps> = ({ children }) => {
 
-  const isLogin = true
-  const userRole = 'admin' 
+  const isLogin = useAuthStore(state => state.isAuthenticated)
+  // const userRole = 'admin' 
 
   const location = useLocation();
 
   if (!isLogin) {
     return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   }
-  if(!hasPermission(location.pathname, userRole)){
-    return <Navigate to="/not-permission" replace />;
-  }
+  // if(!hasPermission(location.pathname, userRole)){
+  //   return <Navigate to="/not-permission" replace />;
+  // }
 
   return <>{children}</>;
 };

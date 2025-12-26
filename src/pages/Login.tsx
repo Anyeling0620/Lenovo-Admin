@@ -10,17 +10,17 @@ const Login = () => {
   const handleLogin = async (values: { account: string; password: string }) => {
     try {
       await adminLogin(values);
-
       window.dispatchEvent(new Event('login'));
       globalMessage.success('登录成功！');
-
       navigate(fromPath, { replace: true });
     } catch (error) {
       globalErrorHandler.handle(error,globalMessage.error)
     }
   };
   return (
-    <button onClick={()=>handleLogin({account:'admin',password:'123456'})}>Login</button >
+  <div className='flex justify-center items-center py-40'>
+    <button onClick={()=>handleLogin({account:'12345678901234567890',password:'123456'})} className='bg-gray-500 text-white mx-auto my-auto'>Login</button >
+  </div>
   )
 }
 
