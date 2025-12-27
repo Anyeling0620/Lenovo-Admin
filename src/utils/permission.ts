@@ -76,6 +76,6 @@ export enum CSTEGORY {
   TABLET = "TABLET",
   /** 手机 */
   PHONE = "PHONE",
-  /** 服务类（如售后、技术支持等） */
+  /** 服务类 */
   SERVICE = "SERVICE",
 }

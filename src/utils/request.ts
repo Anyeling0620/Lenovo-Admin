@@ -73,6 +73,15 @@ const request = {
             ...config
         })
     },
+
+    uploadPatch<T>(url: string, data: FormData, config?: RequestConfig): Promise<T> {
+        return service.patch(url, data, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            },
+            ...config
+        })
+    },
 }
 
 export default request

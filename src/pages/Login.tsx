@@ -1,7 +1,7 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { adminLogin } from '../services/auth';
 import globalErrorHandler from '../utils/globalAxiosErrorHandler';
 import { globalMessage } from '../utils/globalMessage';
+import { adminLogin } from '../services/api';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -18,8 +18,8 @@ const Login = () => {
     }
   };
   return (
-  <div className='flex justify-center items-center py-40'>
-    <button onClick={()=>handleLogin({account:'12345678901234567890',password:'123456'})} className='bg-gray-500 text-white mx-auto my-auto'>Login</button >
+  <div className='flex justify-center items-center '>
+    <button onClick={()=>handleLogin({account:'12345678901234567890',password:'123456'})} className='bg-gray-500 text-white  my-auto'>Login</button >
   </div>
   )
 }

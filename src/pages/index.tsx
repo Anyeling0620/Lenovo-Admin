@@ -1,7 +1,3 @@
-import React from 'react'
-import { globalMessage } from '../utils/globalMessage'
-
-
 
 const Index = () => {
 
