@@ -1,7 +1,3 @@
-import React from 'react'
-import { globalMessage } from '../utils/globalMessage'
-
-
 
 const Index = () => {
 
@@ -35,16 +31,18 @@ const str2 = `
         至少携带两个参数，第一个是catch捕获的error，第二个是全局消息提示globalMessage.error()方法。
         <br />
         使用示例：
-        {str1}
+        <text className=' text-red-500' >{str1}</text>
         <br />
         在其他地方想使用消息提示：
         {str2}
         <br />
-        此项目尽量使用antd组件库；
+        img标签只要是渲染后端返回图片的，一律使用utils文件夹里的图片url处理工具函数<text className='text-red-500'>getImageUrl(imgName:string)</text>。
+        <br/>
+        此项目尽量使用<text className=' text-red-500' >antd组件库</text>；
         <br />
         此项目含有大量表单设计，对于表单，请使用zod进行表单验证，使用react-form-hooks库设计表单
         <br />
-        禁止使用对话框/模态框设计表单。
+        <text className=' text-red-500' >禁止使用对话框/模态框设计表单</text>。
         请重新写一个页面进行表单设计。提交表单后使用Link返回原页面即可。
         <br />
         页面内容信息显示量要大，紧凑。padding和margin不要太大。
@@ -58,6 +56,10 @@ const str2 = `
         <br />
         请不要修改Layouts文件夹现有代码。
         大家请在各个模块下新建文件夹，命名为自己的名字缩写或者其他标识，只要能辩认出是你负责的代码即可，用于保存自己负责的代码。
+
+        <br />
+        <text className=' text-red-500' >请认真完成，后面需要自己调试，除非是我后端的问题，否则不再插手前端。</text>
+
 
       </pre>
     </div>

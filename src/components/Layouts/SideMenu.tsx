@@ -4,9 +4,9 @@ import {
     DashboardOutlined,
     DesktopOutlined,
     ShoppingOutlined,
-    FileTextOutlined,
+    // FileTextOutlined,
     UserOutlined,
-    CustomerServiceOutlined,
+    // CustomerServiceOutlined,
     PhoneOutlined,
     SettingOutlined,
     BellOutlined,
@@ -14,7 +14,7 @@ import {
 } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import { configContext } from './ConfigContext';
-import { hasPermission, type UserRole } from '../../utils/permission';
+// import { hasPermission, type UserRole } from '../../utils/permission';
 
 const { Sider } = Layout;
 
@@ -139,26 +139,26 @@ const _menuItems: MenuItem[] = [
 
 
 // 权限过滤函数：根据用户角色过滤菜单项
-const filterMenuItems = (items: MenuItem[], userRole: UserRole): MenuItem[] => {
-    return items.filter(item => {
-        // 1. 有路径的菜单项：检查权限
-        if (item.path) {
-            const hasPerm = hasPermission(item.path, userRole);
-            // 如果有子项，递归过滤子项
-            if (hasPerm && item.children) {
-                item.children = filterMenuItems(item.children, userRole);
-            }
-            return hasPerm;
-        }
-        // 2. 无路径的父菜单项（仅包含子项）：递归过滤子项，若子项为空则隐藏
-        if (item.children) {
-            item.children = filterMenuItems(item.children, userRole);
-            return item.children.length > 0;
-        }
-        // 3. 无路径无子项的菜单项：默认隐藏
-        return false;
-    });
-};
+// const filterMenuItems = (items: MenuItem[], userRole: UserRole): MenuItem[] => {
+//     return items.filter(item => {
+//         // 1. 有路径的菜单项：检查权限
+//         if (item.path) {
+//             const hasPerm = hasPermission(item.path, userRole);
+//             // 如果有子项，递归过滤子项
+//             if (hasPerm && item.children) {
+//                 item.children = filterMenuItems(item.children, userRole);
+//             }
+//             return hasPerm;
+//         }
+//         // 2. 无路径的父菜单项（仅包含子项）：递归过滤子项，若子项为空则隐藏
+//         if (item.children) {
+//             item.children = filterMenuItems(item.children, userRole);
+//             return item.children.length > 0;
+//         }
+//         // 3. 无路径无子项的菜单项：默认隐藏
+//         return false;
+//     });
+// };
 
 const SideMenu: React.FC = () => {
     const { collapsed, triggerRefresh } = useContext(configContext);

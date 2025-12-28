@@ -1,6 +1,6 @@
 // src/components/HeaderBar.tsx
 import React, { useState, useContext, useRef, useEffect } from 'react';
-import { Layout, Button, Typography, Avatar, Dropdown, Input, Badge, Popover, Space, Tag, message } from 'antd';
+import { Layout, Button, Typography, Avatar, Dropdown, Input, Badge, Popover, Space, Tag } from 'antd';
 import {
     MenuFoldOutlined, // 收起图标
     MenuUnfoldOutlined, // 展开图标
@@ -18,9 +18,9 @@ import { Link } from 'react-router-dom';
 import type { MenuItemType } from 'antd/es/menu/interface';
 import { configContext } from './ConfigContext';
 import { useNavigate } from 'react-router-dom';
-import { logout } from '../../services/auth';
 import globalErrorHandler from '../../utils/globalAxiosErrorHandler';
 import { globalMessage } from '../../utils/globalMessage';
+import { adminLogout } from '../../services/api';
 
 const { Header } = Layout;
 const { Text, Title } = Typography;
@@ -125,7 +125,7 @@ const HeaderBar: React.FC = () => {
     // 退出登录处理函数
     const handleLogout = async () => {
         try {
-            await logout();
+            await adminLogout();
             window.dispatchEvent(new CustomEvent('logout'));
         } catch (error) {
             globalErrorHandler.handle(error, globalMessage.error);

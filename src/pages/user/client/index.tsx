@@ -582,4 +582,4 @@ const ClientUserManagement: React.FC = () => {
   );
 };
 
-export default ClientUser
+export default ClientUserManagement
