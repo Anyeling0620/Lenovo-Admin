@@ -28,7 +28,7 @@ jobs:
       - name: Build Project
         run: |
           export NODE_OPTIONS="--max-old-space-size=1024"
-          pnpm build
+          pnpm vite build
 
       # 部署到 Web 根目录
       - name: Deploy to Web Root
