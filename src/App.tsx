@@ -7,6 +7,8 @@ import Index from "./pages/index.tsx";
 import NotFound from "./pages/404.tsx";
 import PrivateRoute from "./components/PrivateRoute.tsx";
 import NotAuthorized from "./pages/403.tsx";
+import DashboardPage from "./pages/Lei/Dashboard";
+import WorkbenchPage from "./pages/Lei/Workbench";
 
 // 用户管理相关页面
 import ClientUserManagement from "./pages/user/client/index.tsx";
@@ -22,6 +24,8 @@ export default function App() {
         <Route path="/not-permission" element={<NotAuthorized />} />
         <Route path="/" element={<PrivateRoute><MainLayout /></PrivateRoute>}>
           <Route index element={<Index />} />
+          <Route path="/dashboard" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
+          <Route path="/workbench" element={<PrivateRoute><WorkbenchPage /></PrivateRoute>} />
           <Route path="*" element={<NotFound />} />
           
           {/* 用户管理路由 */}
