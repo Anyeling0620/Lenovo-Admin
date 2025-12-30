@@ -20,13 +20,16 @@ const service: AxiosInstance = axios.create({
 })
 service.interceptors.request.use(
     (config: InternalAxiosRequestConfig) => {
-        if(!config.url?.startsWith('http')){
-            config.url = '/admin' + config.url
+        // 如果 url 不以 http 开头，且不以 /admin 开头，才添加前缀
+        if (config.url && !config.url.startsWith('http')) {
+            if (!config.url.startsWith('/admin')) {
+                config.url = '/admin' + config.url;
+            }
         }
-        return config
+        return config;
     },
     (error) => Promise.reject(error)
-)
+);
 service.interceptors.response.use(
     <T>(response: AxiosResponse<ApiResponse<T>>) => {
         const { code, data, message } = response.data
