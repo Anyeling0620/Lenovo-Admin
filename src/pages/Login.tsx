@@ -9,19 +9,19 @@ const Login = () => {
   const fromPath = (location.state as { from?: string })?.from || '/';
   const handleLogin = async (values: { account: string; password: string }) => {
     try {
-      console.log('[Login] 正在请求登录...', { account: values.account });
+      console.warn('[LOGIN START] 正在请求登录，已配置 45 秒超时...', { account: values.account });
       const response = await adminLogin(values);
-      console.log('[Login] 登录响应:', response);
+      console.log('[LOGIN SUCCESS] 登录响应:', response);
       // 存储 sessionId 到 localStorage 作为备选认证（当 cookie 被 Cloudflare 过滤时）
       if (response && 'sessionId' in response && typeof response.sessionId === 'string') {
         localStorage.setItem('admin_sessionId', response.sessionId);
-        console.log('[Login] sessionId 已存储');
+        console.log('[LOGIN] sessionId 已存储到 localStorage');
       }
       window.dispatchEvent(new Event('login'));
       globalMessage.success('登录成功！');
       navigate(fromPath, { replace: true });
     } catch (error) {
-      console.error('[Login] 登录失败:', error);
+      console.error('[LOGIN FAILED]', error);
       globalErrorHandler.handle(error, globalMessage.error)
     }
   };

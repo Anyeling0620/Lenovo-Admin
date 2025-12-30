@@ -14,11 +14,12 @@ import axios, {
 } from 'axios'
 
 const apiBaseURL = import.meta.env.VITE_API_BASE_URL;
-console.log('[API] Base URL:', apiBaseURL, 'Environment:', import.meta.env.MODE);
+console.log('[API CONFIG] Base URL:', apiBaseURL, 'Environment:', import.meta.env.MODE);
+console.warn('[API CONFIG] ⚠️ AXIOS TIMEOUT SET TO 45 SECONDS FOR TIDB CLOUD LATENCY');
 
 const service: AxiosInstance = axios.create({
     baseURL: apiBaseURL,
-    timeout: 30000,  // 增加到 30 秒，给云服务器更多响应时间
+    timeout: 45000,  // 增加到 45 秒，充分覆盖 TiDB Cloud 远程查询延迟
     withCredentials: true // ⭐ 关键：携带 HttpOnly Cookie（session）
 })
 service.interceptors.request.use(
