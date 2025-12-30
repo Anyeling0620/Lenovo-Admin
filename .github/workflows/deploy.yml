@@ -27,6 +27,7 @@ jobs:
       # 限制打包内存，防止卡死服务器
       - name: Build Project
         run: |
+          rm -rf dist # 强制删除旧构建目录
           export NODE_OPTIONS="--max-old-space-size=1024"
           pnpm vite build
 
