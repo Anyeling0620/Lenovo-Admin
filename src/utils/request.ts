@@ -13,9 +13,12 @@ import axios, {
     type InternalAxiosRequestConfig
 } from 'axios'
 
+const apiBaseURL = import.meta.env.VITE_API_BASE_URL;
+console.log('[API] Base URL:', apiBaseURL, 'Environment:', import.meta.env.MODE);
+
 const service: AxiosInstance = axios.create({
-    baseURL: import.meta.env.VITE_API_BASE_URL,
-    timeout: 10000,
+    baseURL: apiBaseURL,
+    timeout: 30000,  // 增加到 30 秒，给云服务器更多响应时间
     withCredentials: true // ⭐ 关键：携带 HttpOnly Cookie（session）
 })
 service.interceptors.request.use(
@@ -26,6 +29,14 @@ service.interceptors.request.use(
                 config.url = '/admin' + config.url;
             }
         }
+        
+        // 完整 URL 用于调试
+        const fullUrl = (config.baseURL || '') + (config.url || '');
+        console.log('[API] Request:', {
+            method: config.method?.toUpperCase(),
+            url: fullUrl,
+            timeout: config.timeout
+        });
         
         // 当 cookie 被过滤时，使用 localStorage 中的 sessionId 作为备选认证
         const sessionId = localStorage.getItem('admin_sessionId');
