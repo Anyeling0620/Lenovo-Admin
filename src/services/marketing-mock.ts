@@ -1,0 +1,173 @@
+import type {
+  CouponCenterRequest,
+  CouponCenterResponse,
+  CouponCreateRequest,
+  CouponResponse,
+  CouponStatsResponse,
+  CouponUserResponse
+} from './api-type';
+
+const delay = (ms = 220) => new Promise(resolve => setTimeout(resolve, ms));
+
+const mockCoupons: CouponResponse[] = [
+  {
+    coupon_id: 'coupon_1001',
+    name: '新人满减50',
+    type: '满减券',
+    amount: 50,
+    discount: 0,
+    threshold: 299,
+    start_time: '2025-01-01T00:00:00Z',
+    expire_time: '2025-03-31T23:59:59Z',
+    is_stackable: true,
+    center: null,
+    products: [],
+  },
+  {
+    coupon_id: 'coupon_1002',
+    name: '老客9折券',
+    type: '折扣券',
+    amount: 0,
+    discount: 9,
+    threshold: 199,
+    start_time: '2025-02-01T00:00:00Z',
+    expire_time: '2025-04-30T23:59:59Z',
+    is_stackable: false,
+    center: null,
+    products: [],
+  },
+  {
+    coupon_id: 'coupon_1003',
+    name: '配件满200减30',
+    type: '满减券',
+    amount: 30,
+    discount: 0,
+    threshold: 200,
+    start_time: '2024-12-20T00:00:00Z',
+    expire_time: '2025-02-28T23:59:59Z',
+    is_stackable: true,
+    center: null,
+    products: [],
+  },
+];
+
+const mockCenters: CouponCenterResponse[] = [
+  {
+    coupon_center_id: 'center_1',
+    coupon_id: 'coupon_1001',
+    coupon_name: '新人满减50',
+    start_time: '2025-01-01T00:00:00Z',
+    end_time: '2025-03-31T23:59:59Z',
+    total_num: 5000,
+    limit_num: 1,
+  },
+  {
+    coupon_center_id: 'center_2',
+    coupon_id: 'coupon_1002',
+    coupon_name: '老客9折券',
+    start_time: '2025-02-01T00:00:00Z',
+    end_time: '2025-04-15T23:59:59Z',
+    total_num: 2000,
+    limit_num: 2,
+  },
+];
+
+mockCoupons.forEach(coupon => {
+  const center = mockCenters.find(item => item.coupon_id === coupon.coupon_id);
+  coupon.center = center ?? null;
+});
+
+const mockCouponUsers: Record<string, CouponUserResponse[]> = {
+  coupon_1001: Array.from({ length: 6 }).map((_, index) => ({
+    user_coupon_id: `u-c1-${index + 1}`,
+    user_id: `user_${index + 1}`,
+    user_account: `user${index + 1}@mail.com`,
+    status: index % 2 === 0 ? 'USED' : 'NOT_USED',
+    receive_time: '2025-01-05T10:00:00Z',
+    use_time: index % 2 === 0 ? '2025-01-12T09:30:00Z' : null,
+    order_id: index % 2 === 0 ? `order_${1000 + index}` : null,
+    actual_amount: index % 2 === 0 ? 249 : 0,
+  })),
+  coupon_1002: Array.from({ length: 4 }).map((_, index) => ({
+    user_coupon_id: `u-c2-${index + 1}`,
+    user_id: `vip_${index + 1}`,
+    user_account: `vip${index + 1}@lenovo.com`,
+    status: 'NOT_USED',
+    receive_time: '2025-02-03T12:20:00Z',
+    use_time: null,
+    order_id: null,
+    actual_amount: 0,
+  })),
+  coupon_1003: [],
+};
+
+const mockCouponStats: Record<string, CouponStatsResponse> = {
+  coupon_1001: { total: 5000, used: 1730, unused: 3270 },
+  coupon_1002: { total: 2000, used: 320, unused: 1680 },
+  coupon_1003: { total: 800, used: 95, unused: 705 },
+};
+
+export const marketingMock = {
+  async listCoupons(): Promise<CouponResponse[]> {
+    await delay();
+    return mockCoupons.map(item => ({ ...item }));
+  },
+  async listCouponCenters(): Promise<CouponCenterResponse[]> {
+    await delay();
+    return mockCenters.map(item => ({ ...item }));
+  },
+  async getCouponDetail(couponId: string): Promise<CouponResponse | null> {
+    await delay();
+    const found = mockCoupons.find(item => item.coupon_id === couponId);
+    return found ? { ...found } : null;
+  },
+  async createCoupon(payload: CouponCreateRequest): Promise<{ coupon_id: string }> {
+    await delay();
+    const newId = `coupon_${Date.now()}`;
+    mockCoupons.unshift({
+      coupon_id: newId,
+      name: payload.name,
+      type: payload.type,
+      amount: Number(payload.amount || 0),
+      discount: Number(payload.discount || 0),
+      threshold: Number(payload.threshold || 0),
+      start_time: payload.start_time,
+      expire_time: payload.expire_time,
+      is_stackable: Boolean(payload.is_stackable),
+      center: null,
+      products: [],
+    });
+    return { coupon_id: newId };
+  },
+  async listCouponUsers(couponId: string): Promise<CouponUserResponse[]> {
+    await delay();
+    return (mockCouponUsers[couponId] || []).map(item => ({ ...item }));
+  },
+  async getCouponStats(couponId: string): Promise<CouponStatsResponse> {
+    await delay();
+    return mockCouponStats[couponId] ?? { total: 0, used: 0, unused: 0 };
+  },
+  async setCouponCenter(payload: CouponCenterRequest): Promise<{ coupon_center_id: string }> {
+    await delay();
+    const existing = mockCenters.find(center => center.coupon_id === payload.coupon_id);
+    const id = existing?.coupon_center_id ?? `center_${Date.now()}`;
+    const nextCenter: CouponCenterResponse = {
+      coupon_center_id: id,
+      coupon_id: payload.coupon_id,
+      coupon_name: mockCoupons.find(item => item.coupon_id === payload.coupon_id)?.name,
+      start_time: payload.start_time,
+      end_time: payload.end_time,
+      total_num: payload.total_num,
+      limit_num: payload.limit_num,
+    };
+    if (existing) {
+      Object.assign(existing, nextCenter);
+    } else {
+      mockCenters.unshift(nextCenter);
+    }
+    mockCoupons.forEach(coupon => {
+      coupon.center = coupon.coupon_id === payload.coupon_id ? nextCenter : coupon.center;
+    });
+    return { coupon_center_id: id };
+  },
+};

@@ -11,6 +11,7 @@ export const routeNameMap: Record<string, string> = {
   '/goods/new': '新品专区',
   '/goods/seckill': '商品秒杀专场',
   '/coupon/manage': '优惠券管理',
+  '/coupon/manage/create': '新建优惠券',
   '/coupon/cash': '代金券管理',
   '/broadcast': '广播通知',
   '/bill': '账单管理',

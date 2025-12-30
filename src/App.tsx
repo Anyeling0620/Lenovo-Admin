@@ -13,6 +13,8 @@ import ClientUserManagement from "./pages/user/client/index.tsx";
 import AdminListPage from "./pages/user/admin/list.tsx";
 import PermissionManagement from "./pages/user/permission/index.tsx";
 import OnlineManagement from "./pages/user/online/index.tsx";
+import CouponManage from "./pages/coupon/copilot/CouponManage.tsx";
+import CouponCreate from "./pages/coupon/copilot/CouponCreate.tsx";
 
 export default function App() {
   return (
@@ -29,6 +31,10 @@ export default function App() {
           <Route path="/user/admin/list" element={<PrivateRoute><AdminListPage /></PrivateRoute>} />
           <Route path="/user/admin/permission" element={<PrivateRoute><PermissionManagement /></PrivateRoute>} />
           <Route path="/user/admin/online" element={<PrivateRoute><OnlineManagement /></PrivateRoute>} />
+
+          {/* 营销管理 - 福利中心 */}
+          <Route path="/coupon/manage" element={<PrivateRoute><CouponManage /></PrivateRoute>} />
+          <Route path="/coupon/manage/create" element={<PrivateRoute><CouponCreate /></PrivateRoute>} />
 
           {/* 其他路由可以在这里继续添加 */}
 
