@@ -9,7 +9,11 @@ const Login = () => {
   const fromPath = (location.state as { from?: string })?.from || '/';
   const handleLogin = async (values: { account: string; password: string }) => {
     try {
-      await adminLogin(values);
+      const response = await adminLogin(values);
+      // 存储 sessionId 到 localStorage 作为备选认证（当 cookie 被 Cloudflare 过滤时）
+      if (response && 'sessionId' in response && typeof response.sessionId === 'string') {
+        localStorage.setItem('admin_sessionId', response.sessionId);
+      }
       window.dispatchEvent(new Event('login'));
       globalMessage.success('登录成功！');
       navigate(fromPath, { replace: true });

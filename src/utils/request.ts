@@ -26,6 +26,13 @@ service.interceptors.request.use(
                 config.url = '/admin' + config.url;
             }
         }
+        
+        // 当 cookie 被过滤时，使用 localStorage 中的 sessionId 作为备选认证
+        const sessionId = localStorage.getItem('admin_sessionId');
+        if (sessionId) {
+            config.headers['X-Session-ID'] = sessionId;
+        }
+        
         return config;
     },
     (error) => Promise.reject(error)
