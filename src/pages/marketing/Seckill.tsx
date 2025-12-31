@@ -60,14 +60,8 @@ const Seckill: React.FC = () => {
     setLoading(true);
     try {
       const res = await getSeckillRounds();
-      // 基础数据（如果后端不返回商品列表，先用空）
-      setRounds(res.map(item => ({ ...item, products: [] })));
-      try {
-        const mockRes = await marketingMock.listSeckillRounds();
-        setRounds(mockRes);
-      } catch (mockErr) {
-        globalErrorHandler.handle(mockErr, globalMessage.error);
-      }
+      // 如果后端未返回商品/配置，补空数组保持 UI 正常
+      setRounds(res.map(item => ({ ...item, products: (item as any).products || [] })));
     } catch (error) {
       globalErrorHandler.handle(error, globalMessage.error);
       const mockRes = await marketingMock.listSeckillRounds();
