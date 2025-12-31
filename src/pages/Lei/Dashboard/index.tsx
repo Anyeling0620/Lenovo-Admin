@@ -1,6 +1,24 @@
-import { useMemo, useState } from "react";
-import { Card, Col, Row, Segmented, Space, Statistic, Tag, Typography, Divider, Tooltip, Badge } from "antd";
+import { useEffect, useMemo, useState } from "react";
+import { Card, Col, Row, Segmented, Space, Statistic, Tag, Typography, Divider, Badge, Button } from "antd";
 import { AdminRole } from "../../../utils/permission";
+import {
+  getProductStats,
+  getShelfStats,
+  getStocks,
+  getOrders,
+  getAfterSales,
+  getComplaints,
+  getCoupons,
+  getVouchers,
+  getSeckillRounds,
+  getAdmins,
+  getOnlineAdmins,
+  getIdentitiesWithPermissions,
+  getPermissionMenu,
+  getServiceSessions,
+} from "../../../services/api";
+import globalErrorHandler from "../../../utils/globalAxiosErrorHandler";
+import { globalMessage } from "../../../utils/globalMessage";
 
 type DashboardSection = {
   key: string;
@@ -155,10 +173,168 @@ const Sparkline = ({ data, width = 420, height = 140 }: { data: { label: string;
 const DashboardPage = () => {
   const [activeRole, setActiveRole] = useState<AdminRole>(AdminRole.SUPER_ADMIN);
   const [trendPeriod, setTrendPeriod] = useState<TrendPeriod>("daily");
+  const [loading, setLoading] = useState(false);
+  const [data, setData] = useState({
+    productStats: { total: 0, normal: 0, off: 0, deleted: 0 },
+    shelfCount: 0,
+    lowStock: 0,
+    orders: 0,
+    pendingShip: 0,
+    afterSales: 0,
+    complaints: 0,
+    coupons: 0,
+    vouchers: 0,
+    seckillRounds: 0,
+    admins: 0,
+    onlineAdmins: 0,
+    identities: 0,
+    permissions: 0,
+    serviceSessions: 0,
+  });
+
+  const fetchDashboardData = async () => {
+    setLoading(true);
+    try {
+      const [
+        productStatsRes,
+        shelfStatsRes,
+        stocksRes,
+        ordersRes,
+        afterSalesRes,
+        complaintsRes,
+        couponsRes,
+        vouchersRes,
+        seckillRoundsRes,
+        adminsRes,
+        onlineAdminsRes,
+        identitiesRes,
+        permissionsRes,
+        serviceSessionsRes,
+      ] = await Promise.all([
+        getProductStats(),
+        getShelfStats(),
+        getStocks(),
+        getOrders(),
+        getAfterSales(),
+        getComplaints(),
+        getCoupons(),
+        getVouchers(),
+        getSeckillRounds(),
+        getAdmins(),
+        getOnlineAdmins(),
+        getIdentitiesWithPermissions(),
+        getPermissionMenu(),
+        getServiceSessions(),
+      ]);
+
+      const lowStockCount = stocksRes.filter(
+        (s: any) => typeof s.warn_num === "number" && typeof s.stock_num === "number" && s.stock_num <= s.warn_num
+      ).length;
+      const pendingShipCount = ordersRes.filter((o: any) => {
+        const status = (o.status || "").toString().toLowerCase();
+        return status === "pending_ship" || status === "待发货";
+      }).length;
+
+      setData({
+        productStats: {
+          total: productStatsRes.total,
+          normal: productStatsRes.normal,
+          off: productStatsRes.off,
+          deleted: productStatsRes.deleted,
+        },
+        shelfCount: shelfStatsRes.length,
+        lowStock: lowStockCount,
+        orders: ordersRes.length,
+        pendingShip: pendingShipCount,
+        afterSales: afterSalesRes.length,
+        complaints: complaintsRes.length,
+        coupons: couponsRes.length,
+        vouchers: vouchersRes.length,
+        seckillRounds: seckillRoundsRes.length,
+        admins: adminsRes.length,
+        onlineAdmins: onlineAdminsRes.length,
+        identities: identitiesRes.length,
+        permissions: permissionsRes.length,
+        serviceSessions: serviceSessionsRes.length,
+      });
+      globalMessage.success("数据已刷新");
+    } catch (error) {
+      globalErrorHandler.handle(error, globalMessage.error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const dynamicSections = useMemo<DashboardSection[]>(
+    () => [
+      {
+        key: "order",
+        title: "订单与售后",
+        allowed: [AdminRole.SUPER_ADMIN, AdminRole.SYSTEM_ADMIN, AdminRole.ORDER_MANAGER, AdminRole.AFTER_SALES],
+        apiNote: "接口：GET /admin/orders；GET /admin/after-sales；GET /admin/complaints",
+        stats: [
+          { label: "订单总数", value: data.orders, trend: "" },
+          { label: "待发货", value: data.pendingShip, highlight: true },
+          { label: "售后待处理", value: data.afterSales, highlight: true },
+          { label: "投诉待处理", value: data.complaints, highlight: true },
+        ],
+      },
+      {
+        key: "product",
+        title: "商品与货架",
+        allowed: [AdminRole.SUPER_ADMIN, AdminRole.PRODUCT_MANAGER, AdminRole.WAREHOUSE_MANAGER],
+        apiNote: "接口：GET /admin/products/stats；GET /admin/shelf/stats；GET /admin/stocks",
+        stats: [
+          { label: "商品总数", value: data.productStats.total },
+          { label: "在售", value: data.productStats.normal },
+          { label: "下架", value: data.productStats.off },
+          { label: "低库存告警", value: data.lowStock, highlight: true },
+          { label: "货架条目", value: data.shelfCount },
+        ],
+      },
+      {
+        key: "marketing",
+        title: "营销概览",
+        allowed: [AdminRole.SUPER_ADMIN, AdminRole.SYSTEM_ADMIN, AdminRole.MARKETING],
+        apiNote: "接口：GET /admin/marketing/coupons；/vouchers；/seckill-rounds；/coupons/:id/stats",
+        stats: [
+          { label: "有效优惠券", value: data.coupons },
+          { label: "代金券数", value: data.vouchers },
+          { label: "秒杀场次", value: data.seckillRounds },
+        ],
+      },
+      {
+        key: "system",
+        title: "系统与权限",
+        allowed: [AdminRole.SUPER_ADMIN, AdminRole.SYSTEM_ADMIN],
+        apiNote: "接口：GET /admin/system/admins；/system/identities；/system/permissions；/system/admins/online",
+        stats: [
+          { label: "管理员数", value: data.admins },
+          { label: "在线管理员", value: data.onlineAdmins },
+          { label: "身份数", value: data.identities },
+          { label: "权限点", value: data.permissions },
+        ],
+      },
+      {
+        key: "service",
+        title: "客服概览",
+        allowed: [AdminRole.SUPER_ADMIN, AdminRole.SYSTEM_ADMIN, AdminRole.CUSTOMER_SERVICE],
+        apiNote: "接口：GET /admin/service/sessions；GET /admin/service/sessions/:room_id/messages",
+        stats: [
+          { label: "会话数", value: data.serviceSessions },
+        ],
+      },
+    ],
+    [data]
+  );
 
   const visibleSections = useMemo(
-    () => mockSections.filter((section) => section.allowed.includes(activeRole)),
-    [activeRole]
+    () => dynamicSections.filter((section) => section.allowed.includes(activeRole)),
+    [dynamicSections, activeRole]
   );
 
   return (
@@ -166,13 +342,21 @@ const DashboardPage = () => {
       <Space direction="vertical" size="large" className="w-full">
         <div className="flex items-center justify-between">
           <Title level={3} className="m-0">
-            数据总览（模拟数据）
+            数据总览
           </Title>
-          <Segmented
-            options={identityOptions}
-            value={activeRole}
-            onChange={(val) => setActiveRole(val as AdminRole)}
-          />
+          <Space>
+            <Button size="small" loading={loading} onClick={() => {
+              globalMessage.info("正在刷新数据...");
+              fetchDashboardData();
+            }}>
+              刷新
+            </Button>
+            <Segmented
+              options={identityOptions}
+              value={activeRole}
+              onChange={(val) => setActiveRole(val as AdminRole)}
+            />
+          </Space>
         </div>
 
         <Card
