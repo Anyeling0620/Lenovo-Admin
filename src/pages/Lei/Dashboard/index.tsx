@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Card, Col, Row, Segmented, Space, Statistic, Tag, Typography, Divider, Badge, Button } from "antd";
 import { AdminRole } from "../../../utils/permission";
+import dayjs from "dayjs";
 import {
   getProductStats,
   getShelfStats,
@@ -191,26 +192,16 @@ const DashboardPage = () => {
     permissions: 0,
     serviceSessions: 0,
   });
+  const [orderTrends, setOrderTrends] = useState<Record<TrendPeriod, { label: string; value: number }[]>>({
+    daily: [],
+    monthly: [],
+    quarterly: [],
+  });
 
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      const [
-        productStatsRes,
-        shelfStatsRes,
-        stocksRes,
-        ordersRes,
-        afterSalesRes,
-        complaintsRes,
-        couponsRes,
-        vouchersRes,
-        seckillRoundsRes,
-        adminsRes,
-        onlineAdminsRes,
-        identitiesRes,
-        permissionsRes,
-        serviceSessionsRes,
-      ] = await Promise.all([
+      const settled = await Promise.allSettled([
         getProductStats(),
         getShelfStats(),
         getStocks(),
@@ -227,6 +218,27 @@ const DashboardPage = () => {
         getServiceSessions(),
       ]);
 
+      const pick = <T,>(res: PromiseSettledResult<T>): T | null => {
+        if (res.status === "fulfilled") return res.value;
+        globalErrorHandler.handle(res.reason, globalMessage.error);
+        return null;
+      };
+
+      const productStatsRes = pick(settled[0]) || { total: 0, normal: 0, off: 0, deleted: 0 };
+      const shelfStatsRes = pick(settled[1]) || [];
+      const stocksRes = pick(settled[2]) || [];
+      const ordersRes = pick(settled[3]) || [];
+      const afterSalesRes = pick(settled[4]) || [];
+      const complaintsRes = pick(settled[5]) || [];
+      const couponsRes = pick(settled[6]) || [];
+      const vouchersRes = pick(settled[7]) || [];
+      const seckillRoundsRes = pick(settled[8]) || [];
+      const adminsRes = pick(settled[9]) || [];
+      const onlineAdminsRes = pick(settled[10]) || [];
+      const identitiesRes = pick(settled[11]) || [];
+      const permissionsRes = pick(settled[12]) || [];
+      const serviceSessionsRes = pick(settled[13]) || [];
+
       const lowStockCount = stocksRes.filter(
         (s: any) => typeof s.warn_num === "number" && typeof s.stock_num === "number" && s.stock_num <= s.warn_num
       ).length;
@@ -234,6 +246,33 @@ const DashboardPage = () => {
         const status = (o.status || "").toString().toLowerCase();
         return status === "pending_ship" || status === "待发货";
       }).length;
+
+      // 构造订单趋势（基于 created_at 前端分桶）
+      const dailySeries: { label: string; value: number }[] = [];
+      for (let i = 6; i >= 0; i--) {
+        const day = dayjs().subtract(i, "day");
+        const count = ordersRes.filter((o: any) => dayjs(o.created_at).isSame(day, "day")).length;
+        dailySeries.push({ label: day.format("MM-DD"), value: count });
+      }
+
+      const monthlySeries: { label: string; value: number }[] = [];
+      for (let i = 5; i >= 0; i--) {
+        const month = dayjs().subtract(i, "month");
+        const count = ordersRes.filter((o: any) => dayjs(o.created_at).isSame(month, "month")).length;
+        monthlySeries.push({ label: month.format("YYYY-MM"), value: count });
+      }
+
+      const quarterlySeries: { label: string; value: number }[] = [];
+      for (let i = 3; i >= 0; i--) {
+        const dt = dayjs().subtract(i * 3, "month");
+        const q = Math.floor(dt.month() / 3) + 1;
+        const count = ordersRes.filter((o: any) => {
+          const d = dayjs(o.created_at);
+          const dq = Math.floor(d.month() / 3) + 1;
+          return d.year() === dt.year() && dq === q;
+        }).length;
+        quarterlySeries.push({ label: `${dt.year()}-Q${q}`, value: count });
+      }
 
       setData({
         productStats: {
@@ -256,6 +295,11 @@ const DashboardPage = () => {
         identities: identitiesRes.length,
         permissions: permissionsRes.length,
         serviceSessions: serviceSessionsRes.length,
+      });
+      setOrderTrends({
+        daily: dailySeries,
+        monthly: monthlySeries,
+        quarterly: quarterlySeries,
       });
       globalMessage.success("数据已刷新");
     } catch (error) {
@@ -360,7 +404,7 @@ const DashboardPage = () => {
         </div>
 
         <Card
-          title="订单量趋势（模拟时间序列）"
+          title="订单量趋势"
           extra={
             <Segmented
               options={[
@@ -376,10 +420,10 @@ const DashboardPage = () => {
           <Paragraph type="secondary" className="mb-3 text-xs">
             当前接口返回全量数据，趋势为前端模拟分桶示例；真实按日/月/季可基于返回的订单创建时间自行分组统计。
           </Paragraph>
-          <Sparkline data={trendData[trendPeriod]} />
+          <Sparkline data={orderTrends[trendPeriod] || []} />
           <Divider className="my-3" />
           <Row gutter={[16, 16]}>
-            {trendData[trendPeriod].map((d) => (
+            {(orderTrends[trendPeriod] || []).map((d) => (
               <Col xs={12} md={6} lg={4} key={d.label}>
                 <Card size="small">
                   <Statistic title={d.label} value={d.value} />
