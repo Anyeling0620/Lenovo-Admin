@@ -79,7 +79,7 @@ const _menuItems: MenuItem[] = [
                 ]
             },
             {
-                key: '6-2', label: '秒杀活动', path: '/mall/seckill'
+                key: '6-2', label: '秒杀活动', path: '/marketing/seckill'
             }
         ]
     },

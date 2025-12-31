@@ -8,7 +8,12 @@ import type {
   VoucherResponse,
   VoucherCreateRequest,
   VoucherUserResponse,
-  IssueVoucherRequest
+  IssueVoucherRequest,
+  SeckillRoundResponse,
+  SeckillRoundCreateRequest,
+  SeckillProductCreateRequest,
+  SeckillConfigCreateRequest,
+  SeckillType,
 } from './api-type';
 
 const delay = (ms = 220) => new Promise(resolve => setTimeout(resolve, ms));
@@ -110,6 +115,49 @@ const mockCouponStats: Record<string, CouponStatsResponse> = {
   coupon_1002: { total: 2000, used: 320, unused: 1680 },
   coupon_1003: { total: 800, used: 95, unused: 705 },
 };
+
+type MockSeckillConfig = {
+  seckill_product_config_id: string;
+  seckill_product_id: string;
+  config_id: string;
+  config1: string;
+  config2?: string;
+  config3?: string;
+  shelf_num: number;
+  seckill_price: number;
+};
+
+type MockSeckillProduct = {
+  seckill_product_id: string;
+  round_id: string;
+  product_id: string;
+  product_name: string;
+  type: SeckillType;
+  reduce_amount?: number;
+  discount?: number;
+  configs: MockSeckillConfig[];
+};
+
+type MockSeckillRound = SeckillRoundResponse & { products: MockSeckillProduct[] };
+
+const mockSeckillRounds: MockSeckillRound[] = [
+  {
+    seckill_round_id: 'round_1001',
+    title: '元旦秒杀专场',
+    start_time: '2025-01-01T08:00:00Z',
+    end_time: '2025-01-01T23:59:59Z',
+    status: '启用',
+    products: [],
+  },
+  {
+    seckill_round_id: 'round_1002',
+    title: '开工大促',
+    start_time: '2025-02-10T08:00:00Z',
+    end_time: '2025-02-11T23:59:59Z',
+    status: '启用',
+    products: [],
+  },
+];
 
 const mockVouchers: VoucherResponse[] = [
   {
@@ -248,5 +296,64 @@ export const marketingMock = {
       });
     });
     return null;
+  },
+  async listSeckillRounds(): Promise<MockSeckillRound[]> {
+    await delay();
+    return mockSeckillRounds.map(round => ({
+      ...round,
+      products: round.products.map(p => ({
+        ...p,
+        configs: p.configs.map(c => ({ ...c })),
+      })),
+    }));
+  },
+  async createSeckillRound(payload: SeckillRoundCreateRequest): Promise<{ seckill_round_id: string }> {
+    await delay();
+    const id = `round_${Date.now()}`;
+    mockSeckillRounds.unshift({
+      seckill_round_id: id,
+      title: payload.title,
+      start_time: payload.start_time,
+      end_time: payload.end_time,
+      status: payload.status ?? '启用',
+      products: [],
+    });
+    return { seckill_round_id: id };
+  },
+  async addSeckillProduct(payload: SeckillProductCreateRequest & { product_name?: string }): Promise<{ seckill_product_id: string }> {
+    await delay();
+    const round = mockSeckillRounds.find(r => r.seckill_round_id === payload.round_id);
+    const id = `sp_${Date.now()}`;
+    if (round) {
+      round.products.push({
+        seckill_product_id: id,
+        round_id: payload.round_id,
+        product_id: payload.product_id,
+        product_name: payload.product_name || `商品${payload.product_id}`,
+        type: payload.type,
+        reduce_amount: payload.reduce_amount ? Number(payload.reduce_amount) : undefined,
+        discount: payload.discount ? Number(payload.discount) : undefined,
+        configs: [],
+      });
+    }
+    return { seckill_product_id: id };
+  },
+  async addSeckillConfig(payload: SeckillConfigCreateRequest & { config1?: string; config2?: string; config3?: string }): Promise<{ seckill_product_config_id: string }> {
+    await delay();
+    const product = mockSeckillRounds.flatMap(r => r.products).find(p => p.seckill_product_id === payload.seckill_product_id);
+    const id = `spc_${Date.now()}`;
+    if (product) {
+      product.configs.push({
+        seckill_product_config_id: id,
+        seckill_product_id: payload.seckill_product_id,
+        config_id: payload.config_id,
+        config1: payload.config1 || '默认配置',
+        config2: payload.config2,
+        config3: payload.config3,
+        shelf_num: payload.shelf_num,
+        seckill_price: Number(payload.seckill_price),
+      });
+    }
+    return { seckill_product_config_id: id };
   },
 };

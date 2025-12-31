@@ -17,6 +17,7 @@ import CouponManage from "./pages/coupon/copilot/CouponManage.tsx";
 import CouponCreate from "./pages/coupon/copilot/CouponCreate.tsx";
 import VoucherManage from "./pages/coupon/copilot/VoucherManage.tsx";
 import VoucherCreate from "./pages/coupon/copilot/VoucherCreate.tsx";
+import Seckill from "./pages/marketing/Seckill.tsx";
 
 export default function App() {
   return (
@@ -39,6 +40,7 @@ export default function App() {
           <Route path="/coupon/manage/create" element={<PrivateRoute><CouponCreate /></PrivateRoute>} />
           <Route path="/coupon/cash" element={<PrivateRoute><VoucherManage /></PrivateRoute>} />
           <Route path="/coupon/cash/create" element={<PrivateRoute><VoucherCreate /></PrivateRoute>} />
+          <Route path="/marketing/seckill" element={<PrivateRoute><Seckill /></PrivateRoute>} />
 
           {/* 其他路由可以在这里继续添加 */}
 
