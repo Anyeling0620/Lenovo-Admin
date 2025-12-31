@@ -13,20 +13,42 @@ import axios, {
     type InternalAxiosRequestConfig
 } from 'axios'
 
+const apiBaseURL = import.meta.env.VITE_API_BASE_URL;
+console.log('[API CONFIG] Base URL:', apiBaseURL, 'Environment:', import.meta.env.MODE);
+console.warn('[API CONFIG] ⚠️ AXIOS TIMEOUT SET TO 45 SECONDS FOR TIDB CLOUD LATENCY');
+
 const service: AxiosInstance = axios.create({
-    baseURL: import.meta.env.VITE_API_BASE_URL,
-    timeout: 10000,
+    baseURL: apiBaseURL,
+    timeout: 45000,  // 增加到 45 秒，充分覆盖 TiDB Cloud 远程查询延迟
     withCredentials: true // ⭐ 关键：携带 HttpOnly Cookie（session）
 })
 service.interceptors.request.use(
     (config: InternalAxiosRequestConfig) => {
-        if(!config.url?.startsWith('http')){
-            config.url = '/admin' + config.url
+        // 如果 url 不以 http 开头，且不以 /admin 开头，才添加前缀
+        if (config.url && !config.url.startsWith('http')) {
+            if (!config.url.startsWith('/admin')) {
+                config.url = '/admin' + config.url;
+            }
         }
-        return config
+        
+        // 完整 URL 用于调试
+        const fullUrl = (config.baseURL || '') + (config.url || '');
+        console.log('[API] Request:', {
+            method: config.method?.toUpperCase(),
+            url: fullUrl,
+            timeout: config.timeout
+        });
+        
+        // 当 cookie 被过滤时，使用 localStorage 中的 sessionId 作为备选认证
+        const sessionId = localStorage.getItem('admin_sessionId');
+        if (sessionId) {
+            config.headers['X-Session-ID'] = sessionId;
+        }
+        
+        return config;
     },
     (error) => Promise.reject(error)
-)
+);
 service.interceptors.response.use(
     <T>(response: AxiosResponse<ApiResponse<T>>) => {
         const { code, data, message } = response.data
