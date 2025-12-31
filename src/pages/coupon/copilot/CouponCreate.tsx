@@ -15,7 +15,7 @@ const { Title, Text } = Typography;
 
 const schema = z.object({
   name: z.string().min(1, '请输入优惠券名称'),
-  type: z.enum(['满减券', '折扣券']),
+  type: z.enum(['满减', '折扣']),
   amount: z.string().optional(),
   discount: z.string().optional(),
   threshold: z.string().optional(),
@@ -42,7 +42,7 @@ const CouponCreate: React.FC = () => {
     resolver: zodResolver(schema),
     defaultValues: {
       name: '',
-      type: '满减券',
+      type: '满减',
       amount: '',
       discount: '',
       threshold: '',
@@ -120,8 +120,8 @@ const CouponCreate: React.FC = () => {
                   name="type"
                   render={({ field }) => (
                     <Select {...field} style={{ width: '100%' }} options={[
-                      { label: '满减券', value: '满减券' },
-                      { label: '折扣券', value: '折扣券' },
+                      { label: '满减', value: '满减' },
+                      { label: '折扣', value: '折扣' },
                     ]} />
                   )}
                 />

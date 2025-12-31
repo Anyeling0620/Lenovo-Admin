@@ -33,11 +33,20 @@ const MainLayout: React.FC = () => {
 
   return (
     <configContext.Provider value={{ collapsed, setCollapsed, searchKeyword, setSearchKeyword, triggerRefresh, refreshKeyMap }}>
-      <Layout style={{ minHeight: '100vh' }}>
+      <Layout style={{ minHeight: '100vh', overflow: 'hidden' }}>
         <HeaderBar />  {/* 头部组件 */}
-        <Layout style={{ paddingTop: "64px" }}>
+        <Layout style={{ paddingTop: '64px', height: 'calc(100vh - 64px)', overflow: 'hidden' }}>
           <SideMenu />
-          <Content style={{ marginLeft: "8px", marginTop: '4px', marginRight: "8px" }}>  {/* 内容区域 */}
+          <Content
+            style={{
+              marginLeft: '8px',
+              marginTop: '4px',
+              marginRight: '8px',
+              height: 'calc(100vh - 64px)',
+              overflowY: 'auto',
+              overflowX: 'hidden',
+            }}
+          >
             <PageTabs />
             <Outlet key={currentRefreshKey}/>  {/* 渲染子路由组件 */}
           </Content>

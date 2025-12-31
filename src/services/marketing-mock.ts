@@ -17,7 +17,7 @@ const mockCoupons: CouponResponse[] = [
   {
     coupon_id: 'coupon_1001',
     name: '新人满减50',
-    type: '满减券',
+    type: '满减',
     amount: 50,
     discount: 0,
     threshold: 299,
@@ -30,7 +30,7 @@ const mockCoupons: CouponResponse[] = [
   {
     coupon_id: 'coupon_1002',
     name: '老客9折券',
-    type: '折扣券',
+    type: '折扣',
     amount: 0,
     discount: 9,
     threshold: 199,
@@ -43,7 +43,7 @@ const mockCoupons: CouponResponse[] = [
   {
     coupon_id: 'coupon_1003',
     name: '配件满200减30',
-    type: '满减券',
+    type: '满减',
     amount: 30,
     discount: 0,
     threshold: 200,

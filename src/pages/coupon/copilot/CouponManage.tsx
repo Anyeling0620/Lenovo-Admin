@@ -221,7 +221,11 @@ const CouponManage: React.FC = () => {
 
   return (
     <Space direction="vertical" size={10} style={{ width: '100%' }}>
-      <Flex align="center" justify="space-between">
+      <Flex
+        align="center"
+        justify="space-between"
+        style={{ position: 'sticky', top: 0, zIndex: 9, background: '#fff', padding: '6px 0' }}
+      >
         <Title level={4} style={{ margin: 0 }}>优惠券管理</Title>
         <Space>
           {usingMock && <Tag color="orange">模拟数据</Tag>}
@@ -247,8 +251,8 @@ const CouponManage: React.FC = () => {
             render={({ field }) => (
               <select {...field} className="border px-2 py-1 rounded text-sm" style={{ minWidth: 140 }}>
                 <option value="">全部类型</option>
-                <option value="满减券">满减券</option>
-                <option value="折扣券">折扣券</option>
+                <option value="满减">满减</option>
+                <option value="折扣">折扣</option>
               </select>
             )}
           />

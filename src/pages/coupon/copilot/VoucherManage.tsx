@@ -168,7 +168,11 @@ const VoucherManage: React.FC = () => {
 
   return (
     <Space direction="vertical" size={10} style={{ width: '100%' }}>
-      <Flex align="center" justify="space-between">
+      <Flex
+        align="center"
+        justify="space-between"
+        style={{ position: 'sticky', top: 0, zIndex: 9, background: '#fff', padding: '6px 0' }}
+      >
         <Title level={4} style={{ margin: 0 }}>代金券管理</Title>
         <Space>
           {usingMock && <Tag color="orange">模拟数据</Tag>}
