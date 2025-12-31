@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import dayjs from 'dayjs';
 import { Link } from 'react-router-dom';
-import { createCouponApi } from '../../../services/api';
+import { createCouponApi, setCouponCenter } from '../../../services/api';
 import type { CouponCreateRequest } from '../../../services/api-type';
 import { globalErrorHandler } from '../../../utils/globalAxiosErrorHandler';
 import { globalMessage } from '../../../utils/globalMessage';
@@ -23,11 +23,13 @@ const schema = z.object({
   is_stackable: z.boolean().default(false),
   condition: z.string().optional(),
   scope: z.string().optional(),
+  centerTotalNum: z.string().min(1, '请输入发放总量'),
+  centerLimitNum: z.string().min(1, '请输入单人限领'),
 }).superRefine((values, ctx) => {
-  if (values.type === '折扣券' && !values.discount) {
+  if (values.type === '折扣' && !values.discount) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: '请输入折扣', path: ['discount'] });
   }
-  if (values.type !== '折扣券' && !values.amount) {
+  if (values.type !== '折扣' && !values.amount) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: '请输入面值', path: ['amount'] });
   }
 });
@@ -50,6 +52,8 @@ const CouponCreate: React.FC = () => {
       is_stackable: true,
       condition: '',
       scope: '',
+      centerTotalNum: '1000',
+      centerLimitNum: '1',
     },
   });
 
@@ -60,8 +64,8 @@ const CouponCreate: React.FC = () => {
     const payload: CouponCreateRequest = {
       name: values.name,
       type: values.type,
-      amount: values.type === '折扣券' ? 0 : Number(values.amount || 0),
-      discount: values.type === '折扣券' ? Number(values.discount || 0) : 0,
+      amount: values.type === '折扣' ? 0 : Number(values.amount || 0),
+      discount: values.type === '折扣' ? Number(values.discount || 0) : 0,
       threshold: Number(values.threshold || 0),
       condition: values.condition,
       scope: values.scope,
@@ -73,12 +77,38 @@ const CouponCreate: React.FC = () => {
     try {
       const res = await createCouponApi(payload);
       setCreatedId(res.coupon_id);
-      globalMessage.success('创建成功');
+      try {
+        await setCouponCenter({
+          coupon_id: res.coupon_id,
+          start_time: payload.start_time,
+          end_time: payload.expire_time,
+          total_num: Number(values.centerTotalNum || 0),
+          limit_num: Number(values.centerLimitNum || 0),
+        });
+        globalMessage.success('创建并投放福利中心成功');
+      } catch (error) {
+        globalErrorHandler.handle(error, globalMessage.error);
+        await marketingMock.setCouponCenter({
+          coupon_id: res.coupon_id,
+          start_time: payload.start_time,
+          end_time: payload.expire_time,
+          total_num: Number(values.centerTotalNum || 0),
+          limit_num: Number(values.centerLimitNum || 0),
+        });
+        globalMessage.success('创建成功，已在模拟环境投放福利中心');
+      }
     } catch (error) {
       globalErrorHandler.handle(error, globalMessage.error);
       const res = await marketingMock.createCoupon(payload);
       setCreatedId(res.coupon_id);
-      globalMessage.success('已在模拟环境创建');
+      await marketingMock.setCouponCenter({
+        coupon_id: res.coupon_id,
+        start_time: payload.start_time,
+        end_time: payload.expire_time,
+        total_num: Number(values.centerTotalNum || 0),
+        limit_num: Number(values.centerLimitNum || 0),
+      });
+      globalMessage.success('已在模拟环境创建并投放福利中心');
     } finally {
       setLoading(false);
     }
@@ -127,13 +157,13 @@ const CouponCreate: React.FC = () => {
                 />
               </div>
               <div style={{ minWidth: 200 }}>
-                <Text>{currentType === '折扣券' ? '折扣（如9代表9折）' : '面值（元）'}</Text>
+                <Text>{currentType === '折扣' ? '折扣（如9代表9折）' : '面值（元）'}</Text>
                 <Controller
                   control={control}
-                  name={currentType === '折扣券' ? 'discount' : 'amount'}
+                  name={currentType === '折扣' ? 'discount' : 'amount'}
                   render={({ field, fieldState }) => (
                     <>
-                      <Input {...field} placeholder={currentType === '折扣券' ? '请输入折扣数' : '请输入金额'} />
+                      <Input {...field} placeholder={currentType === '折扣' ? '请输入折扣数' : '请输入金额'} />
                       {fieldState.error && <Text type="danger">{fieldState.error.message}</Text>}
                     </>
                   )}
@@ -167,7 +197,10 @@ const CouponCreate: React.FC = () => {
                   )}
                 />
               </div>
-              <div style={{ minWidth: 160 }}>
+            </Flex>
+
+            <Flex gap={12} wrap="wrap">
+              <div style={{ minWidth: 200 }}>
                 <Text>可叠加</Text>
                 <Controller
                   control={control}
@@ -177,6 +210,35 @@ const CouponCreate: React.FC = () => {
                       <Switch checked={field.value} onChange={field.onChange} />
                       <Text>{field.value ? '允许与其他券叠加' : '不可叠加'}</Text>
                     </Space>
+                  )}
+                />
+              </div>
+            </Flex>
+
+            <Flex gap={12} wrap="wrap">
+              <div style={{ minWidth: 200 }}>
+                <Text>发放总量</Text>
+                <Controller
+                  control={control}
+                  name="centerTotalNum"
+                  render={({ field, fieldState }) => (
+                    <>
+                      <Input {...field} type="number" min={1} placeholder="请输入总量" />
+                      {fieldState.error && <Text type="danger">{fieldState.error.message}</Text>}
+                    </>
+                  )}
+                />
+              </div>
+              <div style={{ minWidth: 200 }}>
+                <Text>单人限领</Text>
+                <Controller
+                  control={control}
+                  name="centerLimitNum"
+                  render={({ field, fieldState }) => (
+                    <>
+                      <Input {...field} type="number" min={1} placeholder="请输入单人限领数量" />
+                      {fieldState.error && <Text type="danger">{fieldState.error.message}</Text>}
+                    </>
                   )}
                 />
               </div>
