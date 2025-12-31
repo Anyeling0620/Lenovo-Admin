@@ -13,6 +13,7 @@ export const routeNameMap: Record<string, string> = {
   '/coupon/manage': '优惠券管理',
   '/coupon/manage/create': '新建优惠券',
   '/coupon/cash': '代金券管理',
+  '/coupon/cash/create': '新建代金券',
   '/broadcast': '广播通知',
   '/bill': '账单管理',
   '/user/client': '客户端用户管理',

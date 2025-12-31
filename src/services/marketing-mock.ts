@@ -4,7 +4,11 @@ import type {
   CouponCreateRequest,
   CouponResponse,
   CouponStatsResponse,
-  CouponUserResponse
+  CouponUserResponse,
+  VoucherResponse,
+  VoucherCreateRequest,
+  VoucherUserResponse,
+  IssueVoucherRequest
 } from './api-type';
 
 const delay = (ms = 220) => new Promise(resolve => setTimeout(resolve, ms));
@@ -107,6 +111,42 @@ const mockCouponStats: Record<string, CouponStatsResponse> = {
   coupon_1003: { total: 800, used: 95, unused: 705 },
 };
 
+const mockVouchers: VoucherResponse[] = [
+  {
+    voucher_id: 'voucher_2001',
+    title: '满500减100 代金券',
+    original_amount: 100,
+    start_time: '2025-01-01T00:00:00Z',
+    end_time: '2025-04-30T23:59:59Z',
+  },
+  {
+    voucher_id: 'voucher_2002',
+    title: '老客专享 200 元',
+    original_amount: 200,
+    start_time: '2025-02-01T00:00:00Z',
+    end_time: '2025-05-31T23:59:59Z',
+  },
+];
+
+const mockVoucherUsers: Record<string, VoucherUserResponse[]> = {
+  voucher_2001: Array.from({ length: 5 }).map((_, i) => ({
+    user_voucher_id: `vu-1-${i + 1}`,
+    user_id: `user_${i + 1}`,
+    user_account: `user${i + 1}@mail.com`,
+    get_time: '2025-01-08T10:00:00Z',
+    use_up_time: i % 2 === 0 ? '2025-01-18T11:00:00Z' : null,
+    remain_amount: i % 2 === 0 ? 0 : 40,
+  })),
+  voucher_2002: Array.from({ length: 3 }).map((_, i) => ({
+    user_voucher_id: `vu-2-${i + 1}`,
+    user_id: `vip_${i + 1}`,
+    user_account: `vip${i + 1}@lenovo.com`,
+    get_time: '2025-02-05T12:30:00Z',
+    use_up_time: null,
+    remain_amount: 200,
+  })),
+};
+
 export const marketingMock = {
   async listCoupons(): Promise<CouponResponse[]> {
     await delay();
@@ -169,5 +209,44 @@ export const marketingMock = {
       coupon.center = coupon.coupon_id === payload.coupon_id ? nextCenter : coupon.center;
     });
     return { coupon_center_id: id };
+  },
+  async listVouchers(): Promise<VoucherResponse[]> {
+    await delay();
+    return mockVouchers.map(item => ({ ...item }));
+  },
+  async createVoucher(payload: VoucherCreateRequest): Promise<{ voucher_id: string }> {
+    await delay();
+    const id = `voucher_${Date.now()}`;
+    mockVouchers.unshift({
+      voucher_id: id,
+      title: payload.title,
+      original_amount: Number(payload.original_amount || 0),
+      start_time: payload.start_time,
+      end_time: payload.end_time,
+    });
+    mockVoucherUsers[id] = [];
+    return { voucher_id: id };
+  },
+  async listVoucherUsers(voucherId: string): Promise<VoucherUserResponse[]> {
+    await delay();
+    return (mockVoucherUsers[voucherId] || []).map(item => ({ ...item }));
+  },
+  async issueVoucher(voucherId: string, payload: IssueVoucherRequest): Promise<null> {
+    await delay();
+    const now = new Date().toISOString();
+    if (!mockVoucherUsers[voucherId]) {
+      mockVoucherUsers[voucherId] = [];
+    }
+    payload.user_ids.forEach((userId, index) => {
+      mockVoucherUsers[voucherId].push({
+        user_voucher_id: `vu-${voucherId}-${Date.now()}-${index}`,
+        user_id: userId,
+        user_account: userId,
+        get_time: now,
+        use_up_time: null,
+        remain_amount: mockVouchers.find(v => v.voucher_id === voucherId)?.original_amount ?? 0,
+      });
+    });
+    return null;
   },
 };

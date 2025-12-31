@@ -15,6 +15,8 @@ import PermissionManagement from "./pages/user/permission/index.tsx";
 import OnlineManagement from "./pages/user/online/index.tsx";
 import CouponManage from "./pages/coupon/copilot/CouponManage.tsx";
 import CouponCreate from "./pages/coupon/copilot/CouponCreate.tsx";
+import VoucherManage from "./pages/coupon/copilot/VoucherManage.tsx";
+import VoucherCreate from "./pages/coupon/copilot/VoucherCreate.tsx";
 
 export default function App() {
   return (
@@ -35,6 +37,8 @@ export default function App() {
           {/* 营销管理 - 福利中心 */}
           <Route path="/coupon/manage" element={<PrivateRoute><CouponManage /></PrivateRoute>} />
           <Route path="/coupon/manage/create" element={<PrivateRoute><CouponCreate /></PrivateRoute>} />
+          <Route path="/coupon/cash" element={<PrivateRoute><VoucherManage /></PrivateRoute>} />
+          <Route path="/coupon/cash/create" element={<PrivateRoute><VoucherCreate /></PrivateRoute>} />
 
           {/* 其他路由可以在这里继续添加 */}
 
