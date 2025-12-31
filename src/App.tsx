@@ -13,6 +13,11 @@ import ClientUserManagement from "./pages/user/client/index.tsx";
 import AdminListPage from "./pages/user/admin/list.tsx";
 import PermissionManagement from "./pages/user/permission/index.tsx";
 import OnlineManagement from "./pages/user/online/index.tsx";
+import CouponManage from "./pages/coupon/copilot/CouponManage.tsx";
+import CouponCreate from "./pages/coupon/copilot/CouponCreate.tsx";
+import VoucherManage from "./pages/coupon/copilot/VoucherManage.tsx";
+import VoucherCreate from "./pages/coupon/copilot/VoucherCreate.tsx";
+import Seckill from "./pages/marketing/Seckill.tsx";
 
 // 账号管理相关页面
 import AccountInfo from "./pages/account/info.tsx";
@@ -61,6 +66,12 @@ export default function App() {
           <Route path="/after-sale/handle/:afterSaleId" element={<PrivateRoute><AfterSaleHandle /></PrivateRoute>} />
           <Route path="/complaint" element={<PrivateRoute><ComplaintManagement /></PrivateRoute>} />
           <Route path="/complaint/handle/:complaintId" element={<PrivateRoute><ComplaintHandle /></PrivateRoute>} />
+          {/* 营销管理 - 福利中心 */}
+          <Route path="/coupon/manage" element={<PrivateRoute><CouponManage /></PrivateRoute>} />
+          <Route path="/coupon/manage/create" element={<PrivateRoute><CouponCreate /></PrivateRoute>} />
+          <Route path="/coupon/cash" element={<PrivateRoute><VoucherManage /></PrivateRoute>} />
+          <Route path="/coupon/cash/create" element={<PrivateRoute><VoucherCreate /></PrivateRoute>} />
+          <Route path="/marketing/seckill" element={<PrivateRoute><Seckill /></PrivateRoute>} />
 
           {/* 其他路由可以在这里继续添加 */}
 
