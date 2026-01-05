@@ -79,10 +79,7 @@ const _menuItems: MenuItem[] = [
                 ]
             },
             {
-                key: '6-2', label: '秒杀活动', path: '/mall/seckill'
-            },
-            {
-                key: '6-3', label: '通知推送', path: '/notice-push'
+                key: '6-2', label: '秒杀活动', path: '/marketing/seckill'
             }
         ]
     },
@@ -239,7 +236,7 @@ const SideMenu: React.FC = () => {
             collapsible
             collapsed={collapsed}
             className="bg-white border-r border-gray-200 pl-1"
-            style={{ transition: 'all 0.3s ease' }}
+            style={{ transition: 'all 0.3s ease', height: 'calc(100vh - 64px)', position: 'sticky', top: 64, overflow: 'auto' }}
         >
             <Menu
                 mode="inline"
