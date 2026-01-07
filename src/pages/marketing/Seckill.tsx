@@ -1,17 +1,19 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Card, Space, Typography, Form, Input, DatePicker, Select, InputNumber, Button, Divider, Tag, Flex, List } from 'antd';
+import { Card, Space, Typography, Form, Input, DatePicker, Select, InputNumber, Button, Divider, Tag, Flex, List, Modal, Table } from 'antd';
 import dayjs from 'dayjs';
 import {
   getSeckillRounds,
   createSeckillRoundApi,
   addSeckillProductApi,
   addSeckillConfigApi,
+  getProducts,
 } from '../../services/api';
 import type {
   SeckillRoundResponse,
   SeckillRoundCreateRequest,
   SeckillProductCreateRequest,
   SeckillConfigCreateRequest,
+  ProductListItem,
 } from '../../services/api-type';
 import { marketingMock } from '../../services/marketing-mock';
 import { globalMessage } from '../../utils/globalMessage';
@@ -48,6 +50,11 @@ const Seckill: React.FC = () => {
   const [createLoading, setCreateLoading] = useState(false);
   const [productLoading, setProductLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | 'ongoing' | 'upcoming' | 'ended'>('all');
+  const [productModalOpen, setProductModalOpen] = useState(false);
+  const [productFetchLoading, setProductFetchLoading] = useState(false);
+  const [productSearch, setProductSearch] = useState('');
+  const [productList, setProductList] = useState<ProductListItem[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState<ProductListItem | null>(null);
 
   const [roundForm] = Form.useForm();
   const [productForm] = Form.useForm();
@@ -67,6 +74,14 @@ const Seckill: React.FC = () => {
     });
   }, [rounds, statusFilter]);
 
+  const filteredProducts = useMemo(() => {
+    const keyword = productSearch.trim().toLowerCase();
+    if (!keyword) return productList;
+    return productList.filter(p =>
+      p.name.toLowerCase().includes(keyword) || p.product_id.toLowerCase().includes(keyword)
+    );
+  }, [productList, productSearch]);
+
   const fetchRounds = async () => {
     setLoading(true);
     try {
@@ -85,6 +100,35 @@ const Seckill: React.FC = () => {
   useEffect(() => {
     fetchRounds();
   }, []);
+
+  const fetchProducts = async () => {
+    setProductFetchLoading(true);
+    try {
+      const res = await getProducts();
+      setProductList(res);
+    } catch (error) {
+      globalErrorHandler.handle(error, globalMessage.error);
+      setProductList([]);
+    } finally {
+      setProductFetchLoading(false);
+    }
+  };
+
+  const openProductPicker = () => {
+    setProductModalOpen(true);
+    if (!productList.length) {
+      fetchProducts();
+    }
+  };
+
+  const confirmProduct = () => {
+    if (!selectedProduct) return;
+    productForm.setFieldsValue({
+      product_id: selectedProduct.product_id,
+      product_name: selectedProduct.name,
+    });
+    setProductModalOpen(false);
+  };
 
   const handleCreateRound = async (values: any) => {
     const payload: SeckillRoundCreateRequest = {
@@ -197,11 +241,19 @@ const Seckill: React.FC = () => {
             <Form.Item name="round_id" label="所属轮次" rules={[{ required: true, message: '请选择轮次' }]} style={{ minWidth: 220 }}>
               <Select options={roundOptions} placeholder="选择轮次" />
             </Form.Item>
-            <Form.Item name="product_id" label="商品ID" rules={[{ required: true, message: '请输入商品ID' }]} style={{ minWidth: 200 }}>
-              <Input placeholder="商品ID" />
+            <Form.Item label="选择商品" required style={{ minWidth: 260 }}>
+              <Space>
+                <Button onClick={openProductPicker}>选择商品</Button>
+                {selectedProduct && (
+                  <Text type="secondary">已选：{selectedProduct.name}（ID: {selectedProduct.product_id}）</Text>
+                )}
+              </Space>
             </Form.Item>
-            <Form.Item name="product_name" label="商品名" style={{ minWidth: 200 }}>
-              <Input placeholder="可填写商品名称" />
+            <Form.Item name="product_id" hidden rules={[{ required: true, message: '请选择商品' }]}>
+              <Input />
+            </Form.Item>
+            <Form.Item name="product_name" hidden>
+              <Input />
             </Form.Item>
             <Form.Item name="type" label="秒杀类型" rules={[{ required: true, message: '请选择类型' }]} style={{ minWidth: 160 }}>
               <Select options={[{ label: '立减', value: '立减' }, { label: '打折', value: '打折' }]} />
@@ -283,6 +335,45 @@ const Seckill: React.FC = () => {
           )}
         />
       </Card>
+
+      <Modal
+        open={productModalOpen}
+        title="选择商品"
+        onCancel={() => setProductModalOpen(false)}
+        onOk={confirmProduct}
+        okButtonProps={{ disabled: !selectedProduct, loading: productFetchLoading }}
+        destroyOnClose
+        width={900}
+      >
+        <Space style={{ marginBottom: 12 }}>
+          <Input
+            placeholder="输入关键词搜索（名称或ID）"
+            value={productSearch}
+            onChange={e => setProductSearch(e.target.value)}
+            style={{ width: 260 }}
+            allowClear
+          />
+          <Button onClick={fetchProducts} loading={productFetchLoading}>刷新列表</Button>
+        </Space>
+        <Table
+          rowKey="product_id"
+          dataSource={filteredProducts}
+          loading={productFetchLoading}
+          pagination={{ pageSize: 8 }}
+          rowSelection={{
+            type: 'radio',
+            selectedRowKeys: selectedProduct ? [selectedProduct.product_id] : [],
+            onChange: (_, rows) => setSelectedProduct(rows[0]),
+          }}
+          columns={[
+            { title: '商品ID', dataIndex: 'product_id', width: 140 },
+            { title: '名称', dataIndex: 'name' },
+            { title: '品牌', dataIndex: 'brand_name', width: 140 },
+            { title: '分类', dataIndex: 'category_name', width: 160 },
+            { title: '状态', dataIndex: 'status', width: 100 },
+          ]}
+        />
+      </Modal>
     </Space>
   );
 };
