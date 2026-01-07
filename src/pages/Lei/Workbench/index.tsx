@@ -1,6 +1,17 @@
 import { useMemo, useState } from "react";
 import { Card, Col, List, Row, Segmented, Space, Tag, Typography } from "antd";
+import { Link } from "react-router-dom";
 import { AdminRole } from "../../../utils/permission";
+
+type WorkActionLink = {
+  name: string;
+  path?: string;
+};
+
+type WorkItemAction = {
+  label: string;
+  links: WorkActionLink[];
+};
 
 type WorkItem = {
   key: string;
@@ -8,7 +19,7 @@ type WorkItem = {
   allowed: AdminRole[];
   description: string;
   stats?: { label: string; value: number | string }[];
-  actions: { label: string; apis: string[] }[];
+  actions: WorkItemAction[];
 };
 
 const { Title, Paragraph, Text } = Typography;
@@ -37,10 +48,31 @@ const workItems: WorkItem[] = [
       { label: "权限点", value: 112 },
     ],
     actions: [
-      { label: "管理员管理", apis: ["GET /admin/system/admins", "POST /admin/system/admins"] },
-      { label: "绑定/调整身份", apis: ["POST /admin/system/admins/:id/identities", "PATCH /admin/system/admins/:admin_id/identities/:identity_id/expire"] },
-      { label: "权限菜单", apis: ["GET /admin/system/permissions", "GET /admin/system/identities"] },
-      { label: "踢下线/禁用/重置密码", apis: ["POST /admin/system/admins/:id/logout", "POST /admin/system/admins/:id/disable", "POST /admin/system/admins/:id/reset-password"] },
+      {
+        label: "管理员管理",
+        links: [
+          { name: "用户列表", path: "/user/admin/list" },
+          { name: "个人信息", path: "/account/info" },
+        ],
+      },
+      {
+        label: "绑定/调整身份",
+        links: [{ name: "权限管理", path: "/user/admin/permission" }],
+      },
+      {
+        label: "权限菜单",
+        links: [
+          { name: "权限详情", path: "/account/permission" },
+          { name: "权限管理", path: "/user/admin/permission" },
+        ],
+      },
+      {
+        label: "踢下线/禁用/重置密码",
+        links: [
+          { name: "在线管理", path: "/user/admin/online" },
+          { name: "账号安全", path: "/account/security" },
+        ],
+      },
     ],
   },
   {
@@ -55,10 +87,31 @@ const workItems: WorkItem[] = [
       { label: "货架条目", value: 1860 },
     ],
     actions: [
-      { label: "品牌与商品", apis: ["GET /admin/brands", "UPLOAD /admin/products", "PATCH /admin/products/:id/status"] },
-      { label: "标签与配置", apis: ["POST /admin/tags", "POST /admin/product-tags", "POST /admin/products/:product_id/configs"] },
-      { label: "库存调整", apis: ["PATCH /admin/stocks/:config_id"] },
-      { label: "货架操作", apis: ["GET /admin/shelf/products", "POST /admin/shelf/items", "PATCH /admin/shelf/products/:id/carousel"] },
+      {
+        label: "品牌与商品",
+        links: [
+          { name: "商品总览", path: "/goods/overview" },
+          { name: "品牌·专区", path: "/goods/brand-zone" },
+          { name: "商品管理", path: "/goods/manage" },
+        ],
+      },
+      {
+        label: "标签与配置",
+        links: [{ name: "商品配置管理", path: "/goods/manage" }],
+      },
+      {
+        label: "库存调整",
+        links: [{ name: "库存管理", path: "/goods/category" }],
+      },
+      {
+        label: "货架操作",
+        links: [
+          { name: "上架商品管理", path: "/mall/goods" },
+          { name: "售货专区管理", path: "/mall/zone" },
+          { name: "首页展示管理", path: "/mall/home" },
+          { name: "新品展示管理", path: "/mall/new" },
+        ],
+      },
     ],
   },
   {
@@ -73,9 +126,9 @@ const workItems: WorkItem[] = [
       { label: "投诉待处理", value: 6 },
     ],
     actions: [
-      { label: "订单流转", apis: ["GET /admin/orders", "POST /admin/orders/:order_id/ship", "POST /admin/orders/:order_id/pending-receive"] },
-      { label: "售后处理", apis: ["GET /admin/after-sales", "POST /admin/after-sales/:after_sale_id/handle"] },
-      { label: "投诉处理", apis: ["GET /admin/complaints", "POST /admin/complaints/:complaint_id/handle"] },
+      { label: "订单流转", links: [{ name: "订单管理", path: "/order/manage" }] },
+      { label: "售后处理", links: [{ name: "售后管理", path: "/after-sale" }] },
+      { label: "投诉处理", links: [{ name: "投诉管理", path: "/complaint" }] },
     ],
   },
   {
@@ -90,9 +143,9 @@ const workItems: WorkItem[] = [
       { label: "今日秒杀场次", value: 3 },
     ],
     actions: [
-      { label: "优惠券", apis: ["GET /admin/marketing/coupons", "POST /admin/marketing/coupons", "GET /admin/marketing/coupons/:id/stats"] },
-      { label: "代金券发放", apis: ["GET /admin/marketing/vouchers", "POST /admin/marketing/vouchers/:id/issue"] },
-      { label: "秒杀配置", apis: ["POST /admin/marketing/seckill-rounds", "POST /admin/marketing/seckill-products", "POST /admin/marketing/seckill-configs"] },
+      { label: "优惠券", links: [{ name: "优惠券管理", path: "/coupon/manage" }] },
+      { label: "代金券发放", links: [{ name: "代金券管理", path: "/coupon/cash" }] },
+      { label: "秒杀配置", links: [{ name: "秒杀活动", path: "/marketing/seckill" }] },
     ],
   },
   {
@@ -106,9 +159,9 @@ const workItems: WorkItem[] = [
       { label: "平均首响(分钟)", value: 2.8 },
     ],
     actions: [
-      { label: "会话列表", apis: ["GET /admin/service/sessions"] },
-      { label: "消息收发", apis: ["GET /admin/service/sessions/:room_id/messages", "POST /admin/service/messages/:message_id/read"] },
-      { label: "结束/撤回", apis: ["POST /admin/service/sessions/:room_id/end", "POST /admin/service/messages/:message_id/withdraw"] },
+      { label: "会话列表", links: [{ name: "服务总览", path: "/customer-service/overview" }] },
+      { label: "消息收发", links: [{ name: "会话中心", path: "/customer-service/session" }] },
+      { label: "结束/撤回", links: [{ name: "评价管理", path: "/customer-service/evaluation" }] },
     ],
   },
 ];
@@ -157,12 +210,25 @@ const WorkbenchPage = () => {
                     <Text strong>{action.label}</Text>
                     <List
                       size="small"
-                      dataSource={action.apis}
-                      renderItem={(api) => (
+                      dataSource={action.links}
+                      renderItem={(link) => (
                         <List.Item className="py-1">
-                          <Text type="secondary" className="text-xs">
-                            API: {api}
-                          </Text>
+                          {link.path ? (
+                            <Link to={link.path}>
+                              <Text type="secondary" className="text-xs">
+                                {link.name}
+                              </Text>
+                            </Link>
+                          ) : (
+                            <Space size={6}>
+                              <Tag color="red" className="m-0">
+                                页面未实现
+                              </Tag>
+                              <Text type="secondary" className="text-xs">
+                                {link.name}
+                              </Text>
+                            </Space>
+                          )}
                         </List.Item>
                       )}
                     />
