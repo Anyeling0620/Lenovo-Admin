@@ -342,7 +342,7 @@ const Seckill: React.FC = () => {
             </Form.Item>
           </Flex>
 
-          <Divider orientation="left">可选配置（SKU 价格/库存）</Divider>
+          <Divider orientation="horizontal">可选配置（SKU 价格/库存）</Divider>
           <Flex gap={12} wrap="wrap">
             <Form.Item name="config_id" label="选择配置" style={{ minWidth: 240 }}>
               <Select
