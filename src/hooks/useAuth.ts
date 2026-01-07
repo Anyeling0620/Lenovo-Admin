@@ -51,7 +51,7 @@ const useAuthLifecycle = () => {
             window.removeEventListener("login", handleLogin);
             window.removeEventListener("logout", handleLogout);
         }
-    }, [])
+    }, [nav])
 }
 
 

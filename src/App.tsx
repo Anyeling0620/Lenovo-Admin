@@ -48,7 +48,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/not-permission" element={<NotAuthorized />} />
-        <Route path="/" element={<PrivateRoute><MainLayout /></PrivateRoute>}>
+        <Route path="/" element={<PrivateRoute> <MainLayout /> </PrivateRoute>}>
           <Route index element={<Index />} />
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/workbench" element={<WorkbenchPage />} />

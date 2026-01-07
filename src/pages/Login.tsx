@@ -1,35 +1,55 @@
+import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { Button, Card, Form, Input, Typography } from 'antd';
 import globalErrorHandler from '../utils/globalAxiosErrorHandler';
 import { globalMessage } from '../utils/globalMessage';
 import { adminLogin } from '../services/api';
+
+const DEFAULT_FORM = { account: '12345678901234567890', password: '123456' };
 
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const fromPath = (location.state as { from?: string })?.from || '/';
+  const [loading, setLoading] = useState(false);
+
   const handleLogin = async (values: { account: string; password: string }) => {
+    setLoading(true);
     try {
-      console.warn('[LOGIN START] 正在请求登录，已配置 45 秒超时...', { account: values.account });
       const response = await adminLogin(values);
-      console.log('[LOGIN SUCCESS] 登录响应:', response);
-      // 存储 sessionId 到 localStorage 作为备选认证（当 cookie 被 Cloudflare 过滤时）
       if (response && 'sessionId' in response && typeof response.sessionId === 'string') {
         localStorage.setItem('admin_sessionId', response.sessionId);
-        console.log('[LOGIN] sessionId 已存储到 localStorage');
       }
       window.dispatchEvent(new Event('login'));
-      globalMessage.success('登录成功！');
+      globalMessage.success('登录成功');
       navigate(fromPath, { replace: true });
     } catch (error) {
-      console.error('[LOGIN FAILED]', error);
-      globalErrorHandler.handle(error, globalMessage.error)
+      globalErrorHandler.handle(error, globalMessage.error);
+    } finally {
+      setLoading(false);
     }
   };
-  return (
-  <div className='flex justify-center items-center '>
-    <button onClick={()=>handleLogin({account:'12345678901234567890',password:'123456'})} className='bg-gray-500 text-white  my-auto'>Login</button >
-  </div>
-  )
-}
 
-export default Login
+  return (
+    <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#f5f5f5' }}>
+      <Card style={{ width: 360 }}>
+        <Typography.Title level={4} style={{ textAlign: 'center', marginBottom: 24 }}>
+          管理后台登录
+        </Typography.Title>
+        <Form initialValues={DEFAULT_FORM} layout="vertical" onFinish={handleLogin}>
+          <Form.Item label="账号" name="account" rules={[{ required: true, message: '请输入账号' }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item label="密码" name="password" rules={[{ required: true, message: '请输入密码' }]}>
+            <Input.Password />
+          </Form.Item>
+          <Button type="primary" htmlType="submit" block loading={loading}>
+            登录
+          </Button>
+        </Form>
+      </Card>
+    </div>
+  );
+};
+
+export default Login;
