@@ -90,26 +90,26 @@ const workItems: WorkItem[] = [
       {
         label: "品牌与商品",
         links: [
-          { name: "商品总览", path: "/goods/overview" },
-          { name: "品牌·专区", path: "/goods/brand-zone" },
-          { name: "商品管理", path: "/goods/manage" },
+          { name: "商品总览（/goods/overview）" },
+          { name: "品牌·专区（/goods/brand-zone）" },
+          { name: "商品管理（/goods/manage）" },
         ],
       },
       {
         label: "标签与配置",
-        links: [{ name: "商品配置管理", path: "/goods/manage" }],
+        links: [{ name: "商品配置管理（/goods/manage）" }],
       },
       {
         label: "库存调整",
-        links: [{ name: "库存管理", path: "/goods/category" }],
+        links: [{ name: "库存管理（/goods/category）" }],
       },
       {
         label: "货架操作",
         links: [
-          { name: "上架商品管理", path: "/mall/goods" },
-          { name: "售货专区管理", path: "/mall/zone" },
-          { name: "首页展示管理", path: "/mall/home" },
-          { name: "新品展示管理", path: "/mall/new" },
+          { name: "上架商品管理（/mall/goods）" },
+          { name: "售货专区管理（/mall/zone）" },
+          { name: "首页展示管理（/mall/home）" },
+          { name: "新品展示管理（/mall/new）" },
         ],
       },
     ],
@@ -159,9 +159,9 @@ const workItems: WorkItem[] = [
       { label: "平均首响(分钟)", value: 2.8 },
     ],
     actions: [
-      { label: "会话列表", links: [{ name: "服务总览", path: "/customer-service/overview" }] },
-      { label: "消息收发", links: [{ name: "会话中心", path: "/customer-service/session" }] },
-      { label: "结束/撤回", links: [{ name: "评价管理", path: "/customer-service/evaluation" }] },
+      { label: "会话列表", links: [{ name: "服务总览（/customer-service/overview）" }] },
+      { label: "消息收发", links: [{ name: "会话中心（/customer-service/session）" }] },
+      { label: "结束/撤回", links: [{ name: "评价管理（/customer-service/evaluation）" }] },
     ],
   },
 ];
