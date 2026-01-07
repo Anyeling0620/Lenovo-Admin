@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Card, Table, Tag, Space, Button, Typography, Row, Col, Statistic, Divider, Descriptions, List, Flex } from 'antd';
+import { Card, Table, Tag, Space, Button, Typography, Row, Col, Statistic, Divider, Descriptions, List, Flex, Input, Select } from 'antd';
 import { ReloadOutlined, PlusOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { Link } from 'react-router-dom';
@@ -242,34 +242,57 @@ const CouponManage: React.FC = () => {
             control={control}
             name="keyword"
             render={({ field }) => (
-              <input {...field} placeholder="名称/类型关键字" className="border px-2 py-1 rounded text-sm" style={{ minWidth: 160 }} />
+              <Input
+                {...field}
+                value={field.value || ''}
+                allowClear
+                size="middle"
+                placeholder="名称 / 类型关键字"
+                style={{ width: 260 }}
+              />
             )}
           />
           <Controller
             control={control}
             name="type"
             render={({ field }) => (
-              <select {...field} className="border px-2 py-1 rounded text-sm" style={{ minWidth: 140 }}>
-                <option value="">全部类型</option>
-                <option value="满减">满减</option>
-                <option value="折扣">折扣</option>
-              </select>
+              <Select
+                {...field}
+                value={field.value || undefined}
+                onChange={value => field.onChange(value)}
+                allowClear
+                size="middle"
+                placeholder="全部类型"
+                style={{ minWidth: 160 }}
+                options={[
+                  { label: '满减', value: '满减' },
+                  { label: '折扣', value: '折扣' },
+                ]}
+              />
             )}
           />
           <Controller
             control={control}
             name="stackable"
             render={({ field }) => (
-              <select {...field} className="border px-2 py-1 rounded text-sm" style={{ minWidth: 140 }}>
-                <option value="">叠加限制</option>
-                <option value="yes">可叠加</option>
-                <option value="no">不可叠加</option>
-              </select>
+              <Select
+                {...field}
+                value={field.value || undefined}
+                onChange={value => field.onChange(value)}
+                allowClear
+                size="middle"
+                placeholder="叠加限制"
+                style={{ minWidth: 160 }}
+                options={[
+                  { label: '可叠加', value: 'yes' },
+                  { label: '不可叠加', value: 'no' },
+                ]}
+              />
             )}
           />
           <Space size={6}>
-            <Button htmlType="submit" type="primary" size="small">筛选</Button>
-            <Button onClick={handleReset} size="small">重置</Button>
+            <Button htmlType="submit" type="primary" size="middle">筛选</Button>
+            <Button onClick={handleReset} size="middle">重置</Button>
           </Space>
         </form>
       </Card>
