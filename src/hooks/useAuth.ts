@@ -1,15 +1,17 @@
 import { useEffect } from "react";
 import useAuthStore from "../store/auth";
-// import useAdminInfoStore from "../store/adminInfo";
+import useAdminProfileStore from "../store/adminInfo";
 import globalErrorHandler from "../utils/globalAxiosErrorHandler";
 import { useNavigate } from "react-router-dom";
 import { globalMessage } from "../utils/globalMessage";
+import { getAccountProfile } from "../services/api";
+
 
 
 const handleLoginUserInfo = async () => {
     try {
-        // const userInfo = await getUserInfo();
-        // useAdminInfoStore.getState().setAdminInfo(userInfo);
+        const profile = await getAccountProfile();
+        useAdminProfileStore.getState().setProfile(profile);
     } catch (error) {
         globalErrorHandler.handle(error, globalMessage.error);
     }
@@ -28,7 +30,7 @@ const useAuthLifecycle = () => {
 
         const handleLogout = () => {
             useAuthStore.getState().logout();
-            // useAdminInfoStore.getState().clearAdminInfo(); 
+            useAdminProfileStore.getState().clearProfile();
             setTimeout(() => {
                 nav('/',{
                     replace:true,
@@ -49,7 +51,7 @@ const useAuthLifecycle = () => {
             window.removeEventListener("login", handleLogin);
             window.removeEventListener("logout", handleLogout);
         }
-    }, [])
+    }, [nav])
 }
 
 

@@ -270,6 +270,12 @@ class GlobalAxiosErrorHandler {
     customMsg?: string,
   ): void {
     const errorInfo = this.parse(error);
+
+    // 如果是 401，触发全局登出事件，由 auth 生命周期统一处理
+    if (errorInfo.status === 401) {
+      // window.dispatchEvent(new Event('logout'));
+    }
+
     const finalMsg = customMsg || errorInfo.message;
     notify(finalMsg);
   }

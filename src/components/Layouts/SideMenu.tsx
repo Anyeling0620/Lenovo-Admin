@@ -1,4 +1,4 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { Layout, Menu, type MenuProps } from 'antd';
 import {
     DashboardOutlined,
@@ -12,7 +12,7 @@ import {
     BellOutlined,
     GiftOutlined,
 } from '@ant-design/icons';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { configContext } from './ConfigContext';
 // import { hasPermission, type UserRole } from '../../utils/permission';
 
@@ -159,8 +159,10 @@ const _menuItems: MenuItem[] = [
 
 const SideMenu: React.FC = () => {
     const { collapsed, triggerRefresh } = useContext(configContext);
+    const location = useLocation();
     // 控制菜单展开的key（受控状态）
     const [openKeys, setOpenKeys] = useState<string[]>([]);
+    const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
     // 工具函数：获取key的一级父级（顶级）key，如5-2-1 → 5，5-2 → 5，3 → 3
     const getRootKey = (key: string): string => {
         return key.split('-')[0];
@@ -169,6 +171,20 @@ const SideMenu: React.FC = () => {
     // 工具函数：获取key的所有父级key（包括自身），如5-2-1 → [5, 5-2, 5-2-1]
     const getKeyPath = (key: string): string[] => {
         return key.split('-').map((_, index) => key.split('-').slice(0, index + 1).join('-'));
+    };
+
+    // 根据当前路由寻找匹配的菜单 key（精确或前缀匹配）
+    const findKeyByPath = (items: MenuItem[], targetPath: string): string | null => {
+        for (const item of items) {
+            if (item.path && (targetPath === item.path || targetPath.startsWith(`${item.path}/`))) {
+                return item.key;
+            }
+            if (item.children) {
+                const childKey = findKeyByPath(item.children, targetPath);
+                if (childKey) return childKey;
+            }
+        }
+        return null;
     };
 
     // 工具函数：判断key是否是目标key的子级（包括自身）
@@ -211,6 +227,18 @@ const SideMenu: React.FC = () => {
         }
     };
 
+    // 路由变化时同步选中与展开项
+    useEffect(() => {
+        const matchedKey = findKeyByPath(_menuItems, location.pathname);
+        if (matchedKey) {
+            setSelectedKeys([matchedKey]);
+            setOpenKeys(getKeyPath(matchedKey));
+        } else {
+            setSelectedKeys([]);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [location.pathname]);
+
     // 递归渲染菜单（支持多级）
     const renderMenuItems = (items: MenuItem[]): MenuProps['items'] => {
         return items.map((item) => {
@@ -243,6 +271,7 @@ const SideMenu: React.FC = () => {
                 items={renderMenuItems(_menuItems)}  // 暂时关闭权限控制
                 className="border-none pt-2! bg-[#fafafa]!"
                 openKeys={openKeys}
+                selectedKeys={selectedKeys}
                 onOpenChange={handleOpenChange}
             />
         </Sider>
