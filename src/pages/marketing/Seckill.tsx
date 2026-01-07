@@ -47,6 +47,7 @@ const Seckill: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [createLoading, setCreateLoading] = useState(false);
   const [productLoading, setProductLoading] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'ongoing' | 'upcoming' | 'ended'>('all');
 
   const [roundForm] = Form.useForm();
   const [productForm] = Form.useForm();
@@ -55,6 +56,16 @@ const Seckill: React.FC = () => {
     () => rounds.map(r => ({ label: r.title, value: r.seckill_round_id })),
     [rounds]
   );
+
+  const filteredRounds = useMemo(() => {
+    const now = dayjs();
+    return rounds.filter(r => {
+      const start = dayjs(r.start_time);
+      const end = dayjs(r.end_time);
+      const status = now.isBefore(start) ? 'upcoming' : now.isAfter(end) ? 'ended' : 'ongoing';
+      return statusFilter === 'all' || statusFilter === status;
+    });
+  }, [rounds, statusFilter]);
 
   const fetchRounds = async () => {
     setLoading(true);
@@ -234,9 +245,29 @@ const Seckill: React.FC = () => {
         </Form>
       </Card>
 
-      <Card size="small" title="秒杀轮次列表" loading={loading}>
+      <Card
+        size="small"
+        title="秒杀轮次列表"
+        loading={loading}
+        extra={
+          <Space>
+            <Text type="secondary">筛选</Text>
+            <Select
+              value={statusFilter}
+              onChange={setStatusFilter}
+              style={{ width: 140 }}
+              options={[
+                { label: '全部', value: 'all' },
+                { label: '进行中', value: 'ongoing' },
+                { label: '未开始', value: 'upcoming' },
+                { label: '已结束', value: 'ended' },
+              ]}
+            />
+          </Space>
+        }
+      >
         <List
-          dataSource={rounds}
+          dataSource={filteredRounds}
           renderItem={round => (
             <List.Item key={round.seckill_round_id}>
               <div style={{ width: '100%' }}>
@@ -246,46 +277,7 @@ const Seckill: React.FC = () => {
                     <Tag color={round.status === '启用' ? 'green' : round.status === '禁用' ? 'red' : 'blue'}>{round.status}</Tag>
                     <Text type="secondary">{dayjs(round.start_time).format('YYYY-MM-DD HH:mm')} ~ {dayjs(round.end_time).format('YYYY-MM-DD HH:mm')}</Text>
                   </Space>
-                  <Text type="secondary">商品数：{round.products?.length ?? 0}</Text>
                 </Flex>
-                <Divider style={{ margin: '8px 0' }} />
-                <List
-                  size="small"
-                  dataSource={round.products || []}
-                  locale={{ emptyText: '暂未添加商品' }}
-                  renderItem={prod => (
-                    <List.Item key={prod.seckill_product_id}>
-                      <div style={{ width: '100%' }}>
-                        <Space size={8} wrap>
-                          <Text strong>{prod.product_name}</Text>
-                          <Tag color="purple">{prod.type}</Tag>
-                          {prod.type === '立减' && <Text>立减 {prod.reduce_amount} 元</Text>}
-                          {prod.type === '打折' && <Text>{prod.discount} 折</Text>}
-                          <Text type="secondary">商品ID：{prod.product_id}</Text>
-                        </Space>
-                        {prod.configs && prod.configs.length > 0 && (
-                          <List
-                            style={{ marginTop: 6 }}
-                            size="small"
-                            dataSource={prod.configs}
-                            renderItem={cfg => (
-                              <List.Item key={cfg.seckill_product_config_id}>
-                                <Space size={8} wrap>
-                                  <Text>配置ID：{cfg.config_id}</Text>
-                                  {cfg.config1 && <Text>{cfg.config1}</Text>}
-                                  {cfg.config2 && <Text>{cfg.config2}</Text>}
-                                  {cfg.config3 && <Text>{cfg.config3}</Text>}
-                                  <Text>库存 {cfg.shelf_num}</Text>
-                                  <Text>秒杀价 {cfg.seckill_price}</Text>
-                                </Space>
-                              </List.Item>
-                            )}
-                          />
-                        )}
-                      </div>
-                    </List.Item>
-                  )}
-                />
               </div>
             </List.Item>
           )}
