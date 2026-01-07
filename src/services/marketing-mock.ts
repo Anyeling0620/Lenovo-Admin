@@ -14,6 +14,7 @@ import type {
   SeckillProductCreateRequest,
   SeckillConfigCreateRequest,
   SeckillType,
+  ProductListItem,
 } from './api-type';
 
 const delay = (ms = 220) => new Promise(resolve => setTimeout(resolve, ms));
@@ -115,6 +116,42 @@ const mockCouponStats: Record<string, CouponStatsResponse> = {
   coupon_1002: { total: 2000, used: 320, unused: 1680 },
   coupon_1003: { total: 800, used: 95, unused: 705 },
 };
+
+const mockProducts: ProductListItem[] = [
+  {
+    product_id: 'p1001',
+    name: 'ThinkPad X1 Carbon 2025',
+    brand_id: 'b01',
+    brand_name: 'ThinkPad',
+    category_id: 'c-notebook',
+    category_name: '笔记本',
+    status: '正常',
+    main_image: '',
+    created_at: '2025-01-05T10:00:00Z',
+  },
+  {
+    product_id: 'p1002',
+    name: '拯救者 R9000P 2025',
+    brand_id: 'b02',
+    brand_name: '拯救者',
+    category_id: 'c-notebook',
+    category_name: '游戏本',
+    status: '正常',
+    main_image: '',
+    created_at: '2025-02-10T10:00:00Z',
+  },
+  {
+    product_id: 'p1003',
+    name: '小新 Pad Pro',
+    brand_id: 'b03',
+    brand_name: '小新',
+    category_id: 'c-tablet',
+    category_name: '平板',
+    status: '正常',
+    main_image: '',
+    created_at: '2024-12-20T10:00:00Z',
+  },
+];
 
 type MockSeckillConfig = {
   seckill_product_config_id: string;
@@ -296,6 +333,10 @@ export const marketingMock = {
       });
     });
     return null;
+  },
+  async listProducts(): Promise<ProductListItem[]> {
+    await delay();
+    return mockProducts.map(p => ({ ...p }));
   },
   async listSeckillRounds(): Promise<MockSeckillRound[]> {
     await delay();

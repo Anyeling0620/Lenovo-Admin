@@ -108,7 +108,8 @@ const Seckill: React.FC = () => {
       setProductList(res);
     } catch (error) {
       globalErrorHandler.handle(error, globalMessage.error);
-      setProductList([]);
+      const mock = await marketingMock.listProducts();
+      setProductList(mock);
     } finally {
       setProductFetchLoading(false);
     }
