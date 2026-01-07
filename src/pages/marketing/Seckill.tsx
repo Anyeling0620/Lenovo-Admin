@@ -59,6 +59,7 @@ const Seckill: React.FC = () => {
   const [selectedProduct, setSelectedProduct] = useState<ProductListItem | null>(null);
   const [productConfigs, setProductConfigs] = useState<ProductConfigResponse[]>([]);
   const [productConfigLoading, setProductConfigLoading] = useState(false);
+  const [computedPrice, setComputedPrice] = useState<number | null>(null); // Initialize computed price
 
   const [roundForm] = Form.useForm();
   const [productForm] = Form.useForm();
@@ -126,15 +127,41 @@ const Seckill: React.FC = () => {
     }
   };
 
+  const calcSeckillPrice = (values: any, configs: ProductConfigResponse[] = productConfigs): number | null => {
+    const cfg = configs.find(item => item.product_config_id === values.config_id);
+    if (!cfg) return null;
+    const base = Number((cfg as any).sale_price ?? 0);
+    if (!Number.isFinite(base)) return null;
+    const type = values.type;
+    if (type === '立减') {
+      const price = base - Number(values.reduce_amount || 0);
+      return Math.max(0, Number(price.toFixed(2)));
+    }
+    if (type === '打折') {
+      const price = base * Number(values.discount || 0) / 10;
+      return Math.max(0, Number(price.toFixed(2)));
+    }
+    return null;
+  };
+
+  const refreshComputedPrice = () => {
+    const values = productForm.getFieldsValue();
+    const price = calcSeckillPrice(values);
+    setComputedPrice(price);
+  };
+
   const loadProductConfigs = async (productId: string) => {
     if (!productId) {
       setProductConfigs([]);
+      setComputedPrice(null); // Clear computed price when no product id provided
       return;
     }
     setProductConfigLoading(true);
     try {
       const res = await getProductConfigs(productId);
       setProductConfigs(res);
+      const values = productForm.getFieldsValue();
+      setComputedPrice(calcSeckillPrice(values, res));
     } catch (error) {
       globalErrorHandler.handle(error, globalMessage.error);
       const mock = await marketingMock.listProductConfigs(productId);
@@ -142,10 +169,13 @@ const Seckill: React.FC = () => {
       if (mock.length) {
         globalMessage.info('已切换为模拟配置');
       }
+      const values = productForm.getFieldsValue();
+      setComputedPrice(calcSeckillPrice(values, mock));
     } finally {
       setProductConfigLoading(false);
     }
   };
+
 
   const confirmProduct = () => {
     if (!selectedProduct) return;
@@ -153,13 +183,10 @@ const Seckill: React.FC = () => {
       product_id: selectedProduct.product_id,
       product_name: selectedProduct.name,
       config_id: undefined,
-      config1: undefined,
-      config2: undefined,
-      config3: undefined,
       shelf_num: undefined,
-      seckill_price: undefined,
     });
     setProductConfigs([]);
+    setComputedPrice(null); // Clear computed price when product changes
     loadProductConfigs(selectedProduct.product_id);
     setProductModalOpen(false);
   };
@@ -196,6 +223,7 @@ const Seckill: React.FC = () => {
       reduce_amount: values.type === '立减' ? values.reduce_amount : undefined,
       discount: values.type === '打折' ? values.discount : undefined,
     };
+    const priceForPayload = calcSeckillPrice(values);
     setProductLoading(true);
     let createdProductId = '';
     try {
@@ -223,7 +251,7 @@ const Seckill: React.FC = () => {
         config2: values.config2,
         config3: values.config3,
         shelf_num: Number(values.shelf_num || 0),
-        seckill_price: Number(values.seckill_price || 0),
+        seckill_price: Number(priceForPayload ?? 0),
       };
       try {
         await addSeckillConfigApi(configPayload);
@@ -270,7 +298,16 @@ const Seckill: React.FC = () => {
       </Card>
 
       <Card size="small" title="添加秒杀商品与配置">
-        <Form form={productForm} layout="vertical" onFinish={handleAddProduct}>
+        <Form
+          form={productForm}
+          layout="vertical"
+          onFinish={handleAddProduct}
+          onValuesChange={(changed) => {
+            if (['type', 'reduce_amount', 'discount', 'config_id'].some(key => key in changed)) {
+              refreshComputedPrice();
+            }
+          }}
+        >
           <Flex gap={12} wrap="wrap">
             <Form.Item name="round_id" label="所属轮次" rules={[{ required: true, message: '请选择轮次' }]} style={{ minWidth: 220 }}>
               <Select options={roundOptions} placeholder="选择轮次" />
@@ -318,34 +355,16 @@ const Seckill: React.FC = () => {
                 loading={productConfigLoading}
                 disabled={!selectedProduct}
                 allowClear
-                onChange={(value, option) => {
-                  const cfg = (option as any)?.cfg as ProductConfigResponse | undefined;
-                  if (cfg) {
-                    productForm.setFieldsValue({
-                      config1: cfg.config1,
-                      config2: cfg.config2,
-                      config3: cfg.config3 ?? undefined,
-                    });
-                  } else {
-                    productForm.setFieldsValue({ config1: undefined, config2: undefined, config3: undefined });
-                  }
+                onChange={() => {
+                  refreshComputedPrice();
                 }}
               />
             </Form.Item>
-            <Form.Item name="config1" label="规格1" style={{ minWidth: 160 }}>
-              <Input placeholder="如 16G+512G" />
-            </Form.Item>
-            <Form.Item name="config2" label="规格2" style={{ minWidth: 160 }}>
-              <Input placeholder="可选" />
-            </Form.Item>
-            <Form.Item name="config3" label="规格3" style={{ minWidth: 160 }}>
-              <Input placeholder="可选" />
+            <Form.Item label="秒杀价" style={{ minWidth: 160 }}>
+              <Text strong>{computedPrice !== null ? `¥${computedPrice}` : '暂无'}</Text>
             </Form.Item>
             <Form.Item name="shelf_num" label="库存" style={{ minWidth: 140 }}>
               <InputNumber style={{ width: '100%' }} min={0} placeholder="件" />
-            </Form.Item>
-            <Form.Item name="seckill_price" label="秒杀价" style={{ minWidth: 160 }}>
-              <InputNumber style={{ width: '100%' }} min={0} placeholder="元" />
             </Form.Item>
           </Flex>
 
