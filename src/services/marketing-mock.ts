@@ -15,6 +15,7 @@ import type {
   SeckillConfigCreateRequest,
   SeckillType,
   ProductListItem,
+  ProductConfigResponse,
 } from './api-type';
 
 const delay = (ms = 220) => new Promise(resolve => setTimeout(resolve, ms));
@@ -152,6 +153,79 @@ const mockProducts: ProductListItem[] = [
     created_at: '2024-12-20T10:00:00Z',
   },
 ];
+
+const mockProductConfigs: Record<string, ProductConfigResponse[]> = {
+  p1001: [
+    {
+      product_config_id: 'cfg_p1001_1',
+      product_id: 'p1001',
+      config1: '16G+512G',
+      config2: '标准版',
+      config3: null,
+      sale_price: 8999,
+      original_price: 9999,
+      status: '正常',
+      stock: {
+        stock_id: 'stk_p1001_1',
+        stock_num: 120,
+        warn_num: 10,
+        freeze_num: 5,
+      },
+    },
+    {
+      product_config_id: 'cfg_p1001_2',
+      product_id: 'p1001',
+      config1: '32G+1T',
+      config2: '高配版',
+      config3: null,
+      sale_price: 10999,
+      original_price: 12999,
+      status: '正常',
+      stock: {
+        stock_id: 'stk_p1001_2',
+        stock_num: 60,
+        warn_num: 6,
+        freeze_num: 3,
+      },
+    },
+  ],
+  p1002: [
+    {
+      product_config_id: 'cfg_p1002_1',
+      product_id: 'p1002',
+      config1: '32G+1T',
+      config2: 'RTX 4070',
+      config3: '240Hz',
+      sale_price: 9999,
+      original_price: 11999,
+      status: '正常',
+      stock: {
+        stock_id: 'stk_p1002_1',
+        stock_num: 80,
+        warn_num: 8,
+        freeze_num: 2,
+      },
+    },
+  ],
+  p1003: [
+    {
+      product_config_id: 'cfg_p1003_1',
+      product_id: 'p1003',
+      config1: '8G+256G',
+      config2: 'WiFi',
+      config3: '灰色',
+      sale_price: 1999,
+      original_price: 2399,
+      status: '正常',
+      stock: {
+        stock_id: 'stk_p1003_1',
+        stock_num: 150,
+        warn_num: 15,
+        freeze_num: 4,
+      },
+    },
+  ],
+};
 
 type MockSeckillConfig = {
   seckill_product_config_id: string;
@@ -337,6 +411,10 @@ export const marketingMock = {
   async listProducts(): Promise<ProductListItem[]> {
     await delay();
     return mockProducts.map(p => ({ ...p }));
+  },
+  async listProductConfigs(productId: string): Promise<ProductConfigResponse[]> {
+    await delay();
+    return (mockProductConfigs[productId] || []).map(cfg => ({ ...cfg, stock: cfg.stock ? { ...cfg.stock } : null }));
   },
   async listSeckillRounds(): Promise<MockSeckillRound[]> {
     await delay();

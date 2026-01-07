@@ -7,6 +7,7 @@ import {
   addSeckillProductApi,
   addSeckillConfigApi,
   getProducts,
+  getProductConfigs,
 } from '../../services/api';
 import type {
   SeckillRoundResponse,
@@ -14,6 +15,7 @@ import type {
   SeckillProductCreateRequest,
   SeckillConfigCreateRequest,
   ProductListItem,
+  ProductConfigResponse,
 } from '../../services/api-type';
 import { marketingMock } from '../../services/marketing-mock';
 import { globalMessage } from '../../utils/globalMessage';
@@ -55,6 +57,8 @@ const Seckill: React.FC = () => {
   const [productSearch, setProductSearch] = useState('');
   const [productList, setProductList] = useState<ProductListItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<ProductListItem | null>(null);
+  const [productConfigs, setProductConfigs] = useState<ProductConfigResponse[]>([]);
+  const [productConfigLoading, setProductConfigLoading] = useState(false);
 
   const [roundForm] = Form.useForm();
   const [productForm] = Form.useForm();
@@ -122,12 +126,41 @@ const Seckill: React.FC = () => {
     }
   };
 
+  const loadProductConfigs = async (productId: string) => {
+    if (!productId) {
+      setProductConfigs([]);
+      return;
+    }
+    setProductConfigLoading(true);
+    try {
+      const res = await getProductConfigs(productId);
+      setProductConfigs(res);
+    } catch (error) {
+      globalErrorHandler.handle(error, globalMessage.error);
+      const mock = await marketingMock.listProductConfigs(productId);
+      setProductConfigs(mock);
+      if (mock.length) {
+        globalMessage.info('已切换为模拟配置');
+      }
+    } finally {
+      setProductConfigLoading(false);
+    }
+  };
+
   const confirmProduct = () => {
     if (!selectedProduct) return;
     productForm.setFieldsValue({
       product_id: selectedProduct.product_id,
       product_name: selectedProduct.name,
+      config_id: undefined,
+      config1: undefined,
+      config2: undefined,
+      config3: undefined,
+      shelf_num: undefined,
+      seckill_price: undefined,
     });
+    setProductConfigs([]);
+    loadProductConfigs(selectedProduct.product_id);
     setProductModalOpen(false);
   };
 
@@ -274,8 +307,30 @@ const Seckill: React.FC = () => {
 
           <Divider orientation="left">可选配置（SKU 价格/库存）</Divider>
           <Flex gap={12} wrap="wrap">
-            <Form.Item name="config_id" label="配置ID" style={{ minWidth: 200 }}>
-              <Input placeholder="如 sku001" />
+            <Form.Item name="config_id" label="选择配置" style={{ minWidth: 240 }}>
+              <Select
+                placeholder={selectedProduct ? '选择商品配置（可选）' : '请先选择商品'}
+                options={productConfigs.map(cfg => ({
+                  label: `${cfg.config1} / ${cfg.config2}${cfg.config3 ? ' / ' + cfg.config3 : ''}（售价¥${cfg.sale_price}）`,
+                  value: cfg.product_config_id,
+                  cfg,
+                }))}
+                loading={productConfigLoading}
+                disabled={!selectedProduct}
+                allowClear
+                onChange={(value, option) => {
+                  const cfg = (option as any)?.cfg as ProductConfigResponse | undefined;
+                  if (cfg) {
+                    productForm.setFieldsValue({
+                      config1: cfg.config1,
+                      config2: cfg.config2,
+                      config3: cfg.config3 ?? undefined,
+                    });
+                  } else {
+                    productForm.setFieldsValue({ config1: undefined, config2: undefined, config3: undefined });
+                  }
+                }}
+              />
             </Form.Item>
             <Form.Item name="config1" label="规格1" style={{ minWidth: 160 }}>
               <Input placeholder="如 16G+512G" />
