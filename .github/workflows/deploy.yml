@@ -1,0 +1,46 @@
+name: Admin Panel Deploy
+
+on:
+  push:
+    branches:
+      - master # 或者是你希望触发部署的分支
+
+jobs:
+  build-and-deploy:
+    runs-on: self-hosted # 指向你刚刚在服务器启动的 runner
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Dependencies
+        run: pnpm install
+
+      # 注入生产环境配置：管理后台连接到 https 版本的 API 
+      - name: Inject Production Env
+        run: |
+          echo "VITE_API_BASE_URL=https://api.jxutcm.top" > .env.production
+          echo "VITE_PUBLIC_AVATAR_PATH=static/images/admin/avatar/" >> .env.production
+          echo "VITE_PUBLIC_PRODUCT_IMAGE_PATH=static/images/products/" >> .env.production
+          echo "VITE_USE_MOCK_DATA=false" >> .env.production
+
+      # 限制打包内存，防止卡死服务器
+      - name: Build Project
+        run: |
+          rm -rf dist # 强制删除旧构建目录
+          export NODE_OPTIONS="--max-old-space-size=1024"
+          pnpm vite build
+
+      # 部署到 Web 根目录
+      - name: Deploy to Web Root
+        run: |
+          # 解锁宝塔可能的锁定
+          if [ -f /www/wwwroot/admin.jxutcm.top/.user.ini ]; then
+            chattr -i /www/wwwroot/admin.jxutcm.top/.user.ini
+          fi
+          
+          # 同步产物
+          rsync -av --delete --exclude='.user.ini' dist/ /www/wwwroot/admin.jxutcm.top/
+          
+          # 修正权限
+          chown -R www:www /www/wwwroot/admin.jxutcm.top/

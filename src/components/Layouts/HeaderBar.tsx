@@ -62,7 +62,7 @@ const HeaderBar: React.FC = () => {
     const [userInfo] = useState<UserInfo>({
         name: '管理员',
         email: 'admin@lenovo.com',
-        avatar: 'http://q.qlogo.cn/headimg_dl?dst_uin=2154072905&spec=100&img_type=jpg', // 示例头像URL
+        avatar: 'https://q.qlogo.cn/headimg_dl?dst_uin=2154072905&spec=100&img_type=jpg', // 示例头像URL
     });
 
     // 模拟通知消息列表
