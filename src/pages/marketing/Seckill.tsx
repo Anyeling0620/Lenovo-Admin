@@ -17,7 +17,6 @@ import type {
   ProductListItem,
   ProductConfigResponse,
 } from '../../services/api-type';
-import { marketingMock } from '../../services/marketing-mock';
 import { globalMessage } from '../../utils/globalMessage';
 import { globalErrorHandler } from '../../utils/globalAxiosErrorHandler';
 
@@ -95,8 +94,7 @@ const Seckill: React.FC = () => {
       setRounds(res.map(item => ({ ...item, products: (item as any).products || [] })));
     } catch (error) {
       globalErrorHandler.handle(error, globalMessage.error);
-      const mockRes = await marketingMock.listSeckillRounds();
-      setRounds(mockRes);
+      setRounds([]);
     } finally {
       setLoading(false);
     }
@@ -113,8 +111,7 @@ const Seckill: React.FC = () => {
       setProductList(res);
     } catch (error) {
       globalErrorHandler.handle(error, globalMessage.error);
-      const mock = await marketingMock.listProducts();
-      setProductList(mock);
+      setProductList([]);
     } finally {
       setProductFetchLoading(false);
     }
@@ -164,13 +161,8 @@ const Seckill: React.FC = () => {
       setComputedPrice(calcSeckillPrice(values, res));
     } catch (error) {
       globalErrorHandler.handle(error, globalMessage.error);
-      const mock = await marketingMock.listProductConfigs(productId);
-      setProductConfigs(mock);
-      if (mock.length) {
-        globalMessage.info('已切换为模拟配置');
-      }
-      const values = productForm.getFieldsValue();
-      setComputedPrice(calcSeckillPrice(values, mock));
+      setProductConfigs([]);
+      setComputedPrice(null);
     } finally {
       setProductConfigLoading(false);
     }
@@ -205,8 +197,6 @@ const Seckill: React.FC = () => {
       globalMessage.success('创建秒杀轮次成功');
     } catch (error) {
       globalErrorHandler.handle(error, globalMessage.error);
-      await marketingMock.createSeckillRound(payload);
-      globalMessage.success('已在模拟环境创建轮次');
     } finally {
       setCreateLoading(false);
       fetchRounds();
@@ -232,9 +222,6 @@ const Seckill: React.FC = () => {
       globalMessage.success('已添加秒杀商品');
     } catch (error) {
       globalErrorHandler.handle(error, globalMessage.error);
-      const res = await marketingMock.addSeckillProduct(productPayload);
-      createdProductId = res.seckill_product_id;
-      globalMessage.success('已在模拟环境添加商品');
     }
 
     // 配置可选
@@ -258,8 +245,6 @@ const Seckill: React.FC = () => {
         globalMessage.success('已添加秒杀配置');
       } catch (error) {
         globalErrorHandler.handle(error, globalMessage.error);
-        await marketingMock.addSeckillConfig(configPayload);
-        globalMessage.success('已在模拟环境添加配置');
       }
     }
 

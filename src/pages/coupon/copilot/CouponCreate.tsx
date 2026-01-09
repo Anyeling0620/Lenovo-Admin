@@ -9,7 +9,6 @@ import { createCouponApi, setCouponCenter } from '../../../services/api';
 import type { CouponCreateRequest } from '../../../services/api-type';
 import { globalErrorHandler } from '../../../utils/globalAxiosErrorHandler';
 import { globalMessage } from '../../../utils/globalMessage';
-import { marketingMock } from '../../../services/marketing-mock';
 
 const { Title, Text } = Typography;
 
@@ -88,27 +87,9 @@ const CouponCreate: React.FC = () => {
         globalMessage.success('创建并投放福利中心成功');
       } catch (error) {
         globalErrorHandler.handle(error, globalMessage.error);
-        await marketingMock.setCouponCenter({
-          coupon_id: res.coupon_id,
-          start_time: payload.start_time,
-          end_time: payload.expire_time,
-          total_num: Number(values.centerTotalNum || 0),
-          limit_num: Number(values.centerLimitNum || 0),
-        });
-        globalMessage.success('创建成功，已在模拟环境投放福利中心');
       }
     } catch (error) {
       globalErrorHandler.handle(error, globalMessage.error);
-      const res = await marketingMock.createCoupon(payload);
-      setCreatedId(res.coupon_id);
-      await marketingMock.setCouponCenter({
-        coupon_id: res.coupon_id,
-        start_time: payload.start_time,
-        end_time: payload.expire_time,
-        total_num: Number(values.centerTotalNum || 0),
-        limit_num: Number(values.centerLimitNum || 0),
-      });
-      globalMessage.success('已在模拟环境创建并投放福利中心');
     } finally {
       setLoading(false);
     }
