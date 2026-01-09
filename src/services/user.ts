@@ -1,6 +1,6 @@
 import request from "../utils/request";
 import { API_PATHS } from "./api-paths";
-import { mockApi, mockUsers, mockAdmins, mockPermissions, mockIdentities, mockOnlineUsers, mockOnlineAdmins, mockLoginRecords, mockUserStatistics } from "./mock-data";
+import { mockApi, mockUsers, mockAdmins, mockPermissions, mockIdentities, mockUserStatistics } from "./mock-data";
 
 /**
  * 检查是否使用模拟数据
@@ -9,7 +9,54 @@ import { mockApi, mockUsers, mockAdmins, mockPermissions, mockIdentities, mockOn
  * 2. 开发环境 (import.meta.env.DEV)
  * 用途：在开发阶段使用模拟数据，避免依赖真实后端服务
  */
-const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA === 'true' || import.meta.env.DEV;
+// 不使用严格/强制的 mock 逻辑：仅当显式声明 VITE_USE_MOCK_DATA=true 才启用 mock。
+// 这样管理面板默认会从后端 lenovo-shop-server 的 /admin/system/users 拉取数据。
+const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA === 'true';
+
+// 后端(lenovo-shop-server)管理端用户列表返回结构
+// 对应：GET /admin/system/users
+type BackendUserListItem = {
+  user_id: string;
+  account: string;
+  email: string | null;
+  nickname: string | null;
+  avatar: string | null;
+  member_type: string;
+  gender: string;
+  created_at: string | Date;
+  status?: string; // 添加 status 字段
+};
+
+const mapBackendUserToUser = (u: BackendUserListItem): User => {
+  const memberType = ((): User['memberType'] => {
+    if (u.member_type === 'SVIP') return 'SVIP';
+    if (u.member_type === 'VIP') return 'VIP';
+    return 'NORMAL';
+  })();
+
+  const gender = ((): User['gender'] => {
+    if (u.gender === 'MALE') return 'MALE';
+    if (u.gender === 'FEMALE') return 'FEMALE';
+    return 'UNKNOWN';
+  })();
+
+  return {
+    id: u.user_id,
+    account: u.account,
+    email: u.email ?? '',
+    nickname: u.nickname ?? undefined,
+    avatar: u.avatar ?? undefined,
+    memberType,
+    gender,
+    birthday: undefined,
+    createdAt: typeof u.created_at === 'string' ? u.created_at : u.created_at.toISOString(),
+    updatedAt: typeof u.created_at === 'string' ? u.created_at : u.created_at.toISOString(),
+    lastLoginTime: undefined,
+    status: (u.status as User['status']) || 'ACTIVE',
+    orderCount: 0,
+    totalSpent: 0,
+  };
+};
 
 // ==================== 客户端用户管理 ====================
 
@@ -80,8 +127,22 @@ export const getClientUsers = async (params: UserListParams): Promise<UserListRe
   if (USE_MOCK_DATA) {
     return mockApi.getClientUsers(params);
   }
-  const response = await request.get<UserListResponse>(API_PATHS.USER.CLIENT_LIST, { params });
-  return response;
+  // 后端目前提供的是系统用户全量列表：GET /admin/system/users
+  // 管理端 request.ts 会自动补 /admin 前缀，因此这里写 /system/users 即可。
+  const list = await request.get<BackendUserListItem[]>(`/system/users`, { params });
+  const mapped = Array.isArray(list) ? list.map(mapBackendUserToUser) : [];
+  const page = params.page ?? 1;
+  const pageSize = params.pageSize ?? 10;
+  // 后端当前接口不分页：前端做一次本地分页，保证 UI 行为不变。
+  const start = (page - 1) * pageSize;
+  const end = start + pageSize;
+  const paged = mapped.slice(start, end);
+  return {
+    list: paged,
+    total: mapped.length,
+    page,
+    pageSize,
+  };
 };
 
 /**
@@ -100,6 +161,45 @@ export const getClientUserDetail = async (userId: string): Promise<User> => {
 };
 
 /**
+ * 创建客户端用户（后端接口：POST /admin/system/users）
+ */
+export const createClientUser = async (data: {
+  account: string;
+  password: string;
+  email: string;
+  nickname?: string;
+  memberType?: User['memberType'];
+  status?: User['status'];
+}): Promise<User> => {
+  if (USE_MOCK_DATA) {
+    // mock：返回一个临时对象
+    return {
+      id: `mock_${Date.now()}`,
+      email: data.email,
+      account: data.account,
+      memberType: data.memberType ?? 'NORMAL',
+      gender: 'UNKNOWN',
+      nickname: data.nickname,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      status: data.status ?? 'ACTIVE',
+      orderCount: 0,
+      totalSpent: 0,
+    };
+  }
+
+  const created = await request.post<BackendUserListItem>(`/system/users`, {
+    account: data.account,
+    password: data.password,
+    email: data.email,
+    nickname: data.nickname,
+    member_type: data.memberType,
+    status: data.status,
+  });
+  return mapBackendUserToUser(created);
+};
+
+/**
  * 更新客户端用户信息
  * @param userId 用户ID
  * @param data 更新的用户数据
@@ -110,7 +210,14 @@ export const updateClientUser = async (userId: string, data: Partial<User>): Pro
     console.log('Mock update user:', userId, data);
     return Promise.resolve();
   }
-  await request.put(`${API_PATHS.USER.CLIENT_UPDATE}/${userId}`, data);
+
+  // 后端接口：PATCH /admin/system/users/:user_id
+  await request.patch(`/system/users/${userId}`, {
+    email: data.email,
+    nickname: data.nickname,
+    member_type: data.memberType,
+    status: data.status,
+  });
 };
 
 /**
@@ -123,7 +230,10 @@ export const deleteClientUser = async (userId: string): Promise<void> => {
     console.log('Mock delete user:', userId);
     return Promise.resolve();
   }
-  await request.delete(`${API_PATHS.USER.CLIENT_DELETE}/${userId}`);
+  // 后端(lenovo-shop-server)当前未提供对应的“删除客户端用户”管理端接口。
+  // 为避免误调用不存在的接口，这里先降级为前端提示/空操作。
+  console.warn('[ClientUser] deleteClientUser is not implemented on server yet:', userId);
+  return Promise.resolve();
 };
 
 /**
@@ -134,8 +244,36 @@ export const getClientUserStatistics = async (): Promise<UserStatistics> => {
   if (USE_MOCK_DATA) {
     return Promise.resolve(mockUserStatistics);
   }
-  const response = await request.get<UserStatistics>(API_PATHS.USER.CLIENT_STATISTICS);
-  return response;
+  // 后端当前未提供 /admin/user/client/statistics 之类的统计接口。
+  // 这里改为基于 /admin/system/users 的结果做本地统计，确保管理后台可用。
+  const list = await request.get<BackendUserListItem[]>(`/system/users`);
+  const mapped = Array.isArray(list) ? list.map(mapBackendUserToUser) : [];
+
+  const totalUsers = mapped.length;
+  const vipUsers = mapped.filter((u) => u.memberType === 'VIP').length;
+  const svipUsers = mapped.filter((u) => u.memberType === 'SVIP').length;
+  // 后端当前未返回 status，这里按现有数据能力做“近似统计”
+  const activeUsers = totalUsers;
+
+  const today = new Date();
+  const y = today.getFullYear();
+  const m = today.getMonth();
+  const d = today.getDate();
+  const startOfToday = new Date(y, m, d, 0, 0, 0, 0).getTime();
+  const newUsersToday = mapped.filter((u) => {
+    const t = Date.parse(u.createdAt);
+    return Number.isFinite(t) && t >= startOfToday;
+  }).length;
+
+  return {
+    totalUsers,
+    activeUsers,
+    newUsersToday,
+    vipUsers,
+    svipUsers,
+    // 后端当前未返回消费相关字段，保持 0，避免误导。
+    averageOrderValue: 0,
+  };
 };
 
 // ==================== 后台管理员管理 ====================

@@ -13,7 +13,6 @@ import {
   Statistic,
   Modal,
   Form,
-  message,
   Popconfirm,
   Tooltip,
   Badge,
@@ -40,6 +39,8 @@ import {
   getClientUsers, 
   getClientUserStatistics, 
   deleteClientUser,
+  createClientUser,
+  updateClientUser,
   type User,
   type UserListParams,
   type UserStatistics
@@ -72,7 +73,12 @@ const ClientUserManagement: React.FC = () => {
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
-  const { control, handleSubmit, reset, watch } = useForm<UserFilterForm>({
+  // 新增/编辑弹窗
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [form] = Form.useForm();
+
+  const { handleSubmit, reset, watch } = useForm<UserFilterForm>({
     resolver: zodResolver(userFilterSchema),
     defaultValues: {
       keyword: '',
@@ -178,6 +184,59 @@ const ClientUserManagement: React.FC = () => {
   const handleViewDetail = (user: User) => {
     setSelectedUser(user);
     setDetailModalVisible(true);
+  };
+
+  const openCreateModal = () => {
+    setEditingUser(null);
+    form.resetFields();
+    setEditModalVisible(true);
+  };
+
+  const openEditModal = (user: User) => {
+    setEditingUser(user);
+    form.setFieldsValue({
+      account: user.account,
+      nickname: user.nickname,
+      email: user.email,
+      memberType: user.memberType,
+      status: user.status,
+    });
+    setEditModalVisible(true);
+  };
+
+  const handleSaveUser = async () => {
+    try {
+      const values = await form.validateFields();
+
+      if (editingUser) {
+        await updateClientUser(editingUser.id, {
+          email: values.email,
+          nickname: values.nickname,
+          memberType: values.memberType,
+          status: values.status,
+        });
+        globalMessage.success('用户更新成功');
+      } else {
+        await createClientUser({
+          account: values.account,
+          password: values.password,
+          email: values.email,
+          nickname: values.nickname,
+          memberType: values.memberType,
+          status: values.status || 'ACTIVE',
+        });
+        globalMessage.success('用户创建成功');
+      }
+
+      // 刷新列表/统计
+      loadUserList();
+      loadStatistics();
+
+      setEditModalVisible(false);
+    } catch (error) {
+      // 表单校验失败会抛出，直接返回即可
+      if (error) return;
+    }
   };
 
   // 表格列定义
@@ -291,7 +350,7 @@ const ClientUserManagement: React.FC = () => {
             <Button 
               type="text" 
               icon={<EditOutlined />}
-              disabled={record.status === 'BANNED'}
+              onClick={() => openEditModal(record)}
             />
           </Tooltip>
           <Tooltip title="删除">
@@ -305,7 +364,6 @@ const ClientUserManagement: React.FC = () => {
                 type="text" 
                 danger 
                 icon={<DeleteOutlined />}
-                disabled={record.status === 'BANNED'}
               />
             </Popconfirm>
           </Tooltip>
@@ -377,7 +435,7 @@ const ClientUserManagement: React.FC = () => {
               <Button
                 type="primary"
                 icon={<PlusOutlined />}
-                // onClick={() => setCreateModalVisible(true)}
+                onClick={openCreateModal}
               >
                 新增用户
               </Button>
@@ -577,6 +635,83 @@ const ClientUserManagement: React.FC = () => {
             </Row>
           </div>
         )}
+      </Modal>
+
+      {/* 新增/编辑用户模态框 */}
+      <Modal
+        title={editingUser ? '编辑用户' : '新增用户'}
+        open={editModalVisible}
+        onCancel={() => setEditModalVisible(false)}
+        onOk={handleSaveUser}
+        okText="保存"
+        cancelText="取消"
+        width={640}
+      >
+        <Form form={form} layout="vertical">
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                label="账号"
+                name="account"
+                rules={[{ required: true, message: '请输入账号' }]}
+              >
+                <Input placeholder="请输入账号" disabled={!!editingUser} />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                label="昵称"
+                name="nickname"
+              >
+                <Input placeholder="请输入昵称" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          {!editingUser && (
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item
+                  label="初始密码"
+                  name="password"
+                  rules={[{ required: true, message: '请输入初始密码' }]}
+                >
+                  <Input.Password placeholder="请输入初始密码" />
+                </Form.Item>
+              </Col>
+              <Col span={12} />
+            </Row>
+          )}
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                label="邮箱"
+                name="email"
+                rules={[{ type: 'email', message: '邮箱格式不正确' }]}
+              >
+                <Input placeholder="请输入邮箱" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="会员类型" name="memberType">
+                <Select placeholder="请选择会员类型" allowClear>
+                  <Option value="NORMAL">普通会员</Option>
+                  <Option value="VIP">VIP会员</Option>
+                  <Option value="SVIP">SVIP会员</Option>
+                </Select>
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item label="状态" name="status">
+            <Select placeholder="请选择状态" allowClear>
+              <Option value="ACTIVE">活跃</Option>
+              <Option value="INACTIVE">未激活</Option>
+              <Option value="BANNED">已封禁</Option>
+            </Select>
+          </Form.Item>
+        </Form>
       </Modal>
     </div>
   );
