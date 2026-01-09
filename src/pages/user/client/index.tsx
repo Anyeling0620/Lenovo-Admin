@@ -13,7 +13,8 @@ import {
   Modal,
   Form,
   Tooltip,
-  Descriptions
+  Descriptions,
+  Statistic
 } from 'antd';
 import { 
   SearchOutlined, 
@@ -22,7 +23,10 @@ import {
   EyeOutlined,
   FilterOutlined,
   ShoppingOutlined,
-  DollarOutlined
+  DollarOutlined,
+  UserOutlined,
+  UserAddOutlined,
+  CrownOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useForm } from 'react-hook-form';
@@ -32,8 +36,10 @@ import dayjs from 'dayjs';
 import { 
   getClientUsers, 
   updateClientUser,
+  getClientUserStatistics,
   type User,
-  type UserListParams
+  type UserListParams,
+  type ClientUserStatistics
 } from '../../../services/user';
 import { globalMessage } from '../../../utils/globalMessage';
 import { globalErrorHandler } from '../../../utils/globalAxiosErrorHandler';
@@ -60,6 +66,10 @@ const ClientUserManagement: React.FC = () => {
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
+  // 统计数据
+  const [statistics, setStatistics] = useState<ClientUserStatistics | null>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+
   // 编辑弹窗
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -72,6 +82,19 @@ const ClientUserManagement: React.FC = () => {
       memberType: '',
     }
   });
+
+  // 加载统计数据
+  const loadStatistics = async () => {
+    setStatsLoading(true);
+    try {
+      const stats = await getClientUserStatistics();
+      setStatistics(stats);
+    } catch (error) {
+      console.error('Failed to load statistics:', error);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
 
   // 加载用户列表
   const loadUserList = async (params: UserListParams = {}) => {
@@ -90,6 +113,10 @@ const ClientUserManagement: React.FC = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadStatistics();
+  }, []);
 
   useEffect(() => {
     loadUserList();
@@ -263,6 +290,49 @@ const ClientUserManagement: React.FC = () => {
 
   return (
     <div className="p-4">
+      {/* 统计卡片 */}
+      <Row gutter={16} className="mb-6">
+        <Col span={6}>
+          <Card loading={statsLoading}>
+            <Statistic
+              title="用户总数"
+              value={statistics?.totalUsers ?? 0}
+              prefix={<UserOutlined />}
+            />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card loading={statsLoading}>
+            <Statistic
+              title="今日新增"
+              value={statistics?.newUsersToday ?? 0}
+              prefix={<UserAddOutlined />}
+              valueStyle={{ color: '#3f8600' }}
+            />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card loading={statsLoading}>
+            <Statistic
+              title="VIP会员"
+              value={statistics?.vipUsers ?? 0}
+              prefix={<CrownOutlined />}
+              valueStyle={{ color: '#1890ff' }}
+            />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card loading={statsLoading}>
+            <Statistic
+              title="SVIP会员"
+              value={statistics?.svipUsers ?? 0}
+              prefix={<CrownOutlined />}
+              valueStyle={{ color: '#faad14' }}
+            />
+          </Card>
+        </Col>
+      </Row>
+
       {/* 搜索和操作栏 */}
       <Card className="mb-6">
         <Row justify="end" align="middle" gutter={[16, 16]}>

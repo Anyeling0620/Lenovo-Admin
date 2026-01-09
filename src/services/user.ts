@@ -131,6 +131,27 @@ export const updateClientUser = async (userId: string, data: Partial<User>): Pro
   });
 };
 
+/**
+ * 客户端用户统计数据接口
+ */
+export interface ClientUserStatistics {
+  totalUsers: number;
+  activeUsers: number;
+  newUsersToday: number;
+  vipUsers: number;
+  svipUsers: number;
+  averageOrderValue: number;
+}
+
+/**
+ * 获取客户端用户统计数据
+ * @returns 统计数据
+ */
+export const getClientUserStatistics = async (): Promise<ClientUserStatistics> => {
+  const response = await request.get<ClientUserStatistics>(`/clients/statistics`);
+  return response;
+};
+
 
 // ==================== 后台管理员管理 ====================
 
