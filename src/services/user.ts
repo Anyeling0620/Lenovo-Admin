@@ -197,8 +197,107 @@ export interface AdminListResponse {
  * @returns 管理员列表响应数据
  */
 export const getAdminList = async (params: AdminListParams): Promise<AdminListResponse> => {
-  const response = await request.get<AdminListResponse>(API_PATHS.USER.ADMIN_LIST, { params });
-  return response;
+  // 后端 /system/admins 返回的是 AdminListItem[] 数组，不是分页结构
+  // 需要手动处理分页逻辑
+  type BackendAdminListItem = {
+    admin_id: string;
+    account: string;
+    name: string;
+    nickname?: string | null;
+    email?: string | null;
+    status: string;
+    identities?: Array<{
+      admin_identity_id: string;
+      identity_id: string;
+      identity_name: string;
+      identity_code: string;
+      status: string;
+      expire_time?: string | null;
+    }>;
+    categories?: Array<{
+      admin_product_category_id: string;
+      category_id: string;
+      category_name: string;
+      category_code: string;
+      status: string;
+    }>;
+  };
+  
+  const backendList = await request.get<BackendAdminListItem[]>(API_PATHS.USER.ADMIN_LIST);
+  
+  // 状态映射：后端中文 -> 前端英文
+  const mapStatus = (status: string): 'ACTIVE' | 'INACTIVE' | 'BANNED' => {
+    if (status === '启用') return 'ACTIVE';
+    if (status === '禁用') return 'INACTIVE';
+    return 'INACTIVE'; // 默认为停用
+  };
+  
+  // 转换为前端格式
+  let list: Admin[] = backendList.map(item => ({
+    id: item.admin_id,
+    account: item.account,
+    name: item.name,
+    email: item.email || undefined,
+    avatar: undefined,
+    nickname: item.nickname || undefined,
+    status: mapStatus(item.status),
+    createdAt: '', // 后端未返回创建时间，留空
+    lastLoginTime: undefined,
+    creatorId: undefined,
+    creatorName: undefined,
+    identities: (item.identities || []).map(i => ({
+      id: i.identity_id,
+      name: i.identity_name,
+      code: i.identity_code,
+      description: undefined,
+      isSystem: false,
+      status: i.status === '启用' ? 'ACTIVE' : 'INACTIVE',
+      createdAt: '',
+      permissions: []
+    })),
+    productCategories: (item.categories || []).map(c => ({
+      id: c.category_id,
+      name: c.category_name,
+      code: c.category_code,
+      parentId: undefined,
+      status: c.status === '启用' ? 'ACTIVE' : 'INACTIVE'
+    }))
+  }));
+  
+  // 前端手动实现筛选逻辑
+  if (params.keyword) {
+    const keyword = params.keyword.toLowerCase();
+    list = list.filter(admin => 
+      admin.account.toLowerCase().includes(keyword) ||
+      admin.name.toLowerCase().includes(keyword) ||
+      (admin.email && admin.email.toLowerCase().includes(keyword))
+    );
+  }
+  
+  if (params.status) {
+    list = list.filter(admin => admin.status === params.status);
+  }
+  
+  if (params.identityId) {
+    list = list.filter(admin => 
+      admin.identities.some(identity => identity.id === params.identityId)
+    );
+  }
+  
+  // 前端手动实现分页逻辑
+  const page = params.page || 1;
+  const pageSize = params.pageSize || 10;
+  const total = list.length;
+  const startIndex = (page - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const paginatedList = list.slice(startIndex, endIndex);
+  
+  return {
+    list: paginatedList,
+    total,
+    page,
+    pageSize
+  };
 };
 
 /**
@@ -233,7 +332,18 @@ export interface CreateAdminParams {
  * @returns 新创建的管理员数据
  */
 export const createAdmin = async (data: CreateAdminParams): Promise<Admin> => {
-  const response = await request.post<Admin>(API_PATHS.USER.ADMIN_CREATE, data);
+  // 后端期望 snake_case 参数名
+  const backendParams = {
+    account: data.account,
+    password: data.password,
+    name: data.name,
+    email: data.email,
+    avatar: data.avatar,
+    nickname: data.nickname,
+    identity_ids: data.identityIds || [],
+    category_ids: data.categoryIds || [],
+  };
+  const response = await request.post<Admin>(API_PATHS.USER.ADMIN_CREATE, backendParams);
   return response;
 };
 
@@ -263,8 +373,8 @@ export const deleteAdmin = async (adminId: string): Promise<void> => {
  * @returns Promise<void>
  */
 export const resetAdminPassword = async (adminId: string, newPassword: string): Promise<void> => {
-  // Use ADMIN_DETAIL path (which is /system/admins) to construct the URL
-  await request.post(`${API_PATHS.USER.ADMIN_DETAIL}/${adminId}/reset-password`, { newPassword });
+  // 后端期望的字段名是 new_password (蛇形命名)
+  await request.post(`${API_PATHS.USER.ADMIN_DETAIL}/${adminId}/reset-password`, { new_password: newPassword });
 };
 
 // ==================== 权限管理 ====================
@@ -393,8 +503,61 @@ export interface IdentityListResponse {
  * @returns 身份列表响应数据
  */
 export const getIdentityList = async (params: IdentityListParams): Promise<IdentityListResponse> => {
-  const response = await request.get<IdentityListResponse>(API_PATHS.USER.IDENTITY_LIST, { params });
-  return response;
+  // 后端 /system/identities 返回的是 IdentityWithPermissions[] 数组，不是分页结构
+  type BackendIdentity = {
+    identity_id: string;
+    identity_name: string;
+    identity_code: string;
+    description?: string | null;
+    is_system: boolean;
+    status: string;
+  };
+  
+  const backendList = await request.get<BackendIdentity[]>(API_PATHS.USER.IDENTITY_LIST);
+  
+  // 转换为前端格式
+  let list: Identity[] = backendList.map(item => ({
+    id: item.identity_id,
+    name: item.identity_name,
+    code: item.identity_code,
+    description: item.description || undefined,
+    isSystem: item.is_system,
+    status: item.status === '启用' ? 'ACTIVE' : 'INACTIVE',
+    createdAt: '', // 后端未返回创建时间
+    permissions: []
+  }));
+  
+  // 前端手动实现筛选逻辑
+  if (params.keyword) {
+    const keyword = params.keyword.toLowerCase();
+    list = list.filter(identity => 
+      identity.name.toLowerCase().includes(keyword) ||
+      identity.code.toLowerCase().includes(keyword)
+    );
+  }
+  
+  if (params.status) {
+    list = list.filter(identity => identity.status === params.status);
+  }
+  
+  if (params.isSystem !== undefined) {
+    list = list.filter(identity => identity.isSystem === params.isSystem);
+  }
+  
+  // 前端手动实现分页逻辑
+  const page = params.page || 1;
+  const pageSize = params.pageSize || 10;
+  const total = list.length;
+  const startIndex = (page - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const paginatedList = list.slice(startIndex, endIndex);
+  
+  return {
+    list: paginatedList,
+    total,
+    page,
+    pageSize
+  };
 };
 
 /**
