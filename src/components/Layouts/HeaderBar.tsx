@@ -22,6 +22,7 @@ import globalErrorHandler from '../../utils/globalAxiosErrorHandler';
 import { globalMessage } from '../../utils/globalMessage';
 import { adminLogout } from '../../services/api';
 import useAdminProfileStore from '../../store/adminInfo';
+import { getImageUrl } from '../../utils/imageUrl';
 
 const { Header } = Layout;
 const { Text, Title } = Typography;
@@ -218,7 +219,7 @@ const HeaderBar: React.FC = () => {
             key: 'info',
             label: (
                 <Space align="start" className="pl-0 py-2 pr-4">
-                    <Avatar src={avatar} icon={<UserOutlined />} size="large" />
+                    <Avatar src={getImageUrl(avatar)} icon={<UserOutlined />} size="large" />
                     <div>
                         <Text strong>{name}</Text>
                         <div className="text-xs text-gray-500">{email}</div>
@@ -400,7 +401,7 @@ const HeaderBar: React.FC = () => {
                 {/* 用户信息下拉 */}
                 <Dropdown menu={{ items: userMenuItems }} placement="bottomRight" arrow>
                     <div className="flex items-center cursor-pointer p-1 gap-2 rounded-md hover:bg-gray-200 transition-colors">
-                        <Avatar src={avatar} icon={<UserOutlined />} />
+                        <Avatar src={getImageUrl(avatar)} icon={<UserOutlined />} />
                         <Text strong>{name}</Text>
                     </div>
                 </Dropdown>
