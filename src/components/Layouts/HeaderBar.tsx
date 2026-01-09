@@ -22,6 +22,7 @@ import globalErrorHandler from '../../utils/globalAxiosErrorHandler';
 import { globalMessage } from '../../utils/globalMessage';
 import { adminLogout } from '../../services/api';
 import useAdminProfileStore from '../../store/adminInfo';
+import { getImageUrl } from '../../utils/imageUrl';
 
 const { Header } = Layout;
 const { Text, Title } = Typography;
@@ -218,7 +219,7 @@ const HeaderBar: React.FC = () => {
             key: 'info',
             label: (
                 <Space align="start" className="pl-0 py-2 pr-4">
-                    <Avatar src={avatar} icon={<UserOutlined />} size="large" />
+                    <Avatar src={getImageUrl(avatar!)} icon={<UserOutlined />} size="large" />
                     <div>
                         <Text strong>{name}</Text>
                         <div className="text-xs text-gray-500">{email}</div>
