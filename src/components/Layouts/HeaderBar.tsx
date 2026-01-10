@@ -22,6 +22,7 @@ import globalErrorHandler from '../../utils/globalAxiosErrorHandler';
 import { globalMessage } from '../../utils/globalMessage';
 import { adminLogout } from '../../services/api';
 import useAdminProfileStore from '../../store/adminInfo';
+import { getImageUrl } from '../../utils/imageUrl';
 
 const { Header } = Layout;
 const { Text, Title } = Typography;
@@ -218,7 +219,7 @@ const HeaderBar: React.FC = () => {
             key: 'info',
             label: (
                 <Space align="start" className="pl-0 py-2 pr-4">
-                    <Avatar src={avatar} icon={<UserOutlined />} size="large" />
+                    <Avatar src={getImageUrl(avatar)} icon={<UserOutlined />} size="large" />
                     <div>
                         <Text strong>{name}</Text>
                         <div className="text-xs text-gray-500">{email}</div>
@@ -340,7 +341,7 @@ const HeaderBar: React.FC = () => {
                 <Title
                     level={2}
                     className="m-0 select-none mt-2! font-normal!"
-                    style={{ letterSpacing: '-8px' }} // 自定义压缩间距（数值可调整，如 -1px、-3px）
+                    style={{ letterSpacing: '-1px' }} // 减小压缩间距，避免文字重叠
                 >
                     LenovoAdmin
                 </Title>
@@ -400,7 +401,7 @@ const HeaderBar: React.FC = () => {
                 {/* 用户信息下拉 */}
                 <Dropdown menu={{ items: userMenuItems }} placement="bottomRight" arrow>
                     <div className="flex items-center cursor-pointer p-1 gap-2 rounded-md hover:bg-gray-200 transition-colors">
-                        <Avatar src={avatar} icon={<UserOutlined />} />
+                        <Avatar src={getImageUrl(avatar)} icon={<UserOutlined />} />
                         <Text strong>{name}</Text>
                     </div>
                 </Dropdown>

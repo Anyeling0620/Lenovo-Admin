@@ -11,7 +11,6 @@ import { getVouchers, getVoucherUsers, issueVoucherApi } from '../../../services
 import type { VoucherResponse, VoucherUserResponse, CouponStatsResponse } from '../../../services/api-type';
 import { globalErrorHandler } from '../../../utils/globalAxiosErrorHandler';
 import { globalMessage } from '../../../utils/globalMessage';
-import { marketingMock } from '../../../services/marketing-mock';
 
 const { Title, Text } = Typography;
 
@@ -54,24 +53,19 @@ const VoucherManage: React.FC = () => {
       setUsingMock(false);
     } catch (error) {
       globalErrorHandler.handle(error, globalMessage.error);
-      const list = await marketingMock.listVouchers();
-      setVouchers(list);
-      setSelectedId(list[0]?.voucher_id || '');
-      await loadVoucherStats(list, true);
-      setUsingMock(true);
-      globalMessage.info('已切换为模拟数据展示');
+      setVouchers([]);
+      setStatsMap({});
     } finally {
       setLoading(false);
     }
   };
 
-  const loadVoucherStats = async (list: VoucherResponse[], preferMock = false) => {
+  const loadVoucherStats = async (list: VoucherResponse[]) => {
     if (!list.length) {
       setStatsMap({});
       return;
     }
     const fetcher = async (id: string) => {
-      if (preferMock) return marketingMock.listVoucherUsers(id);
       return getVoucherUsers(id);
     };
     try {
@@ -85,29 +79,19 @@ const VoucherManage: React.FC = () => {
       setStatsMap(map);
     } catch (error) {
       globalErrorHandler.handle(error, globalMessage.error);
-      const results = await Promise.all(list.map(async item => {
-        const userList = await marketingMock.listVoucherUsers(item.voucher_id);
-        const used = userList.filter(u => u.use_up_time || Number(u.remain_amount) === 0).length;
-        return [item.voucher_id, { total: userList.length, used, unused: userList.length - used }] as const;
-      }));
-      const map: Record<string, CouponStatsResponse> = {};
-      results.forEach(([id, stat]) => { map[id] = stat; });
-      setStatsMap(map);
-      setUsingMock(true);
+      setStatsMap({});
     }
   };
 
-  const loadUsers = async (voucherId: string, preferMock = false) => {
+  const loadUsers = async (voucherId: string) => {
     if (!voucherId) return;
     setUserLoading(true);
     try {
-      const data = await (preferMock ? marketingMock.listVoucherUsers(voucherId) : getVoucherUsers(voucherId));
+      const data = await getVoucherUsers(voucherId);
       setUsers(data);
     } catch (error) {
       globalErrorHandler.handle(error, globalMessage.error);
-      const data = await marketingMock.listVoucherUsers(voucherId);
-      setUsers(data);
-      setUsingMock(true);
+      setUsers([]);
     } finally {
       setUserLoading(false);
     }
@@ -119,7 +103,7 @@ const VoucherManage: React.FC = () => {
 
   useEffect(() => {
     if (selectedId) {
-      loadUsers(selectedId, usingMock);
+      loadUsers(selectedId);
     }
   }, [selectedId]);
 
@@ -139,9 +123,6 @@ const VoucherManage: React.FC = () => {
       await Promise.all([loadUsers(selectedId), loadVoucherStats(vouchers)]);
     } catch (error) {
       globalErrorHandler.handle(error, globalMessage.error);
-      await marketingMock.issueVoucher(selectedId, { user_ids: userIds });
-      globalMessage.success('已在模拟环境发放');
-      await Promise.all([loadUsers(selectedId, true), loadVoucherStats(vouchers, true)]);
     }
     reset({ userIds: '' });
   });

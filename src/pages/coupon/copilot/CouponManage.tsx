@@ -22,7 +22,6 @@ import type {
 } from '../../../services/api-type';
 import { globalErrorHandler } from '../../../utils/globalAxiosErrorHandler';
 import { globalMessage } from '../../../utils/globalMessage';
-import { marketingMock } from '../../../services/marketing-mock';
 
 const { Title, Text } = Typography;
 
@@ -76,29 +75,21 @@ const CouponManage: React.FC = () => {
       setUsingMock(false);
     } catch (error) {
       globalErrorHandler.handle(error, globalMessage.error);
-      const [couponList, centerList] = await Promise.all([
-        marketingMock.listCoupons(),
-        marketingMock.listCouponCenters(),
-      ]);
-      setCoupons(couponList);
-      setAllCoupons(couponList);
-      setCenters(centerList);
-      setSelectedId(couponList[0]?.coupon_id || '');
-      await loadStatsForCoupons(couponList, true);
-      setUsingMock(true);
-      globalMessage.info('已切换为模拟数据展示');
+      setCoupons([]);
+      setAllCoupons([]);
+      setCenters([]);
+      setStatsMap({});
     } finally {
       setLoading(false);
     }
   };
 
-  const loadStatsForCoupons = async (list: CouponResponse[], preferMock = false) => {
+  const loadStatsForCoupons = async (list: CouponResponse[]) => {
     if (!list.length) {
       setStatsMap({});
       return;
     }
     const fetcher = async (couponId: string) => {
-      if (preferMock) return marketingMock.getCouponStats(couponId);
       return getCouponStats(couponId);
     };
     try {
@@ -111,14 +102,7 @@ const CouponManage: React.FC = () => {
       setStatsMap(map);
     } catch (error) {
       globalErrorHandler.handle(error, globalMessage.error);
-      const results = await Promise.all(list.map(async item => {
-        const data = await marketingMock.getCouponStats(item.coupon_id);
-        return [item.coupon_id, data] as const;
-      }));
-      const map: Record<string, CouponStatsResponse> = {};
-      results.forEach(([id, data]) => { map[id] = data; });
-      setStatsMap(map);
-      setUsingMock(true);
+      setStatsMap({});
     }
   };
 
@@ -137,15 +121,9 @@ const CouponManage: React.FC = () => {
       setUsingMock(false);
     } catch (error) {
       globalErrorHandler.handle(error, globalMessage.error);
-      const [couponDetail, couponUsers, couponStats] = await Promise.all([
-        marketingMock.getCouponDetail(couponId),
-        marketingMock.listCouponUsers(couponId),
-        marketingMock.getCouponStats(couponId),
-      ]);
-      setDetail(couponDetail);
-      setUsers(couponUsers);
-      setStats(couponStats);
-      setUsingMock(true);
+      setDetail(null);
+      setUsers([]);
+      setStats(null);
     } finally {
       setDetailLoading(false);
     }

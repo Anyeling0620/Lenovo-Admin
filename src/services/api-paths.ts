@@ -48,12 +48,5 @@ export const API_PATHS = {
         
         // 登录记录
         LOGIN_RECORDS: '/user/admin/login-records',
-    },
-
-    
-  
-
-
-
-
+    }
 };
