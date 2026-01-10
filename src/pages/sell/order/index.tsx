@@ -136,7 +136,7 @@ const OrderManagement: React.FC = () => {
       ),
     },
     {
-      title: '支付金额',
+      title: '待支付金额',
       dataIndex: 'pay_amount',
       key: 'pay_amount',
       width: 100,
