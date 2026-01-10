@@ -12,6 +12,7 @@ import { globalMessage } from '../../utils/globalMessage';
 import { globalErrorHandler } from '../../utils/globalAxiosErrorHandler';
 import { mockAdminProfile } from './mockData';
 import type { UploadFile } from 'antd/es/upload/interface';
+import useAdminProfileStore from '../../store/adminInfo';
 
 const { Option } = Select;
 
@@ -100,6 +101,11 @@ const AccountEdit: React.FC = () => {
         avatarFile: avatarFile || undefined,
       });
       globalMessage.success('个人信息更新成功');
+      
+      // 更新全局 store
+      const updatedProfile = await getAccountProfile();
+      useAdminProfileStore.getState().setProfile(updatedProfile);
+      
       navigate('/account/info');
     } catch (error) {
       globalErrorHandler.handle(error, globalMessage.error);

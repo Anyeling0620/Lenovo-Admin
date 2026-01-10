@@ -234,19 +234,19 @@ const HeaderBar: React.FC = () => {
         {
             key: 'profile',
             label: (
-                <div className="flex items-center">
+                <Link to="/account/info" className="flex items-center">
                     <UserOutlined className="mx-2" />
                     个人中心
-                </div>
+                </Link>
             ),
         },
         {
             key: 'settings',
             label: (
-                <div className="flex items-center">
+                <Link to="/account/security" className="flex items-center">
                     <SettingOutlined className="mx-2" />
                     账号设置
-                </div>
+                </Link>
             ),
         },
         {
