@@ -1,3 +1,5 @@
+/* eslint-disable react-hooks/exhaustive-deps */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect } from 'react';
 import { 
   Table, 
@@ -14,9 +16,7 @@ import {
   Popconfirm,
   Tooltip,
   Badge,
-  Avatar,
-  message
-} from 'antd';
+  Avatar} from 'antd';
 import { 
   SearchOutlined, 
   ReloadOutlined, 
@@ -65,8 +65,8 @@ const AdminListPage: React.FC = () => {
   const [selectedAdmin, setSelectedAdmin] = useState<Admin | null>(null);
   const [newPassword, setNewPassword] = useState('');
 
-  const { control, handleSubmit, reset, watch } = useForm<AdminFilterForm>({
-    resolver: zodResolver(adminFilterSchema),
+  const { handleSubmit, reset, watch } = useForm<AdminFilterForm>({
+    resolver: zodResolver(adminFilterSchema as any),
     defaultValues: {
       keyword: '',
       status: '',

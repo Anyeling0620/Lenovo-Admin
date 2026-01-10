@@ -191,6 +191,8 @@ export const getProductConfigs = (productId: string) =>
   request.get<ProductConfigResponse[]>(`/products/${productId}/configs`);
 export const getProductConfigDetail = (configId: string) =>
   request.get<ProductConfigResponse>(`/configs/${configId}`);
+export const deleteProductConfig = (configId: string) =>
+  request.delete<null>(`/configs/${configId}`);
 export const getProductStats = () => request.get<ProductStatsResponse>('/products/stats');
 
 export const getStocks = () => request.get<StockResponse[]>('/stocks');

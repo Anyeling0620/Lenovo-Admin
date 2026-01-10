@@ -55,7 +55,7 @@ const _menuItems: MenuItem[] = [
             { key: '4-1', label: '商品总览', path: '/goods/overview' },
             { key: '4-2', label: '品牌·专区', path: '/goods/brand-zone' },
             { key: '4-3', label: '商品管理', path: '/goods/manage' },
-            { key: '4-4', label: '库存管理', path: '/goods/category' }
+            { key: '4-4', label: '库存管理', path: '/goods/stock' }
         ],
     },
     {

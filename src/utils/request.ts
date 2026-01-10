@@ -1,6 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /** 后端统一返回结构 */
 export interface ApiResponse<T> {
+    name: string | undefined;
+    url: string | undefined;
+    total: number;
+    list: never[];
     code: number
     data: T
     message: string

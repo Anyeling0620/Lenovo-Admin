@@ -1,6 +1,6 @@
 import request from "../utils/request";
 import { API_PATHS } from "./api-paths";
-import { mockApi, mockUsers, mockAdmins, mockPermissions, mockIdentities, mockOnlineUsers, mockOnlineAdmins, mockLoginRecords, mockUserStatistics } from "./mock-data";
+import { mockApi, mockUsers, mockAdmins, mockPermissions, mockIdentities, mockUserStatistics } from "./mock-data";
 
 /**
  * 检查是否使用模拟数据
