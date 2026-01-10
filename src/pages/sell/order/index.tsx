@@ -3,7 +3,7 @@ import { Table, Card, Button, Input, Select, Space, Tag, Popconfirm, Tooltip } f
 import { SearchOutlined, ReloadOutlined, EyeOutlined, SendOutlined, CheckOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import type { ColumnsType } from 'antd/es/table';
-import { getOrders, cancelOrder, setOrderPendingShip, shipOrder, setOrderPendingReceive } from '../../../services/api';
+import { getOrders, cancelOrder, setOrderPendingShip, setOrderPendingReceive } from '../../../services/api';
 import type { OrderListItem } from '../../../services/api-type';
 import { globalMessage } from '../../../utils/globalMessage';
 import { globalErrorHandler } from '../../../utils/globalAxiosErrorHandler';
@@ -68,11 +68,14 @@ const OrderManagement: React.FC = () => {
 
   const getStatusTag = (status: string) => {
     const statusMap: Record<string, { color: string; text: string }> = {
-      '待付款': { color: 'orange', text: '待付款' },
-      '待发货': { color: 'blue', text: '待发货' },
-      '待收货': { color: 'cyan', text: '待收货' },
-      '已完成': { color: 'green', text: '已完成' },
       '已取消': { color: 'red', text: '已取消' },
+      '待支付': { color: 'orange', text: '待支付' },
+      '已支付': { color: 'blue', text: '已支付' },
+      '待发货': { color: 'cyan', text: '待发货' },
+      '已发货': { color: 'purple', text: '已发货' },
+      '待收货': { color: 'geekblue', text: '待收货' },
+      '已收货': { color: 'green', text: '已收货' },
+      '已完成': { color: 'green', text: '已完成' },
     };
     const config = statusMap[status] || { color: 'default', text: status };
     return <Tag color={config.color}>{config.text}</Tag>;
@@ -107,11 +110,14 @@ const OrderManagement: React.FC = () => {
       width: 100,
       render: (status: string) => getStatusTag(status),
       filters: [
-        { text: '待付款', value: '待付款' },
-        { text: '待发货', value: '待发货' },
-        { text: '待收货', value: '待收货' },
-        { text: '已完成', value: '已完成' },
         { text: '已取消', value: '已取消' },
+        { text: '待支付', value: '待支付' },
+        { text: '已支付', value: '已支付' },
+        { text: '待发货', value: '待发货' },
+        { text: '已发货', value: '已发货' },
+        { text: '待收货', value: '待收货' },
+        { text: '已收货', value: '已收货' },
+        { text: '已完成', value: '已完成' },
       ],
       onFilter: (value, record) => record.status === value,
     },
@@ -171,6 +177,28 @@ const OrderManagement: React.FC = () => {
               </Button>
             </Tooltip>
           </Link>
+          {/* 已支付状态：可以确认订单（改为待发货）或取消 */}
+          {record.status === '已支付' && (
+            <>
+              <Popconfirm
+                title="确定要确认订单并设置为待发货吗？"
+                onConfirm={() => handlePendingShip(record.order_id)}
+              >
+                <Button type="link" icon={<CheckOutlined />} size="small">
+                  确认订单
+                </Button>
+              </Popconfirm>
+              <Popconfirm
+                title="确定要取消这个订单吗？"
+                onConfirm={() => handleCancel(record.order_id)}
+              >
+                <Button type="link" danger size="small">
+                  取消
+                </Button>
+              </Popconfirm>
+            </>
+          )}
+          {/* 待发货状态：可以发货（改为已发货） */}
           {record.status === '待发货' && (
             <Link to={`/order/ship/${record.order_id}`}>
               <Tooltip title="发货">
@@ -180,33 +208,14 @@ const OrderManagement: React.FC = () => {
               </Tooltip>
             </Link>
           )}
-          {record.status === '待付款' && (
+          {/* 已发货状态：可以设置为待收货（到达） */}
+          {record.status === '已发货' && (
             <Popconfirm
-              title="确定要取消这个订单吗？"
-              onConfirm={() => handleCancel(record.order_id)}
-            >
-              <Button type="link" danger size="small">
-                取消
-              </Button>
-            </Popconfirm>
-          )}
-          {record.status === '待发货' && (
-            <Popconfirm
-              title="确定要设置为待发货吗？"
-              onConfirm={() => handlePendingShip(record.order_id)}
-            >
-              <Button type="link" size="small">
-                待发货
-              </Button>
-            </Popconfirm>
-          )}
-          {record.status === '待收货' && (
-            <Popconfirm
-              title="确定要设置为待收货吗？"
+              title="确定要将订单设置为待收货（到达）吗？"
               onConfirm={() => handlePendingReceive(record.order_id)}
             >
-              <Button type="link" size="small">
-                待收货
+              <Button type="link" icon={<CheckOutlined />} size="small">
+                到达
               </Button>
             </Popconfirm>
           )}
@@ -236,11 +245,14 @@ const OrderManagement: React.FC = () => {
               style={{ width: 120 }}
               allowClear
             >
-              <Option value="待付款">待付款</Option>
-              <Option value="待发货">待发货</Option>
-              <Option value="待收货">待收货</Option>
-              <Option value="已完成">已完成</Option>
               <Option value="已取消">已取消</Option>
+              <Option value="待支付">待支付</Option>
+              <Option value="已支付">已支付</Option>
+              <Option value="待发货">待发货</Option>
+              <Option value="已发货">已发货</Option>
+              <Option value="待收货">待收货</Option>
+              <Option value="已收货">已收货</Option>
+              <Option value="已完成">已完成</Option>
             </Select>
             <Button icon={<ReloadOutlined />} onClick={loadOrders}>
               刷新
@@ -267,4 +279,5 @@ const OrderManagement: React.FC = () => {
 };
 
 export default OrderManagement;
+
 
