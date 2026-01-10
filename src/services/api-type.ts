@@ -208,6 +208,10 @@ export interface BrandResponse {
   logo: string | null;
   description?: string | null;
   created_at: string;
+  // 添加缺失的字段
+  creator_id?: string;           // 添加 creator_id
+  updated_at?: string;           // 添加 updated_at
+  remark?: string;               // 添加 remark
 }
 
 export interface CreateBrandRequest {
@@ -360,6 +364,9 @@ export interface ProductDetailResponse {
 }
 
 export interface StockResponse {
+  updated_at(updated_at: any): unknown
+  last_in_time: any
+  last_out_time: any
   stock_id: string;
   stock_num: number;
   warn_num: number;
