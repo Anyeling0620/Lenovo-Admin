@@ -151,7 +151,7 @@ const OnlineManagement: React.FC = () => {
                         deviceType === 'android' || 
                         deviceType === 'ios' ||
                         deviceType === 'phone';
-        const deviceTypeName = isMobile ? '移动设备' : '桌面设备';
+        const deviceTypeName = isMobile ? '手机' : '电脑';
         
         return (
           <div className="flex items-center">
@@ -236,7 +236,7 @@ const OnlineManagement: React.FC = () => {
                         deviceType === 'android' || 
                         deviceType === 'ios' ||
                         deviceType === 'phone';
-        const deviceTypeName = isMobile ? '移动设备' : '桌面设备';
+        const deviceTypeName = isMobile ? '手机' : '电脑';
         
         return (
           <div className="flex items-center">
@@ -321,7 +321,7 @@ const OnlineManagement: React.FC = () => {
                         deviceType === 'android' || 
                         deviceType === 'ios' ||
                         deviceType === 'phone';
-        const deviceTypeName = isMobile ? '移动设备' : '桌面设备';
+        const deviceTypeName = isMobile ? '手机' : '电脑';
         
         return (
           <div className="flex items-center">
