@@ -181,20 +181,16 @@ const ProductDetailPage: React.FC = () => {
   // 辅助函数：检查是否有库存信息
   const hasStockInfo = (config: ProductConfig) => {
     // 检查多种可能的库存字段，包括API返回的stock字段
+    // 即使字段值为0，也应该视为有库存信息
     return (
-      (config.stock_num !== undefined && config.stock_num !== null) ||
-      (config.warn_num !== undefined && config.warn_num !== null) ||
-      (config.freeze_num !== undefined && config.freeze_num !== null) ||
-      (config.stock_info && (
-        config.stock_info.stock_num !== undefined ||
-        config.stock_info.warn_num !== undefined ||
-        config.stock_info.freeze_num !== undefined
-      )) ||
-      (config.stock && (
-        config.stock.stock_num !== undefined ||
-        config.stock.warn_num !== undefined ||
-        config.stock.freeze_num !== undefined
-      ))
+      // 检查扁平库存字段
+      config.stock_num !== undefined ||
+      config.warn_num !== undefined ||
+      config.freeze_num !== undefined ||
+      // 检查stock_info对象是否存在（即使里面字段为空）
+      config.stock_info !== undefined && config.stock_info !== null ||
+      // 检查stock对象是否存在（即使里面字段为空）
+      config.stock !== undefined && config.stock !== null
     );
   };
 
@@ -202,24 +198,24 @@ const ProductDetailPage: React.FC = () => {
   const getStockValue = (config: ProductConfig) => {
     if (config.stock) {
       return {
-        stock_num: config.stock.stock_num || 0,
-        warn_num: config.stock.warn_num || 10,
-        freeze_num: config.stock.freeze_num || 0,
+        stock_num: typeof config.stock.stock_num === 'number' ? config.stock.stock_num : 0,
+        warn_num: typeof config.stock.warn_num === 'number' ? config.stock.warn_num : 10,
+        freeze_num: typeof config.stock.freeze_num === 'number' ? config.stock.freeze_num : 0,
         stock_id: config.stock.stock_id
       };
     } else if (config.stock_info) {
       return {
-        stock_num: config.stock_info.stock_num || 0,
-        warn_num: config.stock_info.warn_num || 10,
-        freeze_num: config.stock_info.freeze_num || 0,
+        stock_num: typeof config.stock_info.stock_num === 'number' ? config.stock_info.stock_num : 0,
+        warn_num: typeof config.stock_info.warn_num === 'number' ? config.stock_info.warn_num : 10,
+        freeze_num: typeof config.stock_info.freeze_num === 'number' ? config.stock_info.freeze_num : 0,
         stock_id: config.stock_info.stock_id
       };
     }
     
     return {
-      stock_num: config.stock_num || 0,
-      warn_num: config.warn_num || 10,
-      freeze_num: config.freeze_num || 0,
+      stock_num: typeof config.stock_num === 'number' ? config.stock_num : 0,
+      warn_num: typeof config.warn_num === 'number' ? config.warn_num : 10,
+      freeze_num: typeof config.freeze_num === 'number' ? config.freeze_num : 0,
       stock_id: undefined
     };
   };
@@ -565,14 +561,14 @@ const ProductDetailPage: React.FC = () => {
                             </Col>
                             <Col span={5} style={{ textAlign: 'right' }}>
                               <Space>
-                                <Button 
+                                {/* <Button 
                                   size="small"
                                   onClick={() => navigate(`/goods/manage/sku/edit/${config.product_config_id}`, {
                                     state: getBackState()
                                   })}
                                 >
                                   编辑
-                                </Button>
+                                </Button> */}
                                 <Button 
                                   size="small"
                                   onClick={() => handleStockEdit(stockData.stock_id)}
