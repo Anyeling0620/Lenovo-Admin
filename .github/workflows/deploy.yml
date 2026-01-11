@@ -10,8 +10,22 @@ jobs:
     runs-on: self-hosted # 指向你刚刚在服务器启动的 runner
 
     steps:
+      - name: Fix SSL certificate issues
+        run: |
+          # 更新证书
+          yum update ca-certificates -y || true
+          update-ca-trust || true
+
+      - name: Setup SSH known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          ssh-key: ${{ secrets.DEPLOY_KEY_LENOVO_ADMIN }}
 
       - name: Install Dependencies
         run: pnpm install
