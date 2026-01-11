@@ -373,10 +373,10 @@ const PermissionManagement: React.FC = () => {
   }, []);
 
   return (
-    <div className="p-4">
-      <Row gutter={[16, 16]}>
+    <div style={{ height: 'calc(100vh - 64px)', display: 'flex', flexDirection: 'column', padding: '16px' }}>
+      <Row gutter={[16, 16]} style={{ flex: 1, overflow: 'hidden' }}>
         {/* 左侧权限树 */}
-        <Col xs={24} md={12}>
+        <Col xs={24} md={12} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
           <Card 
             title="权限树" 
             extra={
@@ -388,8 +388,10 @@ const PermissionManagement: React.FC = () => {
                 新增权限
               </Button>
             }
+            style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+            bodyStyle={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
           >
-            <div style={{ marginBottom: '16px' }}>
+            <div style={{ marginBottom: '16px', flexShrink: 0 }}>
               <Form form={filterForm} layout="inline">
                 <Form.Item name="module" style={{ marginBottom: 0 }}>
                   <Input
@@ -418,21 +420,22 @@ const PermissionManagement: React.FC = () => {
               </Form>
             </div>
             
-            <Tree
-              treeData={treeData}
-              expandedKeys={expandedKeys}
-              selectedKeys={selectedKeys}
-              onExpand={handleTreeExpand}
-              onSelect={handleTreeSelect}
-              showIcon
-              blockNode
-              className="border border-gray-200 rounded p-4"
-            />
+            <div style={{ flex: 1, overflow: 'auto', border: '1px solid #d9d9d9', borderRadius: '4px', padding: '16px' }}>
+              <Tree
+                treeData={treeData}
+                expandedKeys={expandedKeys}
+                selectedKeys={selectedKeys}
+                onExpand={handleTreeExpand}
+                onSelect={handleTreeSelect}
+                showIcon
+                blockNode
+              />
+            </div>
           </Card>
         </Col>
 
         {/* 右侧权限列表 */}
-        <Col xs={24} md={12}>
+        <Col xs={24} md={12} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
           <Card 
             title="权限列表"
             extra={
@@ -452,6 +455,8 @@ const PermissionManagement: React.FC = () => {
                 </Select>
               </Form.Item>
             }
+            style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+            bodyStyle={{ flex: 1, overflow: 'hidden', padding: 0 }}
           >
             <Table
               columns={columns}
@@ -465,7 +470,7 @@ const PermissionManagement: React.FC = () => {
                 showTotal: (total) => `共 ${total} 条`,
               }}
               size="middle"
-              scroll={{ y: 500 }}
+              scroll={{ y: 'calc(100vh - 280px)', x: 'max-content' }}
             />
           </Card>
         </Col>
