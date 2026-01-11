@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Goods API 调试工具</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        .content {
+            padding: 30px;
+        }
+        .api-section {
+            margin-bottom: 30px;
+        }
+        .api-section h2 {
+            color: #667eea;
+            font-size: 20px;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        .button-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .test-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+        .test-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+        .test-btn:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .result-area {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+            border: 1px solid #e9ecef;
+        }
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .result-header h3 {
+            color: #333;
+            font-size: 16px;
+        }
+        .clear-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        pre {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 13px;
+            line-height: 1.6;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-success { background: #28a745; }
+        .status-error { background: #dc3545; }
+        .status-warning { background: #ffc107; }
+        .log-item {
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: 6px;
+            border-left: 4px solid;
+        }
+        .log-success {
+            background: #d4edda;
+            border-color: #28a745;
+            color: #155724;
+        }
+        .log-error {
+            background: #f8d7da;
+            border-color: #dc3545;
+            color: #721c24;
+        }
+        .log-info {
+            background: #d1ecf1;
+            border-color: #17a2b8;
+            color: #0c5460;
+        }
+        .config-section {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        .config-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .config-label {
+            font-weight: 600;
+            margin-right: 10px;
+            min-width: 120px;
+        }
+        .config-value {
+            font-family: monospace;
+            background: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔧 Goods API 调试工具</h1>
+            <p>诊断商品管理模块API连接问题 | Lenovo Admin System</p>
+        </div>
+        
+        <div class="content">
+            <!-- 配置信息 -->
+            <div class="config-section">
+                <h3 style="margin-bottom: 15px; color: #856404;">📡 当前配置</h3>
+                <div class="config-item">
+                    <div class="config-label">API地址:</div>
+                    <div class="config-value" id="apiBaseUrl">检测中...</div>
+                </div>
+                <div class="config-item">
+                    <div class="config-label">认证状态:</div>
+                    <div class="config-value" id="authStatus">未知</div>
+                </div>
+                <div class="config-item">
+                    <div class="config-label">Session ID:</div>
+                    <div class="config-value" id="sessionId">未设置</div>
+                </div>
+            </div>
+
+            <!-- 基础连接测试 -->
+            <div class="api-section">
+                <h2>🔌 基础连接测试</h2>
+                <div class="button-group">
+                    <button class="test-btn" onclick="testConnection()">测试服务器连接</button>
+                    <button class="test-btn" onclick="testLogin()">测试登录接口</button>
+                    <button class="test-btn" onclick="checkSession()">检查会话状态</button>
+                </div>
+            </div>
+
+            <!-- Goods API 测试 -->
+            <div class="api-section">
+                <h2>📦 Goods API 测试</h2>
+                <div class="button-group">
+                    <button class="test-btn" onclick="testAPI('getBrands', '/admin/brands')">测试获取品牌</button>
+                    <button class="test-btn" onclick="testAPI('getCategories', '/admin/categories')">测试获取分类</button>
+                    <button class="test-btn" onclick="testAPI('getProducts', '/admin/products')">测试获取商品</button>
+                    <button class="test-btn" onclick="testAPI('getStocks', '/admin/stocks')">测试获取库存</button>
+                    <button class="test-btn" onclick="testAPI('getTags', '/admin/tags')">测试获取标签</button>
+                    <button class="test-btn" onclick="testAPI('getProductStats', '/admin/products/stats')">测试商品统计</button>
+                </div>
+            </div>
+
+            <!-- 批量测试 -->
+            <div class="api-section">
+                <h2>⚡ 批量测试</h2>
+                <div class="button-group">
+                    <button class="test-btn" onclick="testAllAPIs()">测试所有Goods API</button>
+                    <button class="test-btn" onclick="exportResults()">导出测试结果</button>
+                </div>
+            </div>
+
+            <!-- 结果显示区 -->
+            <div class="result-area">
+                <div class="result-header">
+                    <h3>📊 测试结果</h3>
+                    <button class="clear-btn" onclick="clearResults()">清空</button>
+                </div>
+                <div id="result"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://127.0.0.1:3003';
+        let testResults = [];
+
+        // 初始化
+        (function init() {
+            document.getElementById('apiBaseUrl').textContent = API_BASE;
+            const sessionId = localStorage.getItem('admin_sessionId');
+            document.getElementById('sessionId').textContent = sessionId || '未设置';
+            const auth = localStorage.getItem('auth');
+            document.getElementById('authStatus').textContent = auth ? '已登录' : '未登录';
+        })();
+
+        function addLog(type, message, details = null) {
+            const resultDiv = document.getElementById('result');
+            const logClass = type === 'success' ? 'log-success' : type === 'error' ? 'log-error' : 'log-info';
+            
+            const timestamp = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+            let html = `<div class="log-item ${logClass}">
+                <strong>[${timestamp}]</strong> ${message}`;
+            
+            if (details) {
+                html += `<pre style="margin-top: 10px; background: rgba(0,0,0,0.05);">${JSON.stringify(details, null, 2)}</pre>`;
+            }
+            
+            html += '</div>';
+            resultDiv.innerHTML = html + resultDiv.innerHTML;
+            
+            testResults.push({ timestamp, type, message, details });
+        }
+
+        function clearResults() {
+            document.getElementById('result').innerHTML = '';
+            testResults = [];
+        }
+
+        async function testConnection() {
+            addLog('info', '正在测试服务器连接...');
+            try {
+                const response = await fetch(`${API_BASE}/admin/health`, {
+                    method: 'GET',
+                    credentials: 'include'
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    addLog('success', '✅ 服务器连接正常', data);
+                } else {
+                    addLog('error', `❌ 服务器响应异常: ${response.status} ${response.statusText}`);
+                }
+            } catch (error) {
+                addLog('error', `❌ 无法连接到服务器: ${error.message}`);
+            }
+        }
+
+        async function testLogin() {
+            addLog('info', '正在测试登录接口...');
+            try {
+                const response = await fetch(`${API_BASE}/admin/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        account: '12345678901234567890',
+                        password: '123456'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.code && data.code.toString().startsWith('2')) {
+                    addLog('success', '✅ 登录成功', data);
+                    
+                    // 保存 sessionId
+                    if (data.data && data.data.sessionId) {
+                        localStorage.setItem('admin_sessionId', data.data.sessionId);
+                        document.getElementById('sessionId').textContent = data.data.sessionId;
+                    }
+                    
+                    // 更新认证状态
+                    localStorage.setItem('auth', JSON.stringify({ isAuthenticated: true }));
+                    document.getElementById('authStatus').textContent = '已登录';
+                } else {
+                    addLog('error', `❌ 登录失败: ${data.message}`, data);
+                }
+            } catch (error) {
+                addLog('error', `❌ 登录请求失败: ${error.message}`);
+            }
+        }
+
+        async function checkSession() {
+            addLog('info', '正在检查会话状态...');
+            try {
+                const response = await fetch(`${API_BASE}/admin/account/profile`, {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: {
+                        'X-Session-ID': localStorage.getItem('admin_sessionId') || ''
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.code && data.code.toString().startsWith('2')) {
+                    addLog('success', '✅ 会话有效', data);
+                } else if (data.code === 401) {
+                    addLog('error', '❌ 会话已过期或无效，请重新登录', data);
+                } else {
+                    addLog('error', `❌ 检查会话失败: ${data.message}`, data);
+                }
+            } catch (error) {
+                addLog('error', `❌ 请求失败: ${error.message}`);
+            }
+        }
+
+        async function testAPI(name, endpoint) {
+            addLog('info', `正在测试 ${name}...`);
+            try {
+                const response = await fetch(`${API_BASE}${endpoint}`, {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: {
+                        'X-Session-ID': localStorage.getItem('admin_sessionId') || ''
+                    }
+                });
+                
+                const rawData = await response.json();
+                console.log(`[${name}] 原始响应:`, rawData);
+                
+                // 检查响应结构
+                if (rawData.code !== undefined) {
+                    // 标准响应格式
+                    if (rawData.code.toString().startsWith('2')) {
+                        const actualData = rawData.data;
+                        const dataType = Array.isArray(actualData) ? '数组' : typeof actualData;
+                        const count = Array.isArray(actualData) ? actualData.length : 'N/A';
+                        
+                        addLog('success', 
+                            `✅ ${name} 成功 | 数据类型: ${dataType} | 数量: ${count}`, 
+                            {
+                                code: rawData.code,
+                                message: rawData.message,
+                                dataType,
+                                count,
+                                sample: Array.isArray(actualData) ? actualData.slice(0, 2) : actualData
+                            }
+                        );
+                    } else if (rawData.code === 401) {
+                        addLog('error', `❌ ${name} 失败: 未授权，请先登录`, rawData);
+                    } else {
+                        addLog('error', `❌ ${name} 失败: ${rawData.message}`, rawData);
+                    }
+                } else {
+                    // 非标准响应
+                    addLog('error', `❌ ${name} 响应格式异常: 缺少code字段`, rawData);
+                }
+            } catch (error) {
+                addLog('error', `❌ ${name} 请求失败: ${error.message}`);
+            }
+        }
+
+        async function testAllAPIs() {
+            const apis = [
+                { name: '品牌列表', endpoint: '/admin/brands' },
+                { name: '分类列表', endpoint: '/admin/categories' },
+                { name: '商品列表', endpoint: '/admin/products' },
+                { name: '库存列表', endpoint: '/admin/stocks' },
+                { name: '标签列表', endpoint: '/admin/tags' },
+                { name: '商品统计', endpoint: '/admin/products/stats' },
+            ];
+
+            addLog('info', `🚀 开始批量测试 ${apis.length} 个API...`);
+            
+            for (const api of apis) {
+                await testAPI(api.name, api.endpoint);
+                await new Promise(resolve => setTimeout(resolve, 500)); // 延迟500ms
+            }
+            
+            addLog('info', '✨ 批量测试完成');
+        }
+
+        function exportResults() {
+            const dataStr = JSON.stringify(testResults, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `goods-api-test-${new Date().toISOString().slice(0,10)}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            addLog('success', '✅ 测试结果已导出');
+        }
+    </script>
+</body>
+</html>
