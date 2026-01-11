@@ -119,10 +119,9 @@ const PermissionManagement: React.FC = () => {
         title: (
           <div className="flex items-center justify-between" style={{ width: '100%' }}>
             <div className="flex items-center">
-              {config.icon}
-              <span className="mr-2 ml-2">{permission.name}</span>
-              <Tag color={config.color}>
-                {config.emoji} {config.text}
+              <span className="mr-2">{permission.name}</span>
+              <Tag color={config.color} style={{ fontSize: '12px' }}>
+                {config.text}
               </Tag>
             </div>
             <Space size={4}>
@@ -441,8 +440,8 @@ const PermissionManagement: React.FC = () => {
                 selectedKeys={selectedKeys}
                 onExpand={handleTreeExpand}
                 onSelect={handleTreeSelect}
+                showLine={{ showLeafIcon: false }}
                 showIcon
-                blockNode
               />
             </div>
           </Card>
