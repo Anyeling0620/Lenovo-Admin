@@ -10,6 +10,16 @@ jobs:
     runs-on: self-hosted # 指向你刚刚在服务器启动的 runner
 
     steps:
+      - name: Fix SSL certificate issues
+        run: |
+          # 更新证书
+          yum update ca-certificates -y || true
+          update-ca-trust || true
+          
+          # 配置Git绕过SSL验证
+          git config --global http.sslVerify false
+          git config --global http.postBuffer 524288000
+
       - name: Checkout Code
         uses: actions/checkout@v4
 
