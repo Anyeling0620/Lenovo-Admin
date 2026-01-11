@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Table, 
   Card, 
@@ -8,15 +8,13 @@ import {
   Input, 
   Select, 
   Space, 
-  Tag, 
   Statistic,
   Modal,
   Popconfirm,
   Tooltip,
   Badge,
   Descriptions,
-  Tabs,
-  message
+  Tabs
 } from 'antd';
 import { 
   SearchOutlined, 
@@ -55,7 +53,6 @@ const OnlineManagement: React.FC = () => {
   const [activeTab, setActiveTab] = useState('online');
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedSession, setSelectedSession] = useState<OnlineUser | OnlineAdmin | null>(null);
-  const [sessionType, setSessionType] = useState<'USER' | 'ADMIN'>('USER');
   const [keyword, setKeyword] = useState('');
   const [deviceType, setDeviceType] = useState('');
 
@@ -73,20 +70,21 @@ const OnlineManagement: React.FC = () => {
   };
 
   // 加载登录记录
-  const loadLoginRecords = async () => {
+  const loadLoginRecords = useCallback(async () => {
     try {
       const response = await getLoginRecords({
         page: recordsPage,
         pageSize: recordsPageSize,
         account: keyword,
         deviceType: deviceType,
+        userType: 'ADMIN', // 指定为管理员类型
       });
       setLoginRecords(response.list);
       setRecordsTotal(response.total);
     } catch (error) {
       globalErrorHandler.handle(error, globalMessage.error);
     }
-  };
+  }, [recordsPage, recordsPageSize, keyword, deviceType]);
 
   useEffect(() => {
     if (activeTab === 'online') {
@@ -96,7 +94,7 @@ const OnlineManagement: React.FC = () => {
     } else {
       loadLoginRecords();
     }
-  }, [activeTab, recordsPage, recordsPageSize, keyword, deviceType]);
+  }, [activeTab, loadLoginRecords]);
 
   // 强制下线
   const handleForceLogout = async (sessionId: string, userType: 'USER' | 'ADMIN') => {
@@ -110,9 +108,8 @@ const OnlineManagement: React.FC = () => {
   };
 
   // 查看会话详情
-  const handleViewDetail = (session: OnlineUser | OnlineAdmin, type: 'USER' | 'ADMIN') => {
+  const handleViewDetail = (session: OnlineUser | OnlineAdmin) => {
     setSelectedSession(session);
-    setSessionType(type);
     setDetailModalVisible(true);
   };
 
@@ -190,7 +187,7 @@ const OnlineManagement: React.FC = () => {
       render: (_, record) => (
         <Space size="small">
           <Tooltip title="查看详情">
-            <Button type="text" icon={<EyeOutlined />} onClick={() => handleViewDetail(record, 'USER')} />
+            <Button type="text" icon={<EyeOutlined />} onClick={() => handleViewDetail(record)} />
           </Tooltip>
           <Tooltip title="强制下线">
             <Popconfirm title="确定要强制下线这个用户吗？" onConfirm={() => handleForceLogout(record.sessionId, 'USER')}>
@@ -264,7 +261,7 @@ const OnlineManagement: React.FC = () => {
       render: (_, record) => (
         <Space size="small">
           <Tooltip title="查看详情">
-            <Button type="text" icon={<EyeOutlined />} onClick={() => handleViewDetail(record, 'ADMIN')} />
+            <Button type="text" icon={<EyeOutlined />} onClick={() => handleViewDetail(record)} />
           </Tooltip>
           <Tooltip title="强制下线">
             <Popconfirm title="确定要强制下线这个管理员吗？" onConfirm={() => handleForceLogout(record.sessionId, 'ADMIN')}>

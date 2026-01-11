@@ -904,11 +904,37 @@ export interface OnlineListResponse {
 export const getOnlineList = async (): Promise<OnlineListResponse> => {
   // admin.routes.ts: GET /system/admins/online
   const admins = await getOnlineAdmins();
+  
+  // 定义后端返回数据的类型
+  interface AdminSessionResponse {
+    admin_session_id?: string;
+    id: string;
+    admin_id: string;
+    account: string;
+    name: string;
+    session_id: string;
+    expire_time?: string;
+  }
+  
+  // 转换后端返回的数据格式
+  const adminList: OnlineAdmin[] = (admins as AdminSessionResponse[]).map((item) => ({
+    id: item.admin_session_id || item.id,
+    adminId: item.admin_id,
+    account: item.account,
+    name: item.name,
+    loginTime: item.expire_time ? new Date(item.expire_time).toISOString() : new Date().toISOString(),
+    deviceType: 'pc', // 默认值，后端可能没有该字段
+    deviceName: '电脑', // 默认值
+    ipAddress: '', // 默认值
+    sessionId: item.session_id,
+    lastActivityTime: item.expire_time ? new Date(item.expire_time).toISOString() : new Date().toISOString(),
+  }));
+  
   return {
     users: [],
-    admins: admins as unknown as OnlineAdmin[],
+    admins: adminList,
     totalUsers: 0,
-    totalAdmins: Array.isArray(admins) ? admins.length : 0,
+    totalAdmins: adminList.length,
   };
 };
 
@@ -919,10 +945,13 @@ export const getOnlineList = async (): Promise<OnlineListResponse> => {
  * @returns Promise<void>
  */
 export const forceLogout = async (sessionId: string, userType: 'USER' | 'ADMIN'): Promise<void> => {
-  void sessionId;
-  void userType;
-  // TODO: Implement force logout API
-  throw new Error('Backend route not implemented: force logout');
+  if (userType === 'ADMIN') {
+    // admin.routes.ts: POST /system/sessions/:session_id/force-logout
+    await request.post(`/system/sessions/${sessionId}/force-logout`);
+  } else {
+    // 用户强制下线接口（如果后端有的话）
+    throw new Error('Backend route not implemented: force logout for users');
+  }
 };
 
 // ==================== 登录记录 ====================
@@ -969,9 +998,51 @@ export interface LoginRecordResponse {
  * @returns 登录记录响应数据
  */
 export const getLoginRecords = async (params: LoginRecordParams): Promise<LoginRecordResponse> => {
-  void params;
-  // TODO: Implement get login records API
-  throw new Error('Backend route not implemented: login records');
+  if (params.userType === 'ADMIN' || !params.userType) {
+    // 定义后端返回数据的类型
+    interface AdminLoginRecordResponse {
+      id: string;
+      adminId: string;
+      account: string;
+      name: string;
+      deviceType: string;
+      deviceName: string;
+      ipAddress: string;
+      loginTime: string;
+      logoutTime?: string;
+      status: string;
+    }
+    
+    // admin.routes.ts: GET /system/admins/login-records
+    const response = await request.get<{
+      list: AdminLoginRecordResponse[];
+      total: number;
+      page: number;
+      pageSize: number;
+    }>('/system/admins/login-records', { params });
+    
+    return {
+      list: response.list.map((item) => ({
+        id: item.id,
+        userId: item.adminId,
+        account: item.account,
+        name: item.name,
+        deviceType: item.deviceType,
+        deviceName: item.deviceName,
+        ipAddress: item.ipAddress,
+        userAgent: '',
+        loginTime: item.loginTime,
+        logoutTime: item.logoutTime,
+        status: item.status as 'ONLINE' | 'OFFLINE',
+      })),
+      total: response.total,
+      page: response.page,
+      pageSize: response.pageSize,
+    };
+  } else {
+    // 用户登录记录接口（如果后端有的话）
+    throw new Error('Backend route not implemented: login records for users');
+  }
 };
 
 // ==================== 商品专区 ====================
