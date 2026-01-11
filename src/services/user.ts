@@ -365,9 +365,14 @@ export const createAdmin = async (data: CreateAdminParams): Promise<Admin> => {
  * @returns Promise<void>
  */
 export const updateAdmin = async (adminId: string, data: Partial<CreateAdminParams>): Promise<void> => {
-  // 后端真实路由当前未提供 PUT（admin.routes.ts 没有该接口）
-  // 为保持页面可用，先沿用约定的 PATCH 路由（如后端补齐可再对齐）
-  await request.patch(`/system/admins/${adminId}`, data);
+  // 将前端的驼峰命名转换为后端的蛇形命名
+  await request.patch(`/system/admins/${adminId}`, {
+    name: data.name,
+    nickname: data.nickname,
+    email: data.email,
+    identity_ids: data.identityIds,
+    category_ids: data.categoryIds,
+  });
 };
 
 /**
@@ -376,7 +381,6 @@ export const updateAdmin = async (adminId: string, data: Partial<CreateAdminPara
  * @returns Promise<void>
  */
 export const deleteAdmin = async (adminId: string): Promise<void> => {
-  // 后端真实路由当前未提供 DELETE（admin.routes.ts 没有该接口）
   await request.delete(`/system/admins/${adminId}`);
 };
 

@@ -24,7 +24,9 @@ import {
   EyeOutlined,
   PlusOutlined,
   KeyOutlined,
-  LockOutlined
+  LockOutlined,
+  EditOutlined,
+  DeleteOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useForm } from 'react-hook-form';
@@ -35,6 +37,8 @@ import {
   createAdmin,
   resetAdminPassword,
   getIdentityList,
+  updateAdmin,
+  deleteAdmin,
   type Admin,
   type AdminListParams,
   type CreateAdminParams
@@ -42,6 +46,7 @@ import {
 import { disableAdmin, getCategories } from '../../../services/api';
 import { globalMessage } from '../../../utils/globalMessage';
 import { globalErrorHandler } from '../../../utils/globalAxiosErrorHandler';
+import useAdminProfileStore from '../../../store/adminInfo';
 
 const { Option } = Select;
 
@@ -69,6 +74,18 @@ const AdminListPage: React.FC = () => {
   const [createForm] = Form.useForm();
   const [identities, setIdentities] = useState<Array<{ id: string; name: string }>>([]);
   const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
+
+  // 编辑管理员相关状态
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editForm] = Form.useForm();
+  const [editingAdmin, setEditingAdmin] = useState<Admin | null>(null);
+
+  // 获取当前登录管理员的身份信息
+  const getIdentityCodes = useAdminProfileStore((state) => state.getIdentityCodes);
+  const identityCodes = getIdentityCodes();
+  
+  // 检查是否是超级管理员或系统管理员
+  const isSuperOrSystemAdmin = identityCodes.includes('SUPER_ADMIN') || identityCodes.includes('SYSTEM_ADMIN');
 
   const { handleSubmit, reset, watch } = useForm<AdminFilterForm>({
     resolver: zodResolver(adminFilterSchema),
@@ -236,6 +253,65 @@ const AdminListPage: React.FC = () => {
     }
   };
 
+  // 打开编辑管理员弹窗
+  const handleOpenEditModal = (admin: Admin) => {
+    setEditingAdmin(admin);
+    editForm.setFieldsValue({
+      name: admin.name,
+      nickname: admin.nickname,
+      email: admin.email,
+      identityIds: admin.identities?.map((i: IdName) => i.id) || [],
+      categoryIds: admin.productCategories?.map((c: IdName) => c.id) || [],
+    });
+    setEditModalVisible(true);
+  };
+
+  // 编辑管理员
+  const handleEditAdmin = async () => {
+    if (!editingAdmin) return;
+    
+    try {
+      const values = await editForm.validateFields();
+      
+      const params: Partial<CreateAdminParams> = {
+        name: values.name,
+        email: values.email,
+        nickname: values.nickname,
+        identityIds: values.identityIds || [],
+        categoryIds: values.categoryIds || [],
+      };
+      
+      await updateAdmin(editingAdmin.id, params);
+      globalMessage.success('管理员信息更新成功');
+      setEditModalVisible(false);
+      editForm.resetFields();
+      setEditingAdmin(null);
+      loadAdminList();
+    } catch (error) {
+      globalErrorHandler.handle(error, globalMessage.error);
+    }
+  };
+
+  // 删除管理员
+  const handleDeleteAdmin = async (admin: Admin) => {
+    Modal.confirm({
+      title: '确定删除该管理员？',
+      content: `确定要删除管理员 "${admin.name}" (${admin.account}) 吗？此操作不可恢复。`,
+      okText: '删除',
+      okButtonProps: { danger: true },
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          await deleteAdmin(admin.id);
+          globalMessage.success('管理员删除成功');
+          loadAdminList();
+        } catch (error) {
+          globalErrorHandler.handle(error, globalMessage.error);
+        }
+      },
+    });
+  };
+
   // 表格列定义
   const columns: ColumnsType<Admin> = [
     {
@@ -330,7 +406,7 @@ const AdminListPage: React.FC = () => {
     {
       title: '操作',
       key: 'action',
-      width: 150,
+      width: 200,
       fixed: 'right',
       render: (_, record) => (
         <Space size="small">
@@ -340,6 +416,15 @@ const AdminListPage: React.FC = () => {
               icon={<EyeOutlined />}
             />
           </Tooltip>
+          {isSuperOrSystemAdmin && (
+            <Tooltip title="编辑信息">
+              <Button 
+                type="text" 
+                icon={<EditOutlined />}
+                onClick={() => handleOpenEditModal(record)}
+              />
+            </Tooltip>
+          )}
           <Tooltip title="重置密码">
             <Button 
               type="text" 
@@ -356,6 +441,17 @@ const AdminListPage: React.FC = () => {
         disabled={record.status === 'INACTIVE' || record.status === 'BANNED'}
             />
           </Tooltip>
+          {isSuperOrSystemAdmin && (
+            <Tooltip title="删除管理员">
+              <Button
+                type="text"
+                danger
+                icon={<DeleteOutlined />}
+                onClick={() => handleDeleteAdmin(record)}
+                disabled={record.status === 'BANNED'}
+              />
+            </Tooltip>
+          )}
         </Space>
       ),
     },
@@ -536,6 +632,99 @@ const AdminListPage: React.FC = () => {
             </Col>
           </Row>
 
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                label="姓名"
+                name="name"
+                rules={[{ required: true, message: '请输入姓名' }]}
+              >
+                <Input placeholder="请输入姓名" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                label="昵称"
+                name="nickname"
+              >
+                <Input placeholder="请输入昵称（可选）" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col span={24}>
+              <Form.Item
+                label="邮箱"
+                name="email"
+                rules={[
+                  { type: 'email', message: '请输入有效的邮箱地址' }
+                ]}
+              >
+                <Input placeholder="请输入邮箱（可选）" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col span={24}>
+              <Form.Item
+                label="身份/角色"
+                name="identityIds"
+              >
+                <Select
+                  mode="multiple"
+                  placeholder="请选择身份/角色（可选）"
+                  options={identities.map(item => ({
+                    label: item.name,
+                    value: item.id
+                  }))}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col span={24}>
+              <Form.Item
+                label="负责专区"
+                name="categoryIds"
+              >
+                <Select
+                  mode="multiple"
+                  placeholder="请选择负责的商品专区（可选）"
+                  options={categories.map(item => ({
+                    label: item.name,
+                    value: item.id
+                  }))}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+        </Form>
+      </Modal>
+
+      {/* 编辑管理员模态框 */}
+      <Modal
+        title="编辑管理员信息"
+        open={editModalVisible}
+        onCancel={() => {
+          setEditModalVisible(false);
+          editForm.resetFields();
+          setEditingAdmin(null);
+        }}
+        onOk={handleEditAdmin}
+        width={640}
+        okText="保存"
+        cancelText="取消"
+      >
+        {editingAdmin && (
+          <div className="mb-4 p-4 bg-gray-50 rounded">
+            <div className="font-medium">{editingAdmin.name}</div>
+            <div className="text-gray-500">账号：{editingAdmin.account}</div>
+          </div>
+        )}
+        <Form form={editForm} layout="vertical">
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item
