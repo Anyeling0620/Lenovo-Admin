@@ -421,15 +421,14 @@ export interface PermissionListParams {
  * @returns 权限列表数据
  */
 export const getPermissionList = async (params?: PermissionListParams): Promise<Permission[]> => {
-  // 后端当前提供的是菜单/权限树：GET /admin/system/permissions
-  // 这里先复用该接口；如需按 type/module/status 过滤，前端自行过滤
+  // 使用后端真实接口 GET /admin/system/permissions
   const menu = await getPermissionMenu();
   if (!params) return menu as unknown as Permission[];
-  // 仅做轻量过滤（避免破坏现有页面逻辑）
+  // 前端做轻量过滤（后端未提供按 type/module/status 的细粒度过滤）
   return (menu as unknown as Array<Permission & { module?: string; status?: string; type?: string }>).filter(p => {
     if (params.type && p.type !== params.type) return false;
-    if (params.module && p.module !== params.module) return false;
-    if (params.status && p.status !== params.status) return false;
+    if (params.module && (p.module || '') !== params.module) return false;
+    if (params.status && (p.status || '') !== params.status) return false;
     return true;
   });
 };
@@ -439,7 +438,7 @@ export const getPermissionList = async (params?: PermissionListParams): Promise<
  * @returns 权限树结构数据，包含父子关系
  */
 export const getPermissionTree = async (): Promise<Permission[]> => {
-  // 后端已返回树结构
+  // 后端已返回树结构（GET /admin/system/permissions）
   return (await getPermissionMenu()) as unknown as Permission[];
 };
 
@@ -462,9 +461,16 @@ export interface CreatePermissionParams {
  * @returns 新创建的权限数据
  */
 export const createPermission = async (data: CreatePermissionParams): Promise<Permission> => {
-  void data;
-  // 后端 admin.routes.ts 暂无权限 CRUD 接口
-  throw new Error('Backend route not implemented: create permission');
+  // 调用后端新增接口：POST /admin/system/permissions
+  const payload = {
+    name: data.name,
+    code: data.code,
+    type: data.type,
+    module: data.module,
+    parentId: data.parentId ?? null,
+  };
+  const res = await request.post<Record<string, unknown>>('/system/permissions', payload);
+  return res as unknown as Permission;
 };
 
 /**
@@ -474,9 +480,13 @@ export const createPermission = async (data: CreatePermissionParams): Promise<Pe
  * @returns Promise<void>
  */
 export const updatePermission = async (permissionId: string, data: Partial<CreatePermissionParams>): Promise<void> => {
-  void permissionId;
-  void data;
-  throw new Error('Backend route not implemented: update permission');
+  const payload: Record<string, unknown> = {};
+  if (data.name !== undefined) payload.name = data.name;
+  if (data.code !== undefined) payload.code = data.code;
+  if (data.type !== undefined) payload.type = data.type;
+  if (data.module !== undefined) payload.module = data.module;
+  if (data.parentId !== undefined) payload.parentId = data.parentId;
+  await request.patch(`/system/permissions/${permissionId}`, payload);
 };
 
 /**
@@ -485,8 +495,7 @@ export const updatePermission = async (permissionId: string, data: Partial<Creat
  * @returns Promise<void>
  */
 export const deletePermission = async (permissionId: string): Promise<void> => {
-  void permissionId;
-  throw new Error('Backend route not implemented: delete permission');
+  await request.delete(`/system/permissions/${permissionId}`);
 };
 
 // ==================== 身份（角色）管理 ====================
@@ -542,6 +551,7 @@ export const getIdentityList = async (params: IdentityListParams): Promise<Ident
   
   // ⚠️ 定制修复（仅影响“身份/角色列表”模块）：
   // 后端(lenovo-shop-server)真实路由为 GET /admin/system/identities
+  // 使用后端真实接口 GET /admin/system/identities
   const backendList = await request.get<BackendIdentity[]>('/system/identities');
   
   // 转换为前端格式
@@ -597,6 +607,7 @@ export const getIdentityList = async (params: IdentityListParams): Promise<Ident
  * @returns 身份详情数据
  */
 export const getIdentityDetail = async (identityId: string): Promise<Identity> => {
+  // 使用后端 GET /admin/system/identities 并从中查找详情
   const list = await getIdentitiesWithPermissions();
   const hit = list.find(i => i.identity_id === identityId);
   if (!hit) throw new Error(`Identity not found: ${identityId}`);
@@ -632,9 +643,37 @@ export interface CreateIdentityParams {
  * @returns 新创建的身份数据
  */
 export const createIdentity = async (data: CreateIdentityParams): Promise<Identity> => {
-  void data;
-  // 后端 admin.routes.ts 暂无 identity CRUD 接口
-  throw new Error('Backend route not implemented: create identity');
+  const payload = {
+    name: data.name,
+    code: data.code,
+    description: data.description,
+    permission_ids: data.permissionIds || [],
+  };
+  type TemporaryIdentityResponse = Partial<{
+    id: string;
+    identity_id: string;
+    name: string;
+    identity_name: string;
+    code: string;
+    identity_code: string;
+    description: string;
+    is_system: boolean;
+    status: string;
+    createdAt: string;
+  }>;
+  const resRaw = await request.post<Record<string, unknown>>('/system/identities', payload);
+  const res = resRaw as unknown as TemporaryIdentityResponse;
+  // 返回最小可用 Identity 结构（后端可能只返回基础字段）
+  return {
+    id: (res.id || res.identity_id) as string,
+    name: (res.name || res.identity_name) as string,
+    code: (res.code || res.identity_code) as string,
+    description: (res.description as string) || undefined,
+    isSystem: !!res.is_system,
+    status: res.status === '启用' ? 'ACTIVE' : 'INACTIVE',
+    createdAt: (res.createdAt as string) || '',
+    permissions: [],
+  };
 };
 
 /**
@@ -644,9 +683,12 @@ export const createIdentity = async (data: CreateIdentityParams): Promise<Identi
  * @returns Promise<void>
  */
 export const updateIdentity = async (identityId: string, data: Partial<CreateIdentityParams>): Promise<void> => {
-  void identityId;
-  void data;
-  throw new Error('Backend route not implemented: update identity');
+  const payload: Record<string, unknown> = {};
+  if (data.name !== undefined) payload.name = data.name;
+  if (data.code !== undefined) payload.code = data.code;
+  if (data.description !== undefined) payload.description = data.description;
+  if (data.permissionIds !== undefined) payload.permission_ids = data.permissionIds;
+  await request.patch(`/system/identities/${identityId}`, payload);
 };
 
 /**
@@ -655,8 +697,7 @@ export const updateIdentity = async (identityId: string, data: Partial<CreateIde
  * @returns Promise<void>
  */
 export const deleteIdentity = async (identityId: string): Promise<void> => {
-  void identityId;
-  throw new Error('Backend route not implemented: delete identity');
+  await request.delete(`/system/identities/${identityId}`);
 };
 
 /**
@@ -666,9 +707,7 @@ export const deleteIdentity = async (identityId: string): Promise<void> => {
  * @returns Promise<void>
  */
 export const assignPermissionsToIdentity = async (identityId: string, permissionIds: string[]): Promise<void> => {
-  void identityId;
-  void permissionIds;
-  throw new Error('Backend route not implemented: assign permissions to identity');
+  await request.post(`/system/identities/${identityId}/permissions`, { permissionIds });
 };
 
 /**
@@ -678,9 +717,8 @@ export const assignPermissionsToIdentity = async (identityId: string, permission
  * @returns Promise<void>
  */
 export const revokePermissionsFromIdentity = async (identityId: string, permissionIds: string[]): Promise<void> => {
-  void identityId;
-  void permissionIds;
-  throw new Error('Backend route not implemented: revoke permissions from identity');
+  // axios delete with body: pass in config.data
+  await request.delete(`/system/identities/${identityId}/permissions`, { data: { permissionIds } });
 };
 
 // ==================== 管理员-身份关联 ====================
