@@ -406,11 +406,37 @@ export interface Permission {
   id: string;
   name: string;
   code?: string;
-  type: 'MENU' | 'BUTTON' | 'API';
+  type: 'MENU' | 'BUTTON' | 'API' | 'MODULE';
   module: string;
   parentId: string | null;
   children?: Permission[];
   status: 'ACTIVE' | 'INACTIVE';
+}
+
+/**
+ * 权限类型映射函数（后端小写 -> 前端大写）
+ */
+function mapPermissionType(backendType: string): 'MENU' | 'BUTTON' | 'API' | 'MODULE' {
+  const typeMap: Record<string, 'MENU' | 'BUTTON' | 'API' | 'MODULE'> = {
+    'menu': 'MENU',
+    'button': 'BUTTON',
+    'api': 'API',
+    'module': 'MODULE'
+  };
+  return typeMap[backendType.toLowerCase()] || 'MENU';
+}
+
+/**
+ * 权限类型映射（前端大写 -> 后端小写）
+ */
+function mapPermissionTypeToBackend(frontendType: 'MENU' | 'BUTTON' | 'API' | 'MODULE'): string {
+  const typeMap: Record<string, string> = {
+    'MENU': 'menu',
+    'BUTTON': 'button',
+    'API': 'api',
+    'MODULE': 'module'
+  };
+  return typeMap[frontendType] || 'menu';
 }
 
 export interface PermissionListParams {
@@ -445,8 +471,10 @@ export const getPermissionList = async (params?: PermissionListParams): Promise<
   
   // 转换字段名：permission_id -> id, permission_name -> name, parent_id -> parentId
   const permissions: Permission[] = (menu as PermissionMenuItemResponse[]).map((item) => {
+    const mappedType = mapPermissionType(item.type);
     console.log('🔍 映射权限项:', {
       原始type: item.type,
+      映射后type: mappedType,
       原始名称: item.permission_name,
       type类型: typeof item.type
     });
@@ -455,7 +483,7 @@ export const getPermissionList = async (params?: PermissionListParams): Promise<
       id: item.permission_id,
       name: item.permission_name,
       code: item.code,
-      type: item.type as 'MENU' | 'BUTTON' | 'API',
+      type: mappedType,
       module: item.module,
       parentId: item.parent_id,
       status: (item.status as 'ACTIVE' | 'INACTIVE') || 'ACTIVE',
@@ -535,10 +563,10 @@ const buildPermissionTree = (permissions: Permission[]): Permission[] => {
   const sortChildren = (node: Permission) => {
     if (node.children && node.children.length > 0) {
       node.children.sort((a, b) => {
-        // 按类型排序：MENU > BUTTON > API
-        const typeOrder = { MENU: 0, BUTTON: 1, API: 2 };
-        const aOrder = typeOrder[a.type] ?? 3;
-        const bOrder = typeOrder[b.type] ?? 3;
+        // 按类型排序：MODULE > MENU > BUTTON > API
+        const typeOrder: Record<string, number> = { MODULE: 0, MENU: 1, BUTTON: 2, API: 3 };
+        const aOrder = typeOrder[a.type] ?? 4;
+        const bOrder = typeOrder[b.type] ?? 4;
         if (aOrder !== bOrder) {
           return aOrder - bOrder;
         }
@@ -572,7 +600,7 @@ export const getPermissionTree = async (): Promise<Permission[]> => {
 export interface CreatePermissionParams {
   name: string;
   code?: string;
-  type: 'MENU' | 'BUTTON' | 'API';
+  type: 'MENU' | 'BUTTON' | 'API' | 'MODULE';
   module: string;
   parentId?: string;
 }
@@ -587,14 +615,14 @@ export const createPermission = async (data: CreatePermissionParams): Promise<Pe
   // 注意：后端Permission模型没有code字段，所以不要发送code
   const payload: Record<string, unknown> = {
     name: data.name,
-    type: data.type,
+    type: mapPermissionTypeToBackend(data.type), // 转换为后端小写格式
     module: data.module,
     parentId: data.parentId ?? null,
   };
   
-  console.log('创建权限请求数据:', payload);
+  console.log('📝 创建权限请求数据 (转换后):', payload);
   const res = await request.post<Record<string, unknown>>('/system/permissions', payload);
-  console.log('创建权限响应:', res);
+  console.log('✅ 创建权限响应:', res);
   return res as unknown as Permission;
 };
 
@@ -608,13 +636,13 @@ export const updatePermission = async (permissionId: string, data: Partial<Creat
   // 注意：后端Permission模型没有code字段，所以不要发送code
   const payload: Record<string, unknown> = {};
   if (data.name !== undefined) payload.name = data.name;
-  if (data.type !== undefined) payload.type = data.type;
+  if (data.type !== undefined) payload.type = mapPermissionTypeToBackend(data.type); // 转换为后端小写格式
   if (data.module !== undefined) payload.module = data.module;
   if (data.parentId !== undefined) payload.parentId = data.parentId;
   
-  console.log('更新权限请求数据:', { permissionId, payload });
+  console.log('📝 更新权限请求数据:', { permissionId, payload });
   await request.patch(`/system/permissions/${permissionId}`, payload);
-  console.log('更新权限成功');
+  console.log('✅ 更新权限成功');
 };
 
 /**

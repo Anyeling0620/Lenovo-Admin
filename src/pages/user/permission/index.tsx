@@ -50,7 +50,7 @@ interface FilterFormValues {
 interface PermissionFormValues {
   name: string;
   code?: string;
-  type: 'MENU' | 'BUTTON' | 'API';
+  type: 'MENU' | 'BUTTON' | 'API' | 'MODULE';
   module: string;
   parentId?: string;
 }
@@ -105,63 +105,67 @@ const PermissionManagement: React.FC = () => {
 
   // 转换权限数据为树节点
   const convertPermissionsToTreeNodes = (permissions: Permission[]): DataNode[] => {
-    return permissions.map(permission => ({
-      key: permission.id,
-      title: (
-        <div className="flex items-center justify-between" style={{ width: '100%' }}>
-          <div className="flex items-center">
-            {permission.type === 'MENU' && <MenuOutlined className="mr-2" />}
-            {permission.type === 'BUTTON' && <AppstoreOutlined className="mr-2" />}
-            {permission.type === 'API' && <ApiOutlined className="mr-2" />}
-            <span className="mr-2">{permission.name}</span>
-            <Tag color={
-              permission.type === 'MENU' ? 'green' :
-              permission.type === 'BUTTON' ? 'orange' : 'purple'
-            }>
-              {permission.type === 'MENU' ? '菜单' :
-               permission.type === 'BUTTON' ? '按钮' : '接口'}
-            </Tag>
-          </div>
-          <Space size={4}>
-            <Tooltip title="编辑">
-              <Button 
-                type="text" 
-                size="small" 
-                icon={<EditOutlined />}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleEditPermission(permission);
-                }}
-              />
-            </Tooltip>
-            <Tooltip title="删除">
-              <Popconfirm
-                title="确定要删除这个权限吗？"
-                description="删除后无法恢复，请谨慎操作"
-                onConfirm={(e) => {
-                  e?.stopPropagation();
-                  handleDeletePermission(permission.id);
-                }}
-                okText="确定"
-                cancelText="取消"
-              >
+    return permissions.map(permission => {
+      const typeConfig: Record<string, { icon: React.ReactNode; color: string; text: string; emoji: string }> = {
+        MODULE: { icon: <FolderOutlined />, color: 'purple', text: '模块', emoji: '📦' },
+        MENU: { icon: <MenuOutlined />, color: 'blue', text: '菜单', emoji: '📁' },
+        BUTTON: { icon: <AppstoreOutlined />, color: 'green', text: '按钮', emoji: '🔘' },
+        API: { icon: <ApiOutlined />, color: 'orange', text: '接口', emoji: '⚡' },
+      };
+      const config = typeConfig[permission.type] || typeConfig.MENU;
+      
+      return {
+        key: permission.id,
+        title: (
+          <div className="flex items-center justify-between" style={{ width: '100%' }}>
+            <div className="flex items-center">
+              {config.icon}
+              <span className="mr-2 ml-2">{permission.name}</span>
+              <Tag color={config.color}>
+                {config.emoji} {config.text}
+              </Tag>
+            </div>
+            <Space size={4}>
+              <Tooltip title="编辑">
                 <Button 
                   type="text" 
                   size="small" 
-                  danger 
-                  icon={<DeleteOutlined />}
-                  onClick={(e) => e.stopPropagation()}
+                  icon={<EditOutlined />}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleEditPermission(permission);
+                  }}
                 />
-              </Popconfirm>
-            </Tooltip>
-          </Space>
-        </div>
-      ),
-      children: permission.children && permission.children.length > 0 
-        ? convertPermissionsToTreeNodes(permission.children) 
-        : undefined,
-      icon: permission.type === 'MENU' ? <FolderOutlined /> : undefined,
-    }));
+              </Tooltip>
+              <Tooltip title="删除">
+                <Popconfirm
+                  title="确定要删除这个权限吗？"
+                  description="删除后无法恢复，请谨慎操作"
+                  onConfirm={(e) => {
+                    e?.stopPropagation();
+                    handleDeletePermission(permission.id);
+                  }}
+                  okText="确定"
+                  cancelText="取消"
+                >
+                  <Button 
+                    type="text" 
+                    size="small" 
+                    danger 
+                    icon={<DeleteOutlined />}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </Popconfirm>
+              </Tooltip>
+            </Space>
+          </div>
+        ),
+        children: permission.children && permission.children.length > 0 
+          ? convertPermissionsToTreeNodes(permission.children) 
+          : undefined,
+        icon: config.icon,
+      };
+    });
   };
 
   // 获取所有节点key
@@ -287,29 +291,36 @@ const PermissionManagement: React.FC = () => {
       dataIndex: 'name',
       key: 'name',
       width: 200,
-      render: (text, record) => (
-        <div className="flex items-center">
-          {record.type === 'MENU' && <MenuOutlined className="mr-2" />}
-          {record.type === 'BUTTON' && <AppstoreOutlined className="mr-2" />}
-          {record.type === 'API' && <ApiOutlined className="mr-2" />}
-          <span>{text}</span>
-        </div>
-      ),
+      render: (text, record) => {
+        const typeIcons: Record<string, React.ReactNode> = {
+          MODULE: <FolderOutlined className="mr-2" />,
+          MENU: <MenuOutlined className="mr-2" />,
+          BUTTON: <AppstoreOutlined className="mr-2" />,
+          API: <ApiOutlined className="mr-2" />,
+        };
+        return (
+          <div className="flex items-center">
+            {typeIcons[record.type] || <MenuOutlined className="mr-2" />}
+            <span>{text}</span>
+          </div>
+        );
+      },
     },
     {
       title: '类型',
       dataIndex: 'type',
       key: 'type',
-      width: 100,
+      width: 120,
       render: (type: string, record) => {
         console.log('🎨 渲染类型列:', { type, record_name: record.name, record_type: record.type });
-        const typeMap: Record<string, { color: string; text: string }> = {
-          MENU: { color: 'green', text: '菜单' },
-          BUTTON: { color: 'orange', text: '按钮' },
-          API: { color: 'purple', text: '接口' },
+        const typeMap: Record<string, { color: string; text: string; icon: string }> = {
+          MODULE: { color: 'purple', text: '模块', icon: '📦' },
+          MENU: { color: 'blue', text: '菜单', icon: '📁' },
+          BUTTON: { color: 'green', text: '按钮', icon: '🔘' },
+          API: { color: 'orange', text: '接口', icon: '⚡' },
         };
         const config = typeMap[type] || typeMap['MENU'];
-        return <Tag color={config.color}>{config.text}</Tag>;
+        return <Tag color={config.color}>{config.icon} {config.text}</Tag>;
       },
     },
     {
@@ -440,23 +451,28 @@ const PermissionManagement: React.FC = () => {
         {/* 右侧权限列表 */}
         <Col xs={24} md={14} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
           <Card 
-            title="权限列表"
-            extra={
-              <Form.Item name="type" noStyle>
-                <Select
-                  placeholder="按类型筛选"
-                  style={{ width: 120 }}
-                  onChange={(value) => {
-                    filterForm.setFieldsValue({ type: value });
-                    handleSearch();
-                  }}
-                  allowClear
-                >
-                  <Option value="MENU">菜单</Option>
-                  <Option value="BUTTON">按钮</Option>
-                  <Option value="API">接口</Option>
-                </Select>
-              </Form.Item>
+            title={
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                <span>权限列表</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                  <Form.Item name="type" noStyle>
+                    <Select
+                      placeholder="按类型筛选"
+                      style={{ width: 140 }}
+                      onChange={(value) => {
+                        filterForm.setFieldsValue({ type: value });
+                        handleSearch();
+                      }}
+                      allowClear
+                    >
+                      <Option value="MODULE">📦 模块</Option>
+                      <Option value="MENU">📁 菜单</Option>
+                      <Option value="BUTTON">🔘 按钮</Option>
+                      <Option value="API">⚡ 接口</Option>
+                    </Select>
+                  </Form.Item>
+                </div>
+              </div>
             }
             style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', marginLeft: '8px' }}
             bodyStyle={{ flex: 1, overflow: 'hidden', padding: '16px' }}
@@ -467,6 +483,7 @@ const PermissionManagement: React.FC = () => {
               rowKey="id"
               loading={loading}
               pagination={{
+                position: ['bottomCenter'],
                 pageSize: 10,
                 showSizeChanger: true,
                 showQuickJumper: true,
@@ -510,9 +527,10 @@ const PermissionManagement: React.FC = () => {
                 rules={[{ required: true, message: '请选择权限类型' }]}
               >
                 <Select placeholder="请选择权限类型">
-                  <Option value="MENU">菜单权限</Option>
-                  <Option value="BUTTON">按钮权限</Option>
-                  <Option value="API">接口权限</Option>
+                  <Option value="MODULE">📦 模块权限</Option>
+                  <Option value="MENU">📁 菜单权限</Option>
+                  <Option value="BUTTON">🔘 按钮权限</Option>
+                  <Option value="API">⚡ 接口权限</Option>
                 </Select>
               </Form.Item>
             </Col>
@@ -546,22 +564,26 @@ const PermissionManagement: React.FC = () => {
               }
             >
               {parentPermissions.map(permission => {
-                const typeText = permission.type === 'MENU' ? '菜单' : 
-                                permission.type === 'BUTTON' ? '按钮' : '接口';
-                const typeIcon = permission.type === 'MENU' ? '📁' : 
-                                permission.type === 'BUTTON' ? '🔘' : '⚡';
+                const typeConfig: Record<string, { text: string; icon: string }> = {
+                  MODULE: { text: '模块', icon: '📦' },
+                  MENU: { text: '菜单', icon: '📁' },
+                  BUTTON: { text: '按钮', icon: '🔘' },
+                  API: { text: '接口', icon: '⚡' },
+                };
+                const config = typeConfig[permission.type] || typeConfig.MENU;
+                
                 return (
                   <Option 
                     key={permission.id} 
                     value={permission.id}
-                    label={`${permission.name} [${typeText}] ${permission.module}`}
+                    label={`${permission.name} [${config.text}] ${permission.module}`}
                   >
                     <div className="flex items-center justify-between">
                       <span>
-                        {typeIcon} {permission.name}
+                        {config.icon} {permission.name}
                       </span>
                       <span className="text-gray-400 text-xs ml-2">
-                        [{typeText}] {permission.module}
+                        [{config.text}] {permission.module}
                       </span>
                     </div>
                   </Option>
