@@ -21,6 +21,12 @@ import VoucherManage from "./pages/coupon/copilot/VoucherManage.tsx";
 import VoucherCreate from "./pages/coupon/copilot/VoucherCreate.tsx";
 import Seckill from "./pages/marketing/Seckill.tsx";
 
+// AI-Assistant 商城管理页面
+import AIShelfProductManagement from "./pages/mall/AI-Assistant/ShelfProductManagement.tsx";
+import AISalesZoneManagement from "./pages/mall/AI-Assistant/SalesZoneManagement.tsx";
+import AIHomeDisplayManagement from "./pages/mall/AI-Assistant/HomeDisplayManagement.tsx";
+import AINewProductDisplayManagement from "./pages/mall/AI-Assistant/NewProductDisplayManagement.tsx";
+
 // 账号管理相关页面
 import AccountInfo from "./pages/account/info.tsx";
 import AccountPermission from "./pages/account/permission.tsx";
@@ -81,6 +87,12 @@ export default function App() {
           <Route path="/coupon/cash" element={<VoucherManage />} />
           <Route path="/coupon/cash/create" element={<VoucherCreate />} />
           <Route path="/marketing/seckill" element={<Seckill />} />
+
+          {/* AI-Assistant 商城管理路由 */}
+          <Route path="/mall/ai/shelf-product" element={<AIShelfProductManagement />} />
+          <Route path="/mall/ai/sales-zone" element={<AISalesZoneManagement />} />
+          <Route path="/mall/ai/home-display" element={<AIHomeDisplayManagement />} />
+          <Route path="/mall/ai/new-product-display" element={<AINewProductDisplayManagement />} />
 
           {/* 其他路由可以在这里继续添加 */}
 
