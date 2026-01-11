@@ -45,17 +45,24 @@ interface ProductConfig {
   original_price: number | string;
   status: string;
   image?: string | null;
-  // 修改：stock 字段应该是一个嵌套对象，而不是 stock 属性
-  stock_num?: number; // 直接库存数量
-  warn_num?: number;  // 预警数量
-  freeze_num?: number; // 冻结数量
-  // 或者API返回的是这样：
+  // API返回的库存字段
+  stock?: {
+    stock_id: string;
+    stock_num: number;
+    warn_num: number;
+    freeze_num: number;
+  } | null;
+  // 其他可能的库存字段格式
   stock_info?: {
     stock_id: string;
     stock_num: number;
     warn_num: number;
     freeze_num: number;
   } | null;
+  // 扁平库存字段
+  stock_num?: number;
+  warn_num?: number;
+  freeze_num?: number;
 }
 
 interface ProductDetailData {
@@ -173,7 +180,7 @@ const ProductDetailPage: React.FC = () => {
 
   // 辅助函数：检查是否有库存信息
   const hasStockInfo = (config: ProductConfig) => {
-    // 检查多种可能的库存字段
+    // 检查多种可能的库存字段，包括API返回的stock字段
     return (
       (config.stock_num !== undefined && config.stock_num !== null) ||
       (config.warn_num !== undefined && config.warn_num !== null) ||
@@ -182,13 +189,25 @@ const ProductDetailPage: React.FC = () => {
         config.stock_info.stock_num !== undefined ||
         config.stock_info.warn_num !== undefined ||
         config.stock_info.freeze_num !== undefined
+      )) ||
+      (config.stock && (
+        config.stock.stock_num !== undefined ||
+        config.stock.warn_num !== undefined ||
+        config.stock.freeze_num !== undefined
       ))
     );
   };
 
   // 获取库存数值
   const getStockValue = (config: ProductConfig) => {
-    if (config.stock_info) {
+    if (config.stock) {
+      return {
+        stock_num: config.stock.stock_num || 0,
+        warn_num: config.stock.warn_num || 10,
+        freeze_num: config.stock.freeze_num || 0,
+        stock_id: config.stock.stock_id
+      };
+    } else if (config.stock_info) {
       return {
         stock_num: config.stock_info.stock_num || 0,
         warn_num: config.stock_info.warn_num || 10,

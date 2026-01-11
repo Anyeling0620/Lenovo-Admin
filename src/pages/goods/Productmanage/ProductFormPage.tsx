@@ -79,8 +79,8 @@ const ProductFormPage: React.FC = () => {
     try {
       // 使用真实API获取数据
       const [brandsRes, categoriesRes, tagsRes] = await Promise.allSettled([
-        getBrands('正常'), // 只获取启用的品牌
-        getCategories('正常'), // 只获取启用的品类
+        getBrands('启用'), // 只获取启用的品牌
+        getCategories('启用'), // 只获取启用的品类
         getTags('启用'), // 只获取启用的标签
       ]);
 
