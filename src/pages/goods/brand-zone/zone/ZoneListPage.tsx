@@ -121,26 +121,39 @@ const ZoneListPage: React.FC = () => {
   // 加载数据
   const loadData = useCallback(async (filters: any = {}) => {
     setLoading(true);
+    console.log('[ZoneListPage] 开始加载分类数据...');
     try {
       const response = await api.getCategories(filters.status);
-      let categories = response || []; // 修改这里：直接使用response，而不是response?.data
+      console.log('[ZoneListPage] API响应:', { 
+        type: typeof response, 
+        isArray: Array.isArray(response), 
+        length: Array.isArray(response) ? response.length : 'N/A',
+        data: response 
+      });
+      
+      let categories = response || [];
       
       if (categories.length === 0) {
-        console.log('使用模拟专区数据');
-        categories = generateMockCategories();
+        console.warn('[ZoneListPage] ⚠️ API返回空数组，数据库可能没有分类数据');
+        // 不再使用模拟数据，显示空状态
+        globalMessage.warning('暂无分类数据，请先添加分类');
       }
       
       setData(categories);
       applyFilters(categories, filters);
-      
-      // 构建树形数据
       buildTreeData(categories);
-    } catch (error) { 
-      console.log('API调用失败，使用模拟数据');
-      const mockCategories = generateMockCategories();
-      setData(mockCategories);
-      applyFilters(mockCategories, filters);
-      buildTreeData(mockCategories);
+    } catch (error: any) { 
+      console.error('[ZoneListPage] ❌ API调用失败:', {
+        message: error?.message,
+        status: error?.response?.status,
+        data: error?.response?.data
+      });
+      
+      // 显示错误信息而不是静默使用模拟数据
+      globalMessage.error(`加载分类失败: ${error?.message || '未知错误'}`);
+      setData([]);
+      setFilteredData([]);
+      setTreeData([]);
     } finally { 
       setLoading(false); 
     }
