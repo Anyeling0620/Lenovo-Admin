@@ -26,6 +26,7 @@ export interface AdminLoginResponse {
   account: string;
   avatar: string | null;
   email: string | null;
+  sessionId?: string;  // ⭐ 后端返回的会话ID，用于跨域认证
 }
 
 export interface AdminSessionData {

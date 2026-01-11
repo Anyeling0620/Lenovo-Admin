@@ -35,19 +35,22 @@ service.interceptors.request.use(
             }
         }
         
+        // 当 cookie 被过滤时，使用 localStorage 中的 sessionId 作为备选认证
+        const sessionId = localStorage.getItem('admin_sessionId');
+        if (sessionId) {
+            // 添加多种可能的认证 header，增加后端兼容性
+            config.headers['X-Session-ID'] = sessionId;
+            config.headers['X-Admin-Session'] = sessionId;
+            config.headers['Authorization'] = `Bearer ${sessionId}`;
+        }
+        
         // 完整 URL 用于调试
         const fullUrl = (config.baseURL || '') + (config.url || '');
         console.log('[API] Request:', {
             method: config.method?.toUpperCase(),
             url: fullUrl,
-            timeout: config.timeout
+            hasSessionId: !!sessionId
         });
-        
-        // 当 cookie 被过滤时，使用 localStorage 中的 sessionId 作为备选认证
-        const sessionId = localStorage.getItem('admin_sessionId');
-        if (sessionId) {
-            config.headers['X-Session-ID'] = sessionId;
-        }
         
         return config;
     },
