@@ -94,9 +94,8 @@ const PermissionManagement: React.FC = () => {
       const data = await getPermissionList(params);
       setListData(data);
       
-      // 加载父权限选项 - 只有菜单类型可以作为父级
-      const parentOptions = data.filter(p => p.type === 'MENU');
-      setParentPermissions(parentOptions);
+      // 所有权限都可以作为父级（包括MENU、BUTTON、API）
+      setParentPermissions(data);
     } catch (error) {
       globalErrorHandler.handle(error, globalMessage.error);
     }
@@ -390,32 +389,34 @@ const PermissionManagement: React.FC = () => {
               </Button>
             }
           >
-            <Form form={filterForm} layout="inline" className="mb-4">
-              <Form.Item name="module">
-                <Input
-                  placeholder="搜索权限名称"
-                  style={{ width: 200 }}
-                  onPressEnter={handleSearch}
-                />
-              </Form.Item>
-              <Form.Item>
-                <Button
-                  icon={<SearchOutlined />}
-                  type="primary"
-                  onClick={handleSearch}
-                >
-                  搜索
-                </Button>
-              </Form.Item>
-              <Form.Item>
-                <Button
-                  icon={<ReloadOutlined />}
-                  onClick={handleReset}
-                >
-                  重置
-                </Button>
-              </Form.Item>
-            </Form>
+            <div style={{ marginBottom: '16px' }}>
+              <Form form={filterForm} layout="inline">
+                <Form.Item name="module" style={{ marginBottom: 0 }}>
+                  <Input
+                    placeholder="搜索权限名称"
+                    style={{ width: 200 }}
+                    onPressEnter={handleSearch}
+                  />
+                </Form.Item>
+                <Form.Item style={{ marginBottom: 0 }}>
+                  <Button
+                    icon={<SearchOutlined />}
+                    type="primary"
+                    onClick={handleSearch}
+                  >
+                    搜索
+                  </Button>
+                </Form.Item>
+                <Form.Item style={{ marginBottom: 0 }}>
+                  <Button
+                    icon={<ReloadOutlined />}
+                    onClick={handleReset}
+                  >
+                    重置
+                  </Button>
+                </Form.Item>
+              </Form>
+            </div>
             
             <Tree
               treeData={treeData}
@@ -512,8 +513,16 @@ const PermissionManagement: React.FC = () => {
                 label="所属模块" 
                 name="module"
                 rules={[{ required: true, message: '请输入模块名称' }]}
+                tooltip="模块名称用于分组管理权限，如：system、product、order 等"
               >
-                <Input placeholder="请输入模块名称，如: system" />
+                <Input 
+                  placeholder="如: system, product, order" 
+                  onChange={(e) => {
+                    // 自动转换为小写
+                    const value = e.target.value.toLowerCase();
+                    permissionForm.setFieldValue('module', value);
+                  }}
+                />
               </Form.Item>
             </Col>
           </Row>
@@ -522,17 +531,39 @@ const PermissionManagement: React.FC = () => {
             <Select
               placeholder="请选择父级权限（可选）"
               allowClear
+              showSearch
+              optionFilterProp="children"
+              filterOption={(input, option) =>
+                (option?.label?.toString() ?? '').toLowerCase().includes(input.toLowerCase())
+              }
             >
-              {parentPermissions.map(permission => (
-                <Option key={permission.id} value={permission.id}>
-                  {permission.name} ({permission.module})
-                </Option>
-              ))}
+              {parentPermissions.map(permission => {
+                const typeText = permission.type === 'MENU' ? '菜单' : 
+                                permission.type === 'BUTTON' ? '按钮' : '接口';
+                const typeIcon = permission.type === 'MENU' ? '📁' : 
+                                permission.type === 'BUTTON' ? '🔘' : '⚡';
+                return (
+                  <Option 
+                    key={permission.id} 
+                    value={permission.id}
+                    label={`${permission.name} [${typeText}] ${permission.module}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span>
+                        {typeIcon} {permission.name}
+                      </span>
+                      <span className="text-gray-400 text-xs ml-2">
+                        [{typeText}] {permission.module}
+                      </span>
+                    </div>
+                  </Option>
+                );
+              })}
             </Select>
           </Form.Item>
           
           <div className="text-sm text-gray-500">
-            提示：选择父级权限可以创建层级结构，留空则为顶级权限
+            提示：选择父级权限可以创建层级结构，留空则为顶级权限。所有类型的权限都可以作为父级。
           </div>
         </Form>
       </Modal>

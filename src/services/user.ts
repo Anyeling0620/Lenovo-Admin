@@ -466,27 +466,73 @@ export const getPermissionList = async (params?: PermissionListParams): Promise<
  * @returns 树形结构的权限列表
  */
 const buildPermissionTree = (permissions: Permission[]): Permission[] => {
+  if (!permissions || permissions.length === 0) {
+    return [];
+  }
+  
   const map = new Map<string, Permission>();
   const roots: Permission[] = [];
   
-  // 第一遍：创建映射
+  // 第一遍：创建映射，确保每个权限都有独立的children数组
   permissions.forEach(permission => {
-    map.set(permission.id, { ...permission, children: [] });
+    map.set(permission.id, { 
+      ...permission, 
+      children: [] 
+    });
   });
   
   // 第二遍：建立父子关系
   permissions.forEach(permission => {
-    const node = map.get(permission.id)!;
-    if (permission.parentId && map.has(permission.parentId)) {
-      const parent = map.get(permission.parentId)!;
-      if (!parent.children) {
-        parent.children = [];
+    const node = map.get(permission.id);
+    if (!node) return;
+    
+    // 如果有父级ID且父级存在
+    if (permission.parentId && permission.parentId.trim() !== '') {
+      const parent = map.get(permission.parentId);
+      if (parent) {
+        // 确保父级有children数组
+        if (!parent.children) {
+          parent.children = [];
+        }
+        // 添加到父级的children中
+        parent.children.push(node);
+      } else {
+        // 父级不存在，作为根节点
+        console.warn(`权限 "${permission.name}" (${permission.id}) 的父级 ${permission.parentId} 不存在，将作为根节点`);
+        roots.push(node);
       }
-      parent.children.push(node);
     } else {
+      // 没有父级，是根节点
       roots.push(node);
     }
   });
+  
+  // 按模块和名称排序根节点
+  roots.sort((a, b) => {
+    if (a.module !== b.module) {
+      return a.module.localeCompare(b.module);
+    }
+    return a.name.localeCompare(b.name);
+  });
+  
+  // 递归排序子节点
+  const sortChildren = (node: Permission) => {
+    if (node.children && node.children.length > 0) {
+      node.children.sort((a, b) => {
+        // 按类型排序：MENU > BUTTON > API
+        const typeOrder = { MENU: 0, BUTTON: 1, API: 2 };
+        const aOrder = typeOrder[a.type] ?? 3;
+        const bOrder = typeOrder[b.type] ?? 3;
+        if (aOrder !== bOrder) {
+          return aOrder - bOrder;
+        }
+        return a.name.localeCompare(b.name);
+      });
+      node.children.forEach(child => sortChildren(child));
+    }
+  };
+  
+  roots.forEach(root => sortChildren(root));
   
   return roots;
 };
