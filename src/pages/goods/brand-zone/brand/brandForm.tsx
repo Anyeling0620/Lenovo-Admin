@@ -186,7 +186,7 @@ const BrandFormPage: React.FC = () => {
           code: values.code,
           status: values.status as BrandStatus,
           description: values.description || undefined,
-          remark: values.remark || undefined,
+          //remark: values.remark || undefined,
           logoFile: logoFile
         };
         
