@@ -4,9 +4,10 @@ import {
   Card, Row, Col, Button, Upload, Image, Typography, Space, 
   Tooltip, Modal, Form, InputNumber, Tabs, Spin, message, Tag
 } from 'antd';
+import type { UploadFile } from 'antd';
 import {
   ArrowLeftOutlined, PictureOutlined, UploadOutlined, EyeOutlined,
-  EditOutlined, LoadingOutlined
+  EditOutlined, LoadingOutlined, PlusOutlined
 } from '@ant-design/icons';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { getImageUrl } from '../../../utils/imageUrl';
@@ -32,6 +33,9 @@ const ProductGalleryPage: React.FC = () => {
   const [bannerUploading, setBannerUploading] = useState<Record<string, boolean>>({});
   const [appearanceUploading, setAppearanceUploading] = useState<Record<string, boolean>>({});
   const [bannerEditVisible, setBannerEditVisible] = useState(false);
+  const [bannerUploadModalVisible, setBannerUploadModalVisible] = useState(false);
+  const [uploadingFiles, setUploadingFiles] = useState<UploadFile[]>([]);
+  const [defaultSort, setDefaultSort] = useState<number>(0);
   const [editingBanner, setEditingBanner] = useState<any>(null);
   const [bannerForm] = Form.useForm();
   
@@ -99,26 +103,48 @@ const ProductGalleryPage: React.FC = () => {
     return true;
   };
 
-  // Banner上传
-  const handleBannerUpload = async (file: File) => {
-    if (!id || !validateImage(file)) return '';
-    
-    const bannerId = `upload-${Date.now()}`;
-    setBannerUploading(prev => ({ ...prev, [bannerId]: true }));
-    
+  // 打开批量上传模态框
+  const handleOpenBatchUpload = () => {
+    setBannerUploadModalVisible(true);
+  };
+
+  // 批量上传Banner
+  const handleBatchBannerUpload = async () => {
+    if (!id || uploadingFiles.length === 0) {
+      message.warning('请选择要上传的图片');
+      return;
+    }
+
     try {
-      await addProductBanner(id, { imageFile: file });
-      globalMessage.success('Banner添加成功');
+      setBannerUploading({ ...bannerUploading, 'batch': true });
+      
+      // 按顺序上传每张图片，使用递增的排序值
+      const uploadPromises = uploadingFiles.map(async (uploadFile, index) => {
+        const sortValue = defaultSort + index;
+        if (uploadFile.originFileObj) {
+          await addProductBanner(id, { 
+            imageFile: uploadFile.originFileObj, 
+            sort: sortValue 
+          });
+        }
+      });
+
+      await Promise.all(uploadPromises);
+      
+      globalMessage.success(`成功上传 ${uploadingFiles.length} 张图片`);
+      
+      // 重置状态
+      setUploadingFiles([]);
+      setBannerUploadModalVisible(false);
+      setDefaultSort(0);
       
       // 重新加载商品详情
       await loadProductDetail();
-      return '';
     } catch (error) {
-      console.error('Banner上传失败:', error);
+      console.error('批量上传失败:', error);
       globalErrorHandler.handle(error, globalMessage.error);
-      return '';
     } finally {
-      setBannerUploading(prev => ({ ...prev, [bannerId]: false }));
+      setBannerUploading({ ...bannerUploading, 'batch': false });
     }
   };
 
@@ -238,36 +264,31 @@ const ProductGalleryPage: React.FC = () => {
           <TabPane tab="宣传轮播图" key="banners">
             <Card 
               size="small" 
-              title="上传宣传图 (支持多选)" 
+              title="上传宣传图" 
               style={{ marginBottom: 16 }}
+              extra={
+                <Button 
+                  type="primary" 
+                  size="small" 
+                  icon={<PlusOutlined />}
+                  onClick={handleOpenBatchUpload}
+                >
+                  批量上传
+                </Button>
+              }
             >
               <div 
                 style={{ 
-                  display: 'flex', 
-                  gap: 16, 
-                  alignItems: 'center' 
+                  fontSize: 12, 
+                  color: '#999', 
+                  lineHeight: '32px',
+                  marginBottom: 8 
                 }}
               >
-                <Upload 
-                  multiple 
-                  accept="image/*" 
-                  showUploadList={false}
-                  beforeUpload={async (file) => { 
-                    await handleBannerUpload(file);
-                    return false; 
-                  }}
-                >
-                  <Button icon={<UploadOutlined />}>批量选择图片</Button>
-                </Upload>
-                <div 
-                  style={{ 
-                    fontSize: 12, 
-                    color: '#999', 
-                    lineHeight: '32px' 
-                  }}
-                >
-                  支持 JPG/PNG，单张不超过 5MB，建议尺寸 800x400px
-                </div>
+                支持 JPG/PNG，单张不超过 5MB，建议尺寸 800x400px
+              </div>
+              <div style={{ fontSize: 12, color: '#666' }}>
+                当前轮播图数量: {banners.length} 张
               </div>
             </Card>
             
@@ -580,6 +601,104 @@ const ProductGalleryPage: React.FC = () => {
           </TabPane>
         </Tabs>
       </Card>
+      
+      {/* 批量上传Banner模态框 */}
+      <Modal 
+        title="批量上传轮播图" 
+        open={bannerUploadModalVisible} 
+        onCancel={() => {
+          setBannerUploadModalVisible(false);
+          setUploadingFiles([]);
+          setDefaultSort(0);
+        }} 
+        onOk={handleBatchBannerUpload} 
+        width={500}
+        okText="开始上传"
+        cancelText="取消"
+        okButtonProps={{
+          disabled: uploadingFiles.length === 0,
+          loading: bannerUploading['batch']
+        }}
+        destroyOnClose
+      >
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 12, color: '#999', marginBottom: 8 }}>
+            支持 JPG/PNG，单张不超过 5MB，建议尺寸 800x400px
+          </div>
+          <Upload
+            multiple
+            accept="image/*"
+            fileList={uploadingFiles}
+            beforeUpload={(file) => {
+              if (validateImage(file)) {
+                const uploadFile: UploadFile = {
+                  uid: `${Date.now()}-${Math.random()}`,
+                  name: file.name,
+                  status: 'done',
+                  originFileObj: file,
+                };
+                setUploadingFiles(prev => [...prev, uploadFile]);
+              }
+              return false;
+            }}
+            onRemove={(file) => {
+              setUploadingFiles(prev => prev.filter(f => f.uid !== file.uid));
+            }}
+          >
+            <Button icon={<UploadOutlined />}>选择图片</Button>
+          </Upload>
+          
+          {uploadingFiles.length > 0 && (
+            <div style={{ marginTop: 12 }}>
+              <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>
+                已选择 {uploadingFiles.length} 张图片:
+              </div>
+              <div style={{ 
+                maxHeight: 150, 
+                overflowY: 'auto',
+                border: '1px solid #d9d9d9',
+                borderRadius: 4,
+                padding: 8
+              }}>
+                {uploadingFiles.map((file, index) => (
+                  <div 
+                    key={file.uid} 
+                    style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '4px 0',
+                      borderBottom: index < uploadingFiles.length - 1 ? '1px solid #f0f0f0' : 'none'
+                    }}
+                  >
+                    <Text style={{ fontSize: 12 }} ellipsis>
+                      {file.name}
+                    </Text>
+                    <Text type="secondary" style={{ fontSize: 11 }}>
+                      {file.originFileObj && `${(file.originFileObj.size / 1024 / 1024).toFixed(2)} MB`}
+                    </Text>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+        
+        <Form layout="vertical">
+          <Form.Item label="起始排序值" extra="排序值越小，在轮播图中显示越靠前">
+            <InputNumber 
+              value={defaultSort}
+              onChange={(value) => setDefaultSort(value || 0)}
+              min={0}
+              max={100}
+              style={{ width: '100%' }}
+            />
+          </Form.Item>
+          <div style={{ fontSize: 12, color: '#666' }}>
+            图片将按顺序分配排序值: {defaultSort}, {defaultSort + 1}, {defaultSort + 2}...
+          </div>
+        </Form>
+      </Modal>
       
       {/* Banner 排序编辑弹窗 */}
       <Modal 
