@@ -77,27 +77,21 @@ const ProductFormPage: React.FC = () => {
   // 加载选项数据
   const loadOptions = useCallback(async () => {
     try {
-      // 使用真实API获取数据
-      const [brandsRes, categoriesRes, tagsRes] = await Promise.allSettled([
-        getBrands('启用'), // 只获取启用的品牌
-        getCategories('启用'), // 只获取启用的品类
-        getTags('启用'), // 只获取启用的标签
+      // 使用真实API获取数据，不传递status参数，与ProductListPage保持一致
+      const [brandsRes, categoriesRes, tagsRes] = await Promise.all([
+        getBrands(), // 获取所有品牌
+        getCategories(), // 获取所有品类
+        getTags(), // 获取所有标签
       ]);
 
-      // 处理品牌数据
-      if (brandsRes.status === 'fulfilled' && brandsRes.value) {
-        setBrands(brandsRes.value);
-      }
+      // 处理品牌数据，前端筛选启用状态
+      setBrands(brandsRes?.filter(brand => brand.status === '启用') || []);
 
-      // 处理分类数据
-      if (categoriesRes.status === 'fulfilled' && categoriesRes.value) {
-        setCategories(categoriesRes.value);
-      }
+      // 处理分类数据，前端筛选启用状态
+      setCategories(categoriesRes?.filter(category => category.status === '启用') || []);
 
-      // 处理标签数据
-      if (tagsRes.status === 'fulfilled' && tagsRes.value) {
-        setTags(tagsRes.value);
-      }
+      // 处理标签数据，前端筛选启用状态
+      setTags(tagsRes?.filter(tag => tag.status === '启用') || []);
     } catch (error) {
       console.error("加载选项失败", error);
       globalMessage.error('加载选项数据失败');
