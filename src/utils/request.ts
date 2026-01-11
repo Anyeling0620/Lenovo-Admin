@@ -1,6 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /** 后端统一返回结构 */
 export interface ApiResponse<T> {
+    name: string | undefined;
+    url: string | undefined;
+    total: number;
+    list: never[];
     code: number
     data: T
     message: string
@@ -25,10 +29,25 @@ const service: AxiosInstance = axios.create({
 service.interceptors.request.use(
     (config: InternalAxiosRequestConfig) => {
         // 如果 url 不以 http 开头，且不以 /admin 开头，才添加前缀
+        // 目标：
+        // - 'login'        -> '/admin/login'
+        // - '/login'       -> '/admin/login'
+        // - '/system/xxx'  -> '/admin/system/xxx'
+        // - '/admin/xxx'   -> '/admin/xxx' (不重复)
+        // - 'admin/xxx'    -> '/admin/xxx' (容错)
         if (config.url && !config.url.startsWith('http')) {
+            // 先把 'admin/xxx' 纠正成 '/admin/xxx'
+            if (config.url.startsWith('admin/')) config.url = '/' + config.url;
+
+            // 只要不是以 /admin 开头，就补 /admin 前缀（同时处理相对/绝对路径）
             if (!config.url.startsWith('/admin')) {
-                config.url = '/admin' + config.url;
+                // 去掉可能的多余斜杠，避免出现 '/admin//xxx'
+                const cleaned = config.url.startsWith('/') ? config.url.slice(1) : config.url;
+                config.url = `/admin/${cleaned}`;
             }
+
+            // 最后做一次归一化，防止误拼接导致的 '/admin/admin/xxx'
+            config.url = config.url.replace(/^\/admin\/(admin\/)+/, '/admin/');
         }
         
         // 完整 URL 用于调试

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Card, Button, Input, Select, Space, Tag, Tooltip } from 'antd';
-import { SearchOutlined, ReloadOutlined, EyeOutlined, EditOutlined } from '@ant-design/icons';
+import { SearchOutlined, ReloadOutlined, EditOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import type { ColumnsType } from 'antd/es/table';
 import { getAfterSales } from '../../../services/api';
@@ -199,4 +199,5 @@ const AfterSaleManagement: React.FC = () => {
 };
 
 export default AfterSaleManagement;
+
 

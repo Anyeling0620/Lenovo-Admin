@@ -1,5 +1,4 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState } from "react";
 import {
   Table,
   Button,
@@ -75,41 +74,6 @@ const salesZoneSchema = z.object({
 
 
 const SalesZoneManagement = () => {
-  const navigate = useNavigate();
-  
-  // 会话验证 - 只在会话确实不存在时才跳转
-  useEffect(() => {
-    const checkSession = () => {
-      const sessionId = localStorage.getItem('admin_sessionId');
-      if (!sessionId) {
-        console.log('未找到管理员会话，跳转到登录页面');
-        globalMessage.error('未找到管理员会话，请重新登录');
-        navigate('/login', { replace: true });
-        return false;
-      }
-      console.log('找到有效会话:', sessionId.substring(0, 10) + '...');
-      return true;
-    };
-    
-    // 延迟检查，避免在页面加载时立即跳转
-    const timer = setTimeout(() => {
-      checkSession();
-    }, 100);
-    
-    // 监听会话过期事件
-    const handleSessionExpired = () => {
-      globalMessage.error('会话已过期，请重新登录');
-      navigate('/login', { replace: true });
-    };
-    
-    window.addEventListener('SESSION_EXPIRED', handleSessionExpired);
-    
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener('SESSION_EXPIRED', handleSessionExpired);
-    };
-  }, [navigate]);
-
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingZone, setEditingZone] = useState<SalesZoneResponse | null>(null);
   const [filters, setFilters] = useState({

@@ -1,5 +1,4 @@
-
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route ,Navigate} from "react-router-dom";
 
 import MainLayout from "./layouts/MainLayout";
 import Login from "./pages/Login.tsx";
@@ -47,6 +46,32 @@ import useAuthLifecycle from "./hooks/useAuth";
 
 
 
+// 商品管理相关页面
+import GoodsOverview from "./pages/goods/overview/overview.tsx";
+import ProductListPage from './pages/goods/Productmanage/ProductListPage.tsx';
+import ProductFormPage from './pages/goods/Productmanage/ProductFormPage.tsx';
+import ProductSkuPage from './pages/goods/Productmanage/ProductSkuPage.tsx';
+import ProductGalleryPage from './pages/goods/Productmanage/ProductGalleryPage.tsx';
+import BrandZoneHome from './pages/goods/brand-zone/BrandZoneHome.tsx';
+import ZoneListPage from "./pages/goods/brand-zone/zone/ZoneListPage.tsx";
+import BrandListPage from './pages/goods/brand-zone/brand/brand.tsx';
+import BrandFormPage from './pages/goods/brand-zone/brand/brandForm.tsx';
+import StockCreatePage from "./pages/goods/stock/StockCreatePage.tsx";
+import StockListPage from "./pages/goods/stock/StockListPage.tsx";
+import StockEditPage from "./pages/goods/stock/StockEditPage.tsx";
+import ZoneFormPage from "./pages/goods/brand-zone/zone/ZoneFormPage.tsx";
+import ConfigListPage from "./pages/goods/Productmanage/configs.tsx";
+import AnalyticsPage from "./pages/goods/overview/analytics.tsx";
+import ProductDetailPage from "./pages/goods/Productmanage/ProductDetailPages.tsx";
+import TagFormPage from "./pages/goods/Productmanage/tag/TagFormPage.tsx";
+import TagListPage from "./pages/goods/Productmanage/tag/TagListPage.tsx";
+
+//import ShelfListPage from './pages/goods/shelf/ShelfListPage';
+
+
+
+
+
 export default function App() {
   useAuthLifecycle();
   return (
@@ -81,6 +106,7 @@ export default function App() {
           <Route path="/after-sale/handle/:afterSaleId" element={<AfterSaleHandle />} />
           <Route path="/complaint" element={<ComplaintManagement />} />
           <Route path="/complaint/handle/:complaintId" element={<ComplaintHandle />} />
+          
           {/* 营销管理 - 福利中心 */}
           <Route path="/coupon/manage" element={<CouponManage />} />
           <Route path="/coupon/manage/create" element={<CouponCreate />} />
@@ -94,6 +120,34 @@ export default function App() {
           <Route path="/mall/ai/home-display" element={<AIHomeDisplayManagement />} />
           <Route path="/mall/ai/new-product-display" element={<AINewProductDisplayManagement />} />
 
+          {/* 商品管理路由 */}
+          <Route path="/goods/overview" element={<GoodsOverview />} />
+          <Route path="/goods/manage" element={<Navigate to="/goods/manage/list" replace />} />
+          <Route path="/goods/manage/list" element={<ProductListPage />} />
+          <Route path="/goods/manage/create" element={<ProductFormPage />} />
+          <Route path="/goods/detail/:id" element={<ProductDetailPage />} />
+          <Route path="/goods/manage/edit/:id" element={<ProductFormPage />} />
+          <Route path="/goods/manage/sku/:id" element={<ProductSkuPage />} />
+          <Route path="/goods/manage/gallery/:id" element={<ProductGalleryPage />} />
+          <Route path="/goods/brand-zone" element={<BrandZoneHome />} />
+          <Route path="/goods/zone" element={<ZoneListPage />} />
+          <Route path="/goods/zone/create" element={<ZoneFormPage />} />
+          <Route path="/goods/zone/edit/:id" element={<ZoneFormPage />} />
+          <Route path="/goods/brand" element={<BrandListPage />} />
+          <Route path="/goods/brand/create" element={<BrandFormPage />} />
+          <Route path="/goods/brand/edit/:id" element={<BrandFormPage />} />
+          <Route path="/goods/stock" element={<StockListPage />} />
+          <Route path="/goods/stock/edit/:stockId" element={<StockEditPage />} />
+          <Route path="/goods/stock/create" element={<StockCreatePage />} />
+          {/* <Route path="/goods/tags" element={<TagListPage />} /> */}
+          <Route path="/goods/configs" element={<ConfigListPage />} />
+          {/* <Route path="/goods/shelf" element={<ShelfListPage />} />
+          <Route path="/goods/shelf/detail/:shelfId" element={<ShelfListPage />} /> */}
+          <Route path="/goods/analytics" element={<AnalyticsPage />} />
+          <Route path="/goods/analytics/sales" element={<AnalyticsPage />} />
+          <Route path="/goods/tag" element={<TagListPage />} />
+          <Route path="/goods/tag/create" element={<TagFormPage />} />
+          <Route path="/goods/tag/edit/:id" element={<TagFormPage />} />
           {/* 其他路由可以在这里继续添加 */}
 
         </Route>

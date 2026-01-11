@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Descriptions, Table, Tag, Button, Space, Spin } from 'antd';
+import { Card, Descriptions, Table, Tag, Button, Space, Spin, Popconfirm } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import { Link, useParams } from 'react-router-dom';
-import { getOrderDetailApi } from '../../../services/api';
+import { getOrderDetailApi, setOrderPendingReceive } from '../../../services/api';
 import type { OrderDetailResponse } from '../../../services/api-type';
 import { globalMessage } from '../../../utils/globalMessage';
 import { globalErrorHandler } from '../../../utils/globalAxiosErrorHandler';
 import { mockOrderDetail } from '../mockData';
-import dayjs from 'dayjs';
 
 const OrderDetail: React.FC = () => {
   const { orderId } = useParams<{ orderId: string }>();
@@ -47,11 +46,14 @@ const OrderDetail: React.FC = () => {
 
   const getStatusTag = (status: string) => {
     const statusMap: Record<string, { color: string; text: string }> = {
-      '待付款': { color: 'orange', text: '待付款' },
-      '待发货': { color: 'blue', text: '待发货' },
-      '待收货': { color: 'cyan', text: '待收货' },
-      '已完成': { color: 'green', text: '已完成' },
       '已取消': { color: 'red', text: '已取消' },
+      '待支付': { color: 'orange', text: '待支付' },
+      '已支付': { color: 'blue', text: '已支付' },
+      '待发货': { color: 'cyan', text: '待发货' },
+      '已发货': { color: 'purple', text: '已发货' },
+      '待收货': { color: 'geekblue', text: '待收货' },
+      '已收货': { color: 'green', text: '已收货' },
+      '已完成': { color: 'green', text: '已完成' },
     };
     const config = statusMap[status] || { color: 'default', text: status };
     return <Tag color={config.color}>{config.text}</Tag>;
@@ -121,11 +123,29 @@ const OrderDetail: React.FC = () => {
           />
         </Card>
 
-        {orderDetail.status === '待发货' && (
+        {(orderDetail.status === '待发货' || orderDetail.status === '已发货') && (
           <div style={{ marginTop: '16px', textAlign: 'right' }}>
-            <Link to={`/order/ship/${orderDetail.order_id}`}>
-              <Button type="primary">发货</Button>
-            </Link>
+            {orderDetail.status === '待发货' && (
+              <Link to={`/order/ship/${orderDetail.order_id}`}>
+                <Button type="primary">发货</Button>
+              </Link>
+            )}
+            {orderDetail.status === '已发货' && (
+              <Popconfirm
+                title="确定要将订单设置为待收货（到达）吗？"
+                onConfirm={async () => {
+                  try {
+                    await setOrderPendingReceive(orderDetail.order_id);
+                    globalMessage.success('订单已设置为待收货');
+                    loadOrderDetail();
+                  } catch (error) {
+                    globalErrorHandler.handle(error, globalMessage.error);
+                  }
+                }}
+              >
+                <Button type="primary">到达</Button>
+              </Popconfirm>
+            )}
           </div>
         )}
       </Card>

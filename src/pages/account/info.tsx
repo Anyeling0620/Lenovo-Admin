@@ -9,6 +9,7 @@ import { globalMessage } from '../../utils/globalMessage';
 import { globalErrorHandler } from '../../utils/globalAxiosErrorHandler';
 import { mockAdminProfile } from './mockData';
 import dayjs from 'dayjs';
+import useAdminProfileStore from '../../store/adminInfo';
 
 const AccountInfo: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -19,6 +20,8 @@ const AccountInfo: React.FC = () => {
     try {
       const data = await getAccountProfile();
       setProfile(data);
+      // 同步更新全局 store
+      useAdminProfileStore.getState().setProfile(data);
     } catch (error) {
       globalErrorHandler.handle(error, globalMessage.error);
       // API拉取失败时使用模拟数据
