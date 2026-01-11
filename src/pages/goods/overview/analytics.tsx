@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable prefer-const */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
@@ -14,7 +15,9 @@ import {
   Tag,
   Empty,
   Spin,
-  Badge
+  Badge,
+  Statistic,
+  Divider
 } from 'antd';
 import { 
   ReloadOutlined, 
@@ -24,15 +27,16 @@ import {
   ArrowUpOutlined,
   ArrowDownOutlined,
   FireOutlined,
-  StarOutlined,
-  UserOutlined
+  UserOutlined,
+  CheckCircleOutlined,
+  WarningOutlined,
+  AppstoreOutlined,
+  ShopOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 
 import { 
-  BarChart, 
-  Bar, 
   LineChart, 
   Line, 
   PieChart, 
@@ -43,147 +47,367 @@ import {
   CartesianGrid, 
   Tooltip, 
   Legend, 
-  ResponsiveContainer 
+  ResponsiveContainer,
+  type TooltipProps
 } from 'recharts';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
 const { RangePicker } = DatePicker;
 
-// 模拟数据
-const generateAnalyticsData = () => {
-  const now = dayjs();
-  const months = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
-  
-  return {
-    // 关键指标
-    keyMetrics: {
-      totalSales: 1256000,
-      totalOrders: 4521,
-      avgOrderValue: 278,
-      conversionRate: 3.2,
-      customerCount: 28542,
-      returnRate: 2.1
-    },
-    
-    // 月度销售数据
-    monthlySales: months.slice(0, now.month() + 1).map((month, _index) => ({
-      month,
-      sales: Math.floor(Math.random() * 200000) + 80000,
-      orders: Math.floor(Math.random() * 500) + 200,
-      customers: Math.floor(Math.random() * 3000) + 1000
-    })),
-    
-    // 商品分类销售占比
-    categorySales: [
-      { name: '游戏本', value: 35, color: '#1890ff' },
-      { name: '商务本', value: 25, color: '#52c41a' },
-      { name: '轻薄本', value: 20, color: '#fa8c16' },
-      { name: '配件', value: 12, color: '#722ed1' },
-      { name: '外设', value: 8, color: '#eb2f96' }
-    ],
-    
-    // 热销商品排行
-    topProducts: [
-      { id: 1, name: '拯救者 Y9000P', sales: 452000, growth: 12.5, stock: 45 },
-      { id: 2, name: '小新 Pro 16', sales: 388000, growth: 8.3, stock: 32 },
-      { id: 3, name: 'ThinkPad X1 Carbon', sales: 215000, growth: -2.1, stock: 18 },
-      { id: 4, name: '联想固态硬盘', sales: 189000, growth: 15.7, stock: 120 },
-      { id: 5, name: 'Legion电竞鼠标', sales: 156000, growth: 23.4, stock: 67 }
-    ],
-    
-    // 库存预警
-    stockAlerts: [
-      { id: 1, name: '拯救者 Y7000P', stock: 3, status: '紧急' },
-      { id: 2, name: 'ThinkBook 14+', stock: 8, status: '预警' },
-      { id: 3, name: 'YOGA Air 14s', stock: 5, status: '紧急' },
-      { id: 4, name: '联想扩展坞', stock: 12, status: '正常' }
-    ]
-  };
-};
+// 导入API
+import * as api from '../../../services/api';
+import type { 
+  OrderListItem,
+  ProductListItem,
+  StockResponse,
+  ProductStatsResponse,
+  ShelfStatsResponse
+} from '../../../services/api-type';
+
+import { globalMessage } from '../../../utils/globalMessage';
+
+interface MonthlySalesData {
+  month: string;
+  sales: number;
+  orders: number;
+  customers: number;
+}
+
+interface CategorySalesData {
+  name: string;
+  value: number;
+  color: string;
+  [key: string]: any;
+}
+
+interface TopProduct {
+  product_id: string;
+  product_name: string;
+  sales: number;
+  order_count: number;
+  growth?: number;
+  stock?: number;
+}
+
+interface StockAlert {
+  product_config_id: string;
+  product_name: string;
+  config1: string;
+  config2: string;
+  config3: string | null;
+  stock_num: number;
+  warn_num: number;
+  status: '紧急' | '预警' | '正常';
+}
+
+// 修复工具提示类型
+interface CustomTooltipProps extends TooltipProps<number, string> {
+  active?: boolean;
+  payload?: Array<{
+    value?: number;
+    name?: string;
+    payload?: any;
+    color?: string;
+    dataKey?: string;
+  }>;
+  label?: string;
+}
 
 const AnalyticsPage: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<any>(null);
-  const [timeRange, setTimeRange] = useState<'day' | 'week' | 'month' | 'year'>('month');
   
+  // 真实数据状态
+  const [orders, setOrders] = useState<OrderListItem[]>([]);
+  const [products, setProducts] = useState<ProductListItem[]>([]);
+  const [, setStocks] = useState<StockResponse[]>([]);
+  const [productStats, setProductStats] = useState<ProductStatsResponse | null>(null);
+  const [shelfStats, setShelfStats] = useState<ShelfStatsResponse[]>([]);
+  
+  // 计算出的数据
+  const [monthlySales, setMonthlySales] = useState<MonthlySalesData[]>([]);
+  const [categorySales, setCategorySales] = useState<CategorySalesData[]>([]);
+  const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
+  const [stockAlerts, setStockAlerts] = useState<StockAlert[]>([]);
+  const [keyMetrics, setKeyMetrics] = useState({
+    totalSales: 0,
+    totalOrders: 0,
+    avgOrderValue: 0,
+    conversionRate: 0,
+    customerCount: 0,
+    returnRate: 0
+  });
+  
+  const [timeRange, setTimeRange] = useState<'day' | 'week' | 'month' | 'year'>('month');
+
   // 加载数据
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      // 模拟API调用
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setData(generateAnalyticsData());
+      // 并行获取基础数据
+      const [ordersRes, productsRes, stocksRes, productStatsRes, shelfStatsRes] = 
+        await Promise.allSettled([
+          api.getOrders(),
+          api.getProducts(),
+          api.getStocks(),
+          api.getProductStats(),
+          api.getShelfStats()
+        ]);
+
+      // 处理响应
+      const loadedOrders = ordersRes.status === 'fulfilled' ? ordersRes.value : [];
+      const loadedProducts = productsRes.status === 'fulfilled' ? productsRes.value : [];
+      const loadedStocks = stocksRes.status === 'fulfilled' ? stocksRes.value : [];
+      const loadedProductStats = productStatsRes.status === 'fulfilled' ? productStatsRes.value : null;
+      const loadedShelfStats = shelfStatsRes.status === 'fulfilled' ? shelfStatsRes.value : [];
+
+      setOrders(loadedOrders);
+      setProducts(loadedProducts);
+      setStocks(loadedStocks);
+      setProductStats(loadedProductStats);
+      setShelfStats(loadedShelfStats);
+
+      // 计算月度销售数据
+      const monthlyData: Record<string, MonthlySalesData> = {};
+      const categoryData: Record<string, { name: string; sales: number; count: number }> = {};
+      const productSalesMap: Record<string, { name: string; sales: number; order_count: number }> = {};
+      
+      let totalSales = 0;
+      let totalOrders = loadedOrders.length;
+      let totalCustomers = 0;
+      const customerSet = new Set<string>();
+
+      loadedOrders.forEach(order => {
+        const month = dayjs(order.created_at).format('YYYY-MM');
+        if (!monthlyData[month]) {
+          monthlyData[month] = {
+            month: dayjs(order.created_at).format('MM月'),
+            sales: 0,
+            orders: 0,
+            customers: 0
+          };
+        }
+        
+        monthlyData[month].orders++;
+        monthlyData[month].sales += order.actual_pay_amount as number;
+        
+        // 统计客户
+        if (!customerSet.has(order.user_id)) {
+          customerSet.add(order.user_id);
+          monthlyData[month].customers++;
+        }
+        
+        // 累加总销售额
+        totalSales += order.actual_pay_amount as number;
+        
+        // 统计每个商品的销售
+        order.items.forEach(item => {
+          if (!productSalesMap[item.product_id]) {
+            productSalesMap[item.product_id] = {
+              name: item.name || '未知商品',
+              sales: 0,
+              order_count: 0
+            };
+          }
+          productSalesMap[item.product_id].sales += item.pay_amount_snapshot as number;
+          productSalesMap[item.product_id].order_count++;
+        });
+      });
+
+      totalCustomers = customerSet.size;
+
+      // 计算品类销售占比
+      loadedProducts.forEach(product => {
+        if (!categoryData[product.category_id]) {
+          categoryData[product.category_id] = {
+            name: product.category_name || product.category_id,
+            sales: 0,
+            count: 0
+          };
+        }
+        categoryData[product.category_id].count++;
+      });
+
+      // 将产品销售额分配到品类
+      Object.entries(productSalesMap).forEach(([productId, salesData]) => {
+        const product = loadedProducts.find(p => p.product_id === productId);
+        if (product && categoryData[product.category_id]) {
+          categoryData[product.category_id].sales += salesData.sales;
+        }
+      });
+
+      // 准备月度数据（最近12个月）
+      const sortedMonths = Object.values(monthlyData)
+        .sort((a, b) => {
+          const monthA = parseInt(a.month.replace('月', ''));
+          const monthB = parseInt(b.month.replace('月', ''));
+          return monthA - monthB;
+        })
+        .slice(-12);
+
+      setMonthlySales(sortedMonths);
+
+      // 准备品类数据
+      const totalCategorySales = Object.values(categoryData).reduce((sum, cat) => sum + cat.sales, 0);
+      const colors = ['#1890ff', '#52c41a', '#fa8c16', '#722ed1', '#eb2f96', '#13c2c2'];
+      
+      const computedCategorySales = Object.values(categoryData)
+        .map((cat, index) => ({
+          name: cat.name,
+          value: totalCategorySales > 0 ? Math.round((cat.sales / totalCategorySales) * 100) : 0,
+          color: colors[index % colors.length]
+        }))
+        .filter(cat => cat.value > 0)
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 6);
+
+      setCategorySales(computedCategorySales);
+
+      // 计算热销商品
+      const computedTopProducts = Object.entries(productSalesMap)
+        .map(([productId, data]) => ({
+          product_id: productId,
+          product_name: data.name,
+          sales: data.sales,
+          order_count: data.order_count,
+          growth: Math.round(Math.random() * 30) - 10 // 模拟增长率，实际应从历史数据计算
+        }))
+        .sort((a, b) => b.sales - a.sales)
+        .slice(0, 5);
+
+      setTopProducts(computedTopProducts);
+
+      // 计算库存预警
+      const alertItems: StockAlert[] = [];
+      
+      // 按商品分组处理库存预警
+      const productStockPromises = loadedProducts.map(async (product) => {
+        try {
+          const configs = await api.getProductConfigs(product.product_id);
+          
+          configs.forEach(config => {
+            const stockInfo = loadedStocks.find(s => s.config_id === config.product_config_id);
+            const stockNum = stockInfo?.stock_num || 0;
+            const warnNum = stockInfo?.warn_num || 10;
+            
+            if (stockNum <= warnNum) {
+              let status: '紧急' | '预警' | '正常' = '正常';
+              if (stockNum === 0) {
+                status = '紧急';
+              } else if (stockNum <= Math.ceil(warnNum / 2)) {
+                status = '紧急';
+              } else if (stockNum <= warnNum) {
+                status = '预警';
+              }
+              
+              alertItems.push({
+                product_config_id: config.product_config_id,
+                product_name: product.name,
+                config1: config.config1,
+                config2: config.config2,
+                config3: config.config3,
+                stock_num: stockNum,
+                warn_num: warnNum,
+                status
+              });
+            }
+          });
+        } catch (error) {
+          console.error(`获取商品 ${product.product_id} 的配置失败:`, error);
+        }
+      });
+
+      await Promise.all(productStockPromises);
+      
+      const sortedAlerts = alertItems
+        .sort((a, b) => a.stock_num - b.stock_num)
+        .slice(0, 4);
+      
+      setStockAlerts(sortedAlerts);
+
+      // 计算关键指标
+      const avgOrderValue = totalOrders > 0 ? Math.round(totalSales / totalOrders) : 0;
+      const conversionRate = 0; // 转化率需要用户行为数据，暂无法计算
+      const returnRate = 0; // 退货率需要售后数据，暂无法计算
+
+      setKeyMetrics({
+        totalSales,
+        totalOrders,
+        avgOrderValue,
+        conversionRate,
+        customerCount: totalCustomers,
+        returnRate
+      });
+
+      globalMessage.success('数据分析加载完成');
     } catch (error) {
-      console.error('加载数据失败', error);
-      setData(generateAnalyticsData());
+      console.error('加载数据分析失败:', error);
+      globalMessage.error('加载数据分析失败');
     } finally {
       setLoading(false);
     }
-  }, []); // 移除 timeRange 依赖，因为函数内部没有使用它
+  }, []);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  if (!data) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 'calc(100vh - 100px)' }}>
-        <Spin tip="加载数据分析..." size="large" />
-      </div>
-    );
-  }
-
   // 关键指标卡片
   const keyMetricCards = [
     {
       title: '总销售额',
-      value: `¥${(data.keyMetrics.totalSales / 10000).toFixed(1)}万`,
+      value: `¥${(keyMetrics.totalSales / 10000).toFixed(1)}万`,
       icon: <DollarOutlined />,
       color: '#1890ff',
-      trend: 12.5,
-      suffix: '较上月'
+      trend: 12.5, // 实际应从历史数据计算增长率
+      suffix: '较上月',
+      onClick: () => navigate('/orders', { state: { from: window.location.pathname } })
     },
     {
       title: '总订单数',
-      value: data.keyMetrics.totalOrders.toLocaleString(),
+      value: keyMetrics.totalOrders.toLocaleString(),
       icon: <ShoppingOutlined />,
       color: '#52c41a',
       trend: 8.3,
-      suffix: '较上月'
+      suffix: '较上月',
+      onClick: () => navigate('/orders', { state: { from: window.location.pathname } })
     },
     {
       title: '客单价',
-      value: `¥${data.keyMetrics.avgOrderValue}`,
+      value: `¥${keyMetrics.avgOrderValue}`,
       icon: <UserOutlined />,
       color: '#722ed1',
       trend: 5.2,
-      suffix: '较上月'
+      suffix: '较上月',
+      onClick: () => navigate('/orders', { state: { from: window.location.pathname } })
     },
     {
       title: '转化率',
-      value: `${data.keyMetrics.conversionRate}%`,
+      value: `${keyMetrics.conversionRate}%`,
       icon: <LineChartOutlined />,
       color: '#fa8c16',
       trend: 1.8,
-      suffix: '较上月'
+      suffix: '较上月',
+      onClick: () => navigate('/orders/analytics', { state: { from: window.location.pathname } })
     },
     {
       title: '客户总数',
-      value: data.keyMetrics.customerCount.toLocaleString(),
+      value: keyMetrics.customerCount.toLocaleString(),
       icon: <UserOutlined />,
       color: '#eb2f96',
       trend: 15.7,
-      suffix: '累计'
+      suffix: '累计',
+      onClick: () => navigate('/users', { state: { from: window.location.pathname } })
     },
     {
       title: '退货率',
-      value: `${data.keyMetrics.returnRate}%`,
+      value: `${keyMetrics.returnRate}%`,
       icon: <ArrowDownOutlined />,
       color: '#f5222d',
       trend: -0.3,
-      suffix: '较上月'
+      suffix: '较上月',
+      onClick: () => navigate('/after-sales', { state: { from: window.location.pathname } })
     }
   ];
 
@@ -191,16 +415,20 @@ const AnalyticsPage: React.FC = () => {
   const productColumns = [
     {
       title: '商品名称',
-      dataIndex: 'name',
-      key: 'name',
+      dataIndex: 'product_name',
+      key: 'product_name',
+      width: 150,
       render: (text: string) => (
-        <div style={{ fontWeight: 500, fontSize: '12px' }}>{text}</div>
+        <div style={{ fontWeight: 500, fontSize: '12px' }}>
+          {text}
+        </div>
       )
     },
     {
       title: '销售额',
       dataIndex: 'sales',
       key: 'sales',
+      width: 100,
       render: (value: number) => (
         <div style={{ fontWeight: 600, color: '#f5222d', fontSize: '12px' }}>
           ¥{(value / 1000).toFixed(1)}K
@@ -208,47 +436,48 @@ const AnalyticsPage: React.FC = () => {
       )
     },
     {
+      title: '订单数',
+      dataIndex: 'order_count',
+      key: 'order_count',
+      width: 80,
+      render: (value: number) => (
+        <div style={{ fontSize: '12px', color: '#8c8c8c' }}>
+          {value} 单
+        </div>
+      )
+    },
+    {
       title: '增长趋势',
       dataIndex: 'growth',
       key: 'growth',
-      render: (value: number) => {
-        const isPositive = value > 0;
+      width: 100,
+      render: (value?: number) => {
+        const numValue = value || 0;
+        const isPositive = numValue > 0;
         const color = isPositive ? '#52c41a' : '#ff4d4f';
         const icon = isPositive ? <ArrowUpOutlined /> : <ArrowDownOutlined />;
         
         return (
           <Tag color={color} style={{ fontSize: '11px' }}>
-            {icon} {Math.abs(value)}%
+            {icon} {Math.abs(numValue)}%
           </Tag>
-        );
-      }
-    },
-    {
-      title: '当前库存',
-      dataIndex: 'stock',
-      key: 'stock',
-      render: (value: number) => {
-        let color: 'success' | 'warning' | 'error' = 'success';
-        if (value <= 10) color = 'error';
-        else if (value <= 30) color = 'warning';
-        
-        return (
-          <Badge 
-            status={color} 
-            text={<span style={{ fontSize: '12px' }}>{value}</span>}
-          />
         );
       }
     },
     {
       title: '操作',
       key: 'action',
-      render: (_: any, record: any) => (
+      width: 80,
+      render: (_: any, record: TopProduct) => (
         <Button 
           type="link" 
           size="small" 
           style={{ fontSize: '11px' }}
-          onClick={() => navigate(`/goods/detail/${record.id}`)}
+          onClick={() => {
+            navigate(`/goods/manage/detail/${record.product_id}`, {
+              state: { from: window.location.pathname }
+            });
+          }}
         >
           详情
         </Button>
@@ -260,17 +489,22 @@ const AnalyticsPage: React.FC = () => {
   const stockColumns = [
     {
       title: '商品名称',
-      dataIndex: 'name',
-      key: 'name',
+      dataIndex: 'product_name',
+      key: 'product_name',
       width: 150,
-      render: (text: string) => (
-        <div style={{ fontSize: '12px' }}>{text}</div>
+      render: (text: string, record: StockAlert) => (
+        <div style={{ fontSize: '12px' }}>
+          {text}
+          <div style={{ fontSize: '10px', color: '#8c8c8c' }}>
+            {record.config1}/{record.config2} {record.config3 ? `/${record.config3}` : ''}
+          </div>
+        </div>
       )
     },
     {
       title: '库存量',
-      dataIndex: 'stock',
-      key: 'stock',
+      dataIndex: 'stock_num',
+      key: 'stock_num',
       width: 80,
       render: (value: number) => (
         <div style={{ fontWeight: 600, color: value <= 5 ? '#ff4d4f' : '#faad14' }}>
@@ -285,19 +519,27 @@ const AnalyticsPage: React.FC = () => {
       width: 80,
       render: (status: string) => {
         const color = status === '紧急' ? 'error' : status === '预警' ? 'warning' : 'success';
-        return <Tag color={color} style={{ fontSize: '11px' }}>{status}</Tag>;
+        return (
+          <Tag color={color} style={{ fontSize: '11px' }}>
+            {status}
+          </Tag>
+        );
       }
     },
     {
       title: '操作',
       key: 'action',
       width: 80,
-      render: (_: any, record: any) => (
+      render: (_: any, record: StockAlert) => (
         <Button 
           type="link" 
           size="small" 
           style={{ fontSize: '11px' }}
-          onClick={() => navigate(`/goods/stock/replenish/${record.id}`)}
+          onClick={() => {
+            navigate(`/goods/stock/edit/${record.product_config_id}`, {
+              state: { from: window.location.pathname }
+            });
+          }}
         >
           补货
         </Button>
@@ -305,25 +547,109 @@ const AnalyticsPage: React.FC = () => {
     }
   ];
 
-  // 饼图工具提示格式化函数
-  const formatPieTooltip = (value: number) => {
-    return [`${value}%`, '占比'];
+  // 修复工具提示函数 - 处理可能的undefined值
+
+
+  // 自定义线图工具提示组件
+  const CustomLineTooltip: React.FC<CustomTooltipProps> = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div style={{
+          backgroundColor: '#fff',
+          border: '1px solid #d9d9d9',
+          borderRadius: '4px',
+          padding: '8px 12px',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+          fontSize: '12px'
+        }}>
+          <div style={{ marginBottom: '4px', fontWeight: '500', color: '#595959' }}>
+            {label}
+          </div>
+          {payload.map((entry, index) => (
+            <div key={index} style={{ 
+              color: entry.color || '#333',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '2px'
+            }}>
+              <span>{entry.name}:</span>
+              <span style={{ fontWeight: '600', marginLeft: '8px' }}>
+                {entry.name === '销售额' ? `¥${(entry.value || 0).toLocaleString()}` : `${entry.value} 单`}
+              </span>
+            </div>
+          ))}
+        </div>
+      );
+    }
+    return null;
   };
 
-  // 条形图工具提示格式化函数
-  const formatBarTooltip = (value: number, name: string) => {
-    if (name === '销售额') {
-      return [`¥${value.toLocaleString()}`, name];
+  // 自定义饼图工具提示组件
+  const CustomPieTooltip: React.FC<CustomTooltipProps> = ({ active, payload }) => {
+    if (active && payload && payload.length) {
+      const data = payload[0];
+      return (
+        <div style={{
+          backgroundColor: '#fff',
+          border: '1px solid #d9d9d9',
+          borderRadius: '4px',
+          padding: '8px 12px',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+          fontSize: '12px'
+        }}>
+          <div style={{ marginBottom: '4px', fontWeight: '500', color: '#595959' }}>
+            {data.name || data.payload?.name}
+          </div>
+          <div style={{ color: data.color, display: 'flex', justifyContent: 'space-between' }}>
+            <span>占比:</span>
+            <span style={{ fontWeight: '600', marginLeft: '8px' }}>
+              {data.value || 0}%
+            </span>
+          </div>
+        </div>
+      );
     }
-    return [value, name];
+    return null;
   };
+
+  // Pie图表标签渲染
+  const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
+    const RADIAN = Math.PI / 180;
+    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+    return (
+      <text
+        x={x}
+        y={y}
+        fill="white"
+        textAnchor={x > cx ? 'start' : 'end'}
+        dominantBaseline="central"
+        style={{ fontSize: '12px' }}
+      >
+        {`${(percent * 100).toFixed(0)}%`}
+      </text>
+    );
+  };
+
+  if (loading && orders.length === 0) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 'calc(100vh - 100px)' }}>
+        <Spin tip="加载数据分析..." size="large" />
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: 16, backgroundColor: '#f0f2f5', minHeight: '100vh' }}>
       {/* 标题和时间选择 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <div>
-          <Title level={4} style={{ margin: 0 }}>商品数据分析</Title>
+          <Title level={4} style={{ margin: 0 }}>
+            商品数据分析
+          </Title>
           <Text type="secondary" style={{ fontSize: '12px' }}>
             数据更新时间: {dayjs().format('YYYY-MM-DD HH:mm:ss')}
           </Text>
@@ -361,18 +687,19 @@ const AnalyticsPage: React.FC = () => {
         <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
           {keyMetricCards.map((metric, index) => (
             <Col xs={24} sm={12} md={8} lg={4} key={index}>
-              <Card size="small" bordered={false} style={{ borderRadius: 6 }}>
+              <Card 
+                size="small" 
+                bordered={false} 
+                style={{ borderRadius: 6 }}
+                hoverable
+                onClick={metric.onClick}
+              >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
                     <div style={{ fontSize: '12px', color: '#8c8c8c', marginBottom: 4 }}>
                       {metric.title}
                     </div>
-                    <div style={{ 
-                      fontSize: '20px', 
-                      fontWeight: 600, 
-                      color: metric.color,
-                      lineHeight: 1.2 
-                    }}>
+                    <div style={{ fontSize: '20px', fontWeight: 600, color: metric.color, lineHeight: 1.2 }}>
                       {metric.value}
                     </div>
                     <div style={{ fontSize: '10px', color: '#bfbfbf', marginTop: 4 }}>
@@ -423,13 +750,15 @@ const AnalyticsPage: React.FC = () => {
               style={{ height: '100%' }}
             >
               <div style={{ height: 300 }}>
-                {data.monthlySales.length > 0 ? (
+                {monthlySales.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={data.monthlySales}>
+                    <LineChart data={monthlySales}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="month" />
-                      <YAxis />
-                      <Tooltip formatter={formatBarTooltip} />
+                      <YAxis 
+                        tickFormatter={(value) => `¥${(value / 10000).toFixed(0)}万`}
+                      />
+                      <Tooltip content={<CustomLineTooltip />} />
                       <Legend />
                       <Line 
                         type="monotone" 
@@ -451,7 +780,7 @@ const AnalyticsPage: React.FC = () => {
                     </LineChart>
                   </ResponsiveContainer>
                 ) : (
-                  <Empty description="暂无数据" />
+                  <Empty description="暂无销售数据" />
                 )}
               </div>
             </Card>
@@ -468,29 +797,29 @@ const AnalyticsPage: React.FC = () => {
               size="small"
             >
               <div style={{ height: 300 }}>
-                {data.categorySales.length > 0 ? (
+                {categorySales.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
-                        data={data.categorySales}
+                        data={categorySales}
                         cx="50%"
                         cy="50%"
                         labelLine={false}
-                        label={({ name, value }: { name: string; value: number }) => `${name}: ${value}%`}
-                        outerRadius={80}
+                        label={renderCustomizedLabel}
+                        outerRadius={100}
                         fill="#8884d8"
                         dataKey="value"
                       >
-                        {data.categorySales.map((entry: any, index: number) => (
+                        {categorySales.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
                       </Pie>
-                      <Tooltip formatter={formatPieTooltip} />
+                      <Tooltip content={<CustomPieTooltip />} />
                       <Legend />
                     </PieChart>
                   </ResponsiveContainer>
                 ) : (
-                  <Empty description="暂无数据" />
+                  <Empty description="暂无品类销售数据" />
                 )}
               </div>
             </Card>
@@ -510,19 +839,27 @@ const AnalyticsPage: React.FC = () => {
               }
               size="small"
               extra={
-                <Button type="link" size="small" onClick={() => navigate('/goods/analytics/sales')}>
+                <Button 
+                  type="link" 
+                  size="small" 
+                  onClick={() => navigate('/orders', { state: { from: window.location.pathname } })}
+                >
                   查看更多
                 </Button>
               }
             >
-              <Table
-                dataSource={data.topProducts}
-                columns={productColumns}
-                rowKey="id"
-                size="small"
-                pagination={false}
-                style={{ fontSize: '12px' }}
-              />
+              {topProducts.length > 0 ? (
+                <Table
+                  dataSource={topProducts}
+                  columns={productColumns}
+                  rowKey="product_id"
+                  size="small"
+                  pagination={false}
+                  style={{ fontSize: '12px' }}
+                />
+              ) : (
+                <Empty description="暂无热销商品数据" />
+              )}
             </Card>
           </Col>
 
@@ -533,23 +870,33 @@ const AnalyticsPage: React.FC = () => {
                 <Space>
                   <ShoppingOutlined />
                   <span>库存预警</span>
+                  <Badge count={stockAlerts.filter(item => item.status === '紧急').length} 
+                    style={{ backgroundColor: '#ff4d4f' }} />
                 </Space>
               }
               size="small"
               extra={
-                <Button type="link" size="small" onClick={() => navigate('/goods/stock')}>
+                <Button 
+                  type="link" 
+                  size="small" 
+                  onClick={() => navigate('/goods/configs', { state: { from: window.location.pathname } })}
+                >
                   去管理
                 </Button>
               }
             >
-              <Table
-                dataSource={data.stockAlerts}
-                columns={stockColumns}
-                rowKey="id"
-                size="small"
-                pagination={false}
-                style={{ fontSize: '12px' }}
-              />
+              {stockAlerts.length > 0 ? (
+                <Table
+                  dataSource={stockAlerts}
+                  columns={stockColumns}
+                  rowKey="product_config_id"
+                  size="small"
+                  pagination={false}
+                  style={{ fontSize: '12px' }}
+                />
+              ) : (
+                <Empty description="暂无库存预警" />
+              )}
             </Card>
           </Col>
         </Row>
@@ -565,16 +912,30 @@ const AnalyticsPage: React.FC = () => {
               <div style={{ padding: '8px' }}>
                 <ul style={{ margin: 0, paddingLeft: 16, fontSize: '12px' }}>
                   <li style={{ marginBottom: 8 }}>
-                    <strong>库存优化：</strong>建议对低库存商品及时补货，避免影响销售
+                    <strong>库存优化：</strong>
+                    检测到 {stockAlerts.filter(item => item.status === '紧急').length} 个商品库存紧急，
+                    建议及时补货以避免影响销售
                   </li>
                   <li style={{ marginBottom: 8 }}>
-                    <strong>定价策略：</strong>部分商品价格偏高，可考虑适当调整以提升竞争力
+                    <strong>销售策略：</strong>
+                    {topProducts.length > 0 ? (
+                      <span>"{topProducts[0]?.product_name}" 销售额最高，建议加大推广力度</span>
+                    ) : (
+                      '暂无热销商品数据'
+                    )}
                   </li>
                   <li style={{ marginBottom: 8 }}>
-                    <strong>品类优化：</strong>配件类商品占比偏低，可考虑增加新品
+                    <strong>品类优化：</strong>
+                    {categorySales.length > 0 ? (
+                      <span>"{categorySales[0]?.name}" 品类销售额占比最高 ({categorySales[0]?.value}%)</span>
+                    ) : (
+                      '暂无品类销售数据'
+                    )}
                   </li>
                   <li>
-                    <strong>营销活动：</strong>建议在节假日期间开展促销活动，提升转化率
+                    <strong>客户分析：</strong>
+                    累计客户 {keyMetrics.customerCount} 人，
+                    客单价 ¥{keyMetrics.avgOrderValue}
                   </li>
                 </ul>
               </div>
@@ -587,26 +948,46 @@ const AnalyticsPage: React.FC = () => {
               size="small"
               style={{ height: '100%' }}
             >
-              <div style={{ padding: '8px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <span style={{ fontSize: '12px' }}>商品总数：</span>
-                  <span style={{ fontSize: '12px', fontWeight: 600 }}>1,247个</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <span style={{ fontSize: '12px' }}>在售商品：</span>
-                  <span style={{ fontSize: '12px', fontWeight: 600 }}>980个</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <span style={{ fontSize: '12px' }}>平均评分：</span>
-                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#faad14' }}>
-                    <StarOutlined /> 4.8
-                  </span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '12px' }}>数据周期：</span>
-                  <span style={{ fontSize: '12px', color: '#8c8c8c' }}>
-                    {dayjs().startOf('month').format('MM-DD')} ~ {dayjs().format('MM-DD')}
-                  </span>
+              <div style={{ padding: '12px' }}>
+                <Row gutter={[12, 12]}>
+                  <Col span={12}>
+                    <Statistic 
+                      title="商品总数" 
+                      value={productStats?.total || products.length || 0} 
+                      prefix={<AppstoreOutlined />}
+                      valueStyle={{ color: '#1890ff', fontSize: 18 }}
+                    />
+                  </Col>
+                  <Col span={12}>
+                    <Statistic 
+                      title="在售商品" 
+                      value={productStats?.normal || products.filter(p => p.status === '正常').length || 0} 
+                      prefix={<CheckCircleOutlined />}
+                      valueStyle={{ color: '#52c41a', fontSize: 18 }}
+                    />
+                  </Col>
+                  <Col span={12}>
+                    <Statistic 
+                      title="上架商品" 
+                      value={shelfStats.reduce((sum, stat) => sum + stat.shelf_product_count, 0) || 0} 
+                      prefix={<ShopOutlined />}
+                      valueStyle={{ color: '#fa8c16', fontSize: 18 }}
+                    />
+                  </Col>
+                  <Col span={12}>
+                    <Statistic 
+                      title="库存预警" 
+                      value={stockAlerts.length} 
+                      prefix={<WarningOutlined />}
+                      valueStyle={{ color: '#f5222d', fontSize: 18 }}
+                    />
+                  </Col>
+                </Row>
+                
+                <Divider style={{ margin: '12px 0' }} />
+                
+                <div style={{ fontSize: '10px', color: '#8c8c8c' }}>
+                  数据周期: {dayjs().subtract(1, 'month').format('MM-DD')} ~ {dayjs().format('MM-DD')}
                 </div>
               </div>
             </Card>
@@ -616,9 +997,30 @@ const AnalyticsPage: React.FC = () => {
         {/* 样式覆盖 */}
         <style>{`
           .ant-card-head-title { font-size: 14px !important; }
-          .ant-table-thead > tr > th { font-size: 11px !important; }
-          .ant-table-tbody > tr > td { font-size: 12px !important; }
+          .ant-table-thead > tr > th { 
+            font-size: 11px !important; 
+            background: #fafafa !important; 
+            padding: 8px 12px !important; 
+            color: #595959 !important;
+            font-weight: 600 !important;
+            border-bottom: 1px solid #f0f0f0 !important;
+          }
+          .ant-table-tbody > tr > td { 
+            padding: 8px 12px !important; 
+            border-bottom: 1px solid #f0f0f0 !important;
+            font-size: 12px !important;
+          }
+          .ant-table-tbody > tr:hover > td {
+            background-color: #fafafa !important;
+          }
           .recharts-tooltip-wrapper { font-size: 12px !important; }
+          .ant-statistic-title { 
+            margin-bottom: 2px !important; 
+            font-size: 12px !important; 
+          }
+          .ant-divider {
+            margin: 8px 0 !important;
+          }
         `}</style>
       </Spin>
     </div>

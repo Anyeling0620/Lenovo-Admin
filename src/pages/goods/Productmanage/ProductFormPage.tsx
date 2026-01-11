@@ -1,15 +1,14 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Card, Row, Col, Button, Input, Select, Space, Form, Typography,Tag,
-  Divider, Upload, message,Modal, Image
+  Card, Row, Col, Button, Input, Select, Space, Form, Typography, Tag,
+  Divider, Upload, message, Modal, Image
 } from 'antd';
 import {
-  ArrowLeftOutlined, SaveOutlined, UploadOutlined, LoadingOutlined,
+  ArrowLeftOutlined, SaveOutlined, UploadOutlined, 
   PlusOutlined
 } from '@ant-design/icons';
-import { Link, useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -20,13 +19,10 @@ import type {
 } from '../../../services/api-type';
 import { getImageUrl } from '../../../utils/imageUrl';
 import { globalMessage } from '../../../utils/globalMessage';
-import { globalErrorHandler } from '../../../utils/globalAxiosErrorHandler';
 import {
   getBrands, getCategories, getTags, getProductDetail,
   createProduct, updateProduct
 } from '../../../services/api';
-// 导入模拟数据
-import { mockBrands, mockCategories, mockTags, findMockProductDetail } from '../../../services/cyf-mockData';
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -38,66 +34,36 @@ const productSchema = z.object({
   category_id: z.string().min(1, '请选择品类'),
   sub_title: z.string().max(200, '副标题过长').optional().or(z.literal('')),
   description: z.string().max(5000, '描述内容过长').optional().or(z.literal('')),
-  main_image: z.string().optional().or(z.literal('')),
-  status: z.nativeEnum({正常: '正常', 下架: '下架', 删除: '删除'}),
+  status: z.enum(['正常', '下架', '删除']).default('正常'),
   tag_ids: z.array(z.string()).optional(),
 });
 
 type ProductFormData = z.infer<typeof productSchema>;
 
-// 图片上传处理函数
-const handleImageUpload = async (file: File): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const isImage = file.type.startsWith('image/');
-    if (!isImage) {
-      message.error('只能上传图片文件');
-      reject(new Error('只能上传图片文件'));
-      return;
-    }
-    
-    const isLt5M = file.size / 1024 / 1024 < 5;
-    if (!isLt5M) {
-      message.error('图片大小不能超过5MB');
-      reject(new Error('图片大小不能超过5MB'));
-      return;
-    }
-    
-    setTimeout(() => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const result = e.target?.result as string;
-        message.success('图片上传成功');
-        resolve(result);
-      };
-      reader.onerror = () => {
-        message.error('图片读取失败');
-        reject(new Error('图片读取失败'));
-      };
-      reader.readAsDataURL(file);
-    }, 800);
-  });
-};
-
 const ProductFormPage: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const isEditMode = !!id;
   
   const [loading, setLoading] = useState(false);
-  const [mainImageUploading, setMainImageUploading] = useState(false);
-  const [brands, setBrands] = useState<{ label: string; value: string }[]>([]);
-  const [categories, setCategories] = useState<{ label: string; value: string }[]>([]);
-  const [tags, setTags] = useState<{ label: string; value: string }[]>([]);
+  const [mainImageFile, setMainImageFile] = useState<File | null>(null);
+  const [mainImagePreview, setMainImagePreview] = useState<string>('');
+  const [brands, setBrands] = useState<BrandResponse[]>([]);
+  const [categories, setCategories] = useState<CategoryResponse[]>([]);
+  const [tags, setTags] = useState<TagResponse[]>([]);
   const [productDetail, setProductDetail] = useState<any>(null); 
-  // 使用模拟数据标志
-  const useMockData = true;
-  const fromPath = (location.state as any)?.from || '/goods/manage/list';
+  
+  // 获取来源页面 - 优先从URL参数获取，其次从location.state获取
+  const searchParams = new URLSearchParams(location.search);
+  const returnParam = searchParams.get('return');
+  const fromPath = returnParam || (location.state as any)?.from || '/goods/manage/list';
+  
   const { 
     control, 
     handleSubmit, 
     reset,
-    formState: { errors, isSubmitting },
-    setValue,
+    formState: { errors },
   } = useForm<ProductFormData>({
     resolver: zodResolver(productSchema),
     defaultValues: { 
@@ -105,63 +71,68 @@ const ProductFormPage: React.FC = () => {
       tag_ids: [],
       sub_title: '',
       description: '',
-      main_image: ''
     }
   });
 
   // 加载选项数据
   const loadOptions = useCallback(async () => {
     try {
-      if (useMockData) {
-        // 使用模拟数据
-        setBrands(mockBrands.map((b: BrandResponse) => ({ label: b.name, value: b.brand_id })));
-        setCategories(mockCategories.map((c: CategoryResponse) => ({ label: c.name, value: c.category_id })));
-        setTags(mockTags.map((t: TagResponse) => ({ label: t.name, value: t.tag_id })));
-      } else {
-        const [brandsRes, categoriesRes, tagsRes] = await Promise.all([
-          getBrands(),
-          getCategories(),
-          getTags(),
-        ]);
-        
-        setBrands(brandsRes?.map((b: BrandResponse) => ({ label: b.name, value: b.brand_id })) || []);
-        setCategories(categoriesRes?.map((c: CategoryResponse) => ({ label: c.name, value: c.category_id })) || []);
-        setTags(tagsRes?.map((t: TagResponse) => ({ label: t.name, value: t.tag_id })) || []);
+      // 使用真实API获取数据
+      const [brandsRes, categoriesRes, tagsRes] = await Promise.allSettled([
+        getBrands('正常'), // 只获取启用的品牌
+        getCategories('正常'), // 只获取启用的品类
+        getTags('启用'), // 只获取启用的标签
+      ]);
+
+      // 处理品牌数据
+      if (brandsRes.status === 'fulfilled' && brandsRes.value) {
+        setBrands(brandsRes.value);
+      }
+
+      // 处理分类数据
+      if (categoriesRes.status === 'fulfilled' && categoriesRes.value) {
+        setCategories(categoriesRes.value);
+      }
+
+      // 处理标签数据
+      if (tagsRes.status === 'fulfilled' && tagsRes.value) {
+        setTags(tagsRes.value);
       }
     } catch (error) {
       console.error("加载选项失败", error);
+      globalMessage.error('加载选项数据失败');
     }
-  }, [useMockData]);
+  }, []);
 
   // 加载商品详情（编辑模式）
   const loadProductDetail = useCallback(async (productId: string) => {
     try {
-      let detail;
-      
-      if (useMockData) {
-        // 使用模拟数据
-        detail = findMockProductDetail(productId);
-      } else {
-        detail = await getProductDetail(productId);
-      }
+      const detail = await getProductDetail(productId);
       
       if (detail) {
-        setProductDetail(detail); // 保存完整的商品详情
+        setProductDetail(detail);
+        
+        // 如果有主图，设置预览
+        if (detail.main_image) {
+          setMainImagePreview(detail.main_image);
+        }
+        
+        // 重置表单值
         reset({
           name: detail.name || '',
           brand_id: detail.brand_id || '',
           category_id: detail.category_id || '',
           sub_title: detail.sub_title || '',
           description: detail.description || '',
-          main_image: detail.main_image || '',
-          status: (detail.status as ProductStatus) || '正常',
+          status: detail.status || '正常',
           tag_ids: detail.tags ? detail.tags.map((t: any) => t.tag_id) : []
         });
       }
     } catch (error) {
-      globalErrorHandler.handle(error, globalMessage.error);
+      console.error('加载商品详情失败:', error);
+      globalMessage.error('加载商品详情失败');
     }
-  }, [reset, useMockData]);
+  }, [reset]);
 
   // 初始化
   useEffect(() => {
@@ -173,72 +144,93 @@ const ProductFormPage: React.FC = () => {
 
   // 主图上传处理
   const handleMainImageUpload = async (file: File) => {
-    setMainImageUploading(true);
-    try {
-      const imageUrl = await handleImageUpload(file);
-      setValue('main_image', imageUrl);
-      return imageUrl;
-    } catch (error) {
-      console.error('主图上传失败:', error);
-      return '';
-    } finally {
-      setMainImageUploading(false);
+    const isImage = file.type.startsWith('image/');
+    if (!isImage) {
+      message.error('只能上传图片文件');
+      return false;
     }
+    
+    const isLt5M = file.size / 1024 / 1024 < 5;
+    if (!isLt5M) {
+      message.error('图片大小不能超过5MB');
+      return false;
+    }
+    
+    // 生成预览URL
+    const previewUrl = URL.createObjectURL(file);
+    setMainImagePreview(previewUrl);
+    setMainImageFile(file);
+    
+    return false; // 阻止默认上传行为
+  };
+
+  // 移除主图
+  const handleRemoveMainImage = () => {
+    setMainImageFile(null);
+    setMainImagePreview('');
   };
 
   // 表单提交
   const onSubmit = async (values: ProductFormData) => {
     setLoading(true);
     try {
-      globalMessage.loading('提交中...');
-      
       if (isEditMode && id) {
         // 构建更新请求数据
-        const updateData: ProductUpdateRequest = {
+        const updateData: ProductUpdateRequest & { mainImageFile?: File } = {
           name: values.name,
           brand_id: values.brand_id,
           category_id: values.category_id,
           sub_title: values.sub_title,
           description: values.description,
-          main_image: values.main_image,
           status: values.status,
+          mainImageFile: mainImageFile || undefined,
         };
         
-        if (useMockData) {
-          // 模拟更新
-          globalMessage.success('商品信息更新成功');
-        } else {
-          await updateProduct(id, updateData);
-          globalMessage.success('商品信息更新成功');
-        }
+        await updateProduct(id, updateData);
+        globalMessage.success('商品信息更新成功');
       } else {
         // 构建创建请求数据
-        const createData: ProductCreateRequest = {
+        const createData: ProductCreateRequest & { mainImageFile?: File } = {
           brand_id: values.brand_id,
           category_id: values.category_id,
           name: values.name,
           sub_title: values.sub_title,
           description: values.description,
-          main_image: values.main_image,
+          mainImageFile: mainImageFile || undefined,
         };
         
-        if (useMockData) {
-          // 模拟创建
-          globalMessage.success('商品录入成功');
-        } else {
-          await createProduct(createData);
-          globalMessage.success('商品录入成功');
-        }
+        await createProduct(createData);
+        globalMessage.success('商品录入成功');
       }
       
       // 返回原页面
       navigate(fromPath);
-    } catch (error) {
-      globalErrorHandler.handle(error, globalMessage.error);
+    } catch (error: any) {
+      console.error('表单提交失败:', error);
+      const errorMsg = error?.response?.data?.message || '提交失败，请检查网络连接';
+      globalMessage.error(errorMsg);
     } finally {
       setLoading(false);
     }
   };
+
+  // 品牌选项
+  const brandOptions = brands.map(brand => ({
+    label: brand.name,
+    value: brand.brand_id
+  }));
+
+  // 品类选项
+  const categoryOptions = categories.map(category => ({
+    label: category.name,
+    value: category.category_id
+  }));
+
+  // 标签选项
+  const tagOptions = tags.map(tag => ({
+    label: tag.name,
+    value: tag.tag_id
+  }));
 
   return (
     <div style={{ padding: 12, backgroundColor: '#f0f2f5', minHeight: '100%' }}>
@@ -249,7 +241,7 @@ const ProductFormPage: React.FC = () => {
               <Button 
                 size="small" 
                 icon={<ArrowLeftOutlined />}
-                onClick={() => navigate(fromPath)} // 修改返回逻辑
+                onClick={() => navigate(fromPath)}
               />
               <Typography.Text strong>
                 {isEditMode ? '编辑商品档案' : '录入新商品'}
@@ -362,52 +354,54 @@ const ProductFormPage: React.FC = () => {
                   <Controller 
                     name="name" 
                     control={control}
-                    render={({ field }) => <Input {...field} />} 
+                    render={({ field }) => <Input {...field} placeholder="请输入商品名称" />} 
                   />
                 </Form.Item>
                 <Form.Item label="营销副标题">
                   <Controller 
                     name="sub_title" 
                     control={control}
-                    render={({ field }) => <Input {...field} />} 
+                    render={({ field }) => <Input {...field} placeholder="请输入商品副标题" />} 
                   />
                 </Form.Item>
                 <Row gutter={12}>
                   <Col span={12}>
-                <Form.Item 
-                label="所属品牌" 
-                required 
-                validateStatus={errors.brand_id ? 'error' : ''} 
-                help={errors.brand_id?.message}
-                >
-                <Controller 
-                    name="brand_id" 
-                    control={control}
-                    render={({ field }) => (
-                    <Select 
-                        {...field} 
-                        placeholder="选择品牌" 
-                        showSearch 
-                        optionFilterProp="label"
-                        options={brands}
-                        dropdownRender={(menu) => (
-                        <>
-                            {menu}
-                            <Divider style={{ margin: '8px 0' }} />
-                            <Button 
-                            type="text" 
-                            icon={<PlusOutlined />} 
-                            block
-                            onClick={() => navigate('/goods/brand/create')}
-                            >
-                            添加新品牌
-                            </Button>
-                        </>
-                        )}
-                    />
-                    )} 
-                />
-                </Form.Item>
+                    <Form.Item 
+                      label="所属品牌" 
+                      required 
+                      validateStatus={errors.brand_id ? 'error' : ''} 
+                      help={errors.brand_id?.message}
+                    >
+                      <Controller 
+                        name="brand_id" 
+                        control={control}
+                        render={({ field }) => (
+                          <Select 
+                            {...field} 
+                            placeholder="选择品牌" 
+                            showSearch 
+                            optionFilterProp="label"
+                            options={brandOptions}
+                            dropdownRender={(menu) => (
+                              <>
+                                {menu}
+                                <Divider style={{ margin: '8px 0' }} />
+                                <Button 
+                                  type="text" 
+                                  icon={<PlusOutlined />} 
+                                  block
+                                  onClick={() => navigate('/goods/brand/create', {
+                                    state: { from: window.location.pathname + window.location.search }
+                                  })}
+                                >
+                                  添加新品牌
+                                </Button>
+                              </>
+                            )}
+                          />
+                        )} 
+                      />
+                    </Form.Item>
                   </Col>
                   <Col span={12}>
                     <Form.Item 
@@ -420,27 +414,29 @@ const ProductFormPage: React.FC = () => {
                         name="category_id" 
                         control={control}
                         render={({ field }) => (
-                        <Select 
-                        {...field} 
-                        placeholder="选择类目" 
-                        showSearch 
-                        optionFilterProp="label"
-                        options={categories}
-                        dropdownRender={(menu) => (
-                            <>
-                            {menu}
-                            <Divider style={{ margin: '8px 0' }} />
-                            <Button 
-                                type="text" 
-                                icon={<PlusOutlined />} 
-                                block
-                                onClick={() => navigate('/goods/category/add')}
-                            >
-                                添加新品类
-                            </Button>
-                            </>
-                        )}
-                        />
+                          <Select 
+                            {...field} 
+                            placeholder="选择类目" 
+                            showSearch 
+                            optionFilterProp="label"
+                            options={categoryOptions}
+                            dropdownRender={(menu) => (
+                              <>
+                                {menu}
+                                <Divider style={{ margin: '8px 0' }} />
+                                <Button 
+                                  type="text" 
+                                  icon={<PlusOutlined />} 
+                                  block
+                                  onClick={() => navigate('/goods/zone', {
+                                    state: { from: window.location.pathname + window.location.search }
+                                  })}
+                                >
+                                  管理品类
+                                </Button>
+                              </>
+                            )}
+                          />
                         )} 
                       />
                     </Form.Item>
@@ -449,75 +445,61 @@ const ProductFormPage: React.FC = () => {
               </Col>
               <Col span={8}>
                 <Form.Item label="商品主图">
-                  <Controller 
-                    name="main_image" 
-                    control={control}
-                    render={({ field }) => (
-                      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-                        <Upload
-                          maxCount={1}
-                          accept="image/*"
-                          showUploadList={{ showRemoveIcon: true }}
-                          fileList={field.value ? [{ 
-                            uid: '-1', 
-                            name: 'main_image.png', 
-                            status: 'done', 
-                            url: field.value 
-                          }] : []}
-                          beforeUpload={async (file) => {
-                            const url = await handleMainImageUpload(file);
-                            if (url) {
-                              field.onChange(url);
-                            }
-                            return false;
+                  <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+                    <Upload
+                      maxCount={1}
+                      accept="image/*"
+                      showUploadList={false}
+                      beforeUpload={handleMainImageUpload}
+                      disabled={loading}
+                    >
+                      <Button 
+                        icon={<UploadOutlined />}
+                      >
+                        选择主图
+                      </Button>
+                    </Upload>
+                    {mainImagePreview && (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <Image 
+                          src={mainImagePreview.startsWith('blob:') ? mainImagePreview : getImageUrl(mainImagePreview)} 
+                          alt="主图预览"
+                          width={80} 
+                          height={80} 
+                          style={{ 
+                            cursor: 'pointer', 
+                            borderRadius: 4, 
+                            objectFit: 'contain' 
                           }}
-                          onRemove={() => {
-                            field.onChange('');
+                          onClick={() => {
+                            Modal.info({
+                              title: '图片预览',
+                              content: (
+                                <div style={{ textAlign: 'center' }}>
+                                  <Image 
+                                    src={mainImagePreview.startsWith('blob:') ? mainImagePreview : getImageUrl(mainImagePreview)} 
+                                    style={{ maxWidth: '100%', maxHeight: '400px' }}
+                                  />
+                                </div>
+                              ),
+                              icon: null,
+                              width: 600,
+                              maskClosable: true
+                            });
                           }}
-                          disabled={mainImageUploading}
+                        />
+                        <Button 
+                          type="link" 
+                          size="small" 
+                          danger
+                          onClick={handleRemoveMainImage}
+                          style={{ marginTop: 4 }}
                         >
-                          <Button 
-                            icon={mainImageUploading ? <LoadingOutlined /> : <UploadOutlined />}
-                            loading={mainImageUploading}
-                          >
-                            选择主图
-                          </Button>
-                        </Upload>
-                        {field.value && (
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            <Image 
-                            src={field.value.startsWith('data:image') ? field.value : getImageUrl(field.value)} 
-                            alt="主图预览"
-                            width={80} 
-                            height={80} 
-                            style={{ 
-                                cursor: 'pointer', 
-                                borderRadius: 4, 
-                                objectFit: 'contain' 
-                            }}
-                            onClick={() => {
-                                Modal.info({
-                                title: '图片预览',
-                                content: (
-                                    <div style={{ textAlign: 'center' }}>
-                                    <Image 
-                                        src={field.value.startsWith('data:image') ? field.value : getImageUrl(field.value)} 
-                                        style={{ maxWidth: '100%', maxHeight: '400px' }}
-                                    />
-                                    </div>
-                                ),
-                                icon: null,
-                                width: 600,
-                                maskClosable: true
-                                });
-                            }}
-                            />
-                            <span style={{ fontSize: 12, color: '#999', marginTop: 4 }}>点击预览</span>
-                        </div>
-                        )}
+                          移除
+                        </Button>
                       </div>
-                    )} 
-                  />
+                    )}
+                  </div>
                   <div style={{ fontSize: 12, color: '#999', marginTop: 8 }}>
                     支持 JPG、PNG 格式，大小不超过 5MB。建议尺寸 800x800px
                   </div>
@@ -530,26 +512,28 @@ const ProductFormPage: React.FC = () => {
                 name="tag_ids" 
                 control={control}
                 render={({ field }) => (
-                    <Select 
+                  <Select 
                     {...field} 
                     mode="multiple" 
                     placeholder="选择标签" 
-                    options={tags}
+                    options={tagOptions}
                     dropdownRender={(menu) => (
-                        <>
+                      <>
                         {menu}
                         <Divider style={{ margin: '8px 0' }} />
                         <Button 
-                            type="text" 
-                            icon={<PlusOutlined />} 
-                            block
-                            onClick={() => navigate('/goods/tag/add')}
+                          type="text" 
+                          icon={<PlusOutlined />} 
+                          block
+                          onClick={() => navigate('/goods/tags', {
+                            state: { from: window.location.pathname + window.location.search }
+                          })}
                         >
-                            添加新标签
+                          管理标签
                         </Button>
-                        </>
+                      </>
                     )}
-                    />
+                  />
                 )} 
               />
             </Form.Item>
@@ -560,9 +544,9 @@ const ProductFormPage: React.FC = () => {
                 control={control}
                 render={({ field }) => (
                   <Select {...field} style={{ width: 200 }}>
-                    <Option value="正常">正常 (NORMAL)</Option>
-                    <Option value="下架">下架 (OFF)</Option>
-                    <Option value="删除">删除 (DELETED)</Option>
+                    <Option value="正常">正常</Option>
+                    <Option value="下架">下架</Option>
+                    <Option value="删除">删除</Option>
                   </Select>
                 )} 
               />
@@ -572,22 +556,34 @@ const ProductFormPage: React.FC = () => {
               <Controller 
                 name="description" 
                 control={control}
-                render={({ field }) => <TextArea {...field} rows={6} />} 
+                render={({ field }) => (
+                  <TextArea 
+                    {...field} 
+                    rows={6} 
+                    placeholder="请输入商品详细描述" 
+                    showCount 
+                    maxLength={5000}
+                  />
+                )} 
               />
             </Form.Item>
             
             <Divider />
             
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-              <Link to="/goods/manage/list">
-                <Button size="small">取消</Button>
-              </Link>
+              <Button 
+                size="small" 
+                onClick={() => navigate(fromPath)}
+                disabled={loading}
+              >
+                取消
+              </Button>
               <Button 
                 type="primary" 
                 size="small" 
                 htmlType="submit" 
                 icon={<SaveOutlined />} 
-                loading={loading || isSubmitting}
+                loading={loading}
               >
                 提交
               </Button>

@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   Table, 
@@ -18,10 +20,7 @@ import {
   InputNumber,
   message,
   Descriptions,
-  Popconfirm,
-  Divider,
-  Alert
-} from 'antd';
+  Popconfirm} from 'antd';
 import { 
   SearchOutlined, 
   ReloadOutlined, 
@@ -33,23 +32,29 @@ import {
   FilterOutlined,
   HistoryOutlined,
   InfoCircleOutlined,
-  DeleteOutlined,
-  PlusOutlined,
-  ImportOutlined
+  DeleteOutlined
 } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 
-// 使用我们的API和模拟数据
+// 使用真实的API
 import { getStocks, updateStock } from '../../../services/api';
 import type { StockResponse } from '../../../services/api-type';
-import { generateMockStocks, findMockConfig } from '../../../services/cyf-mockData';
+import Dropdown from 'antd/es/dropdown/dropdown';
+import Alert from 'antd/es/alert/Alert';
 
 const { Text } = Typography;
 const { Option } = Select;
 
-interface StockItem extends StockResponse {
+// 修复类型：覆盖错误的 updated_at 定义
+interface FixedStockResponse extends Omit<StockResponse, 'updated_at'> {
+  updated_at: string;
+  last_in_time: string | null;
+  last_out_time: string | null;
+}
+
+interface StockItem extends FixedStockResponse {
   // 添加一些计算属性
   available_stock: number;
   status: 'normal' | 'warning' | 'danger';
@@ -57,6 +62,7 @@ interface StockItem extends StockResponse {
 
 const StockListPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<StockItem[]>([]);
   
@@ -70,66 +76,63 @@ const StockListPage: React.FC = () => {
   // 模态框状态
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
-  const [createModalVisible, setCreateModalVisible] = useState(false);
   const [currentStock, setCurrentStock] = useState<StockItem | null>(null);
 
   // 表单状态
   const [editForm] = Form.useForm();
-  const [createForm] = Form.useForm();
   const [isEditSubmitting, setIsEditSubmitting] = useState(false);
-  const [isCreateSubmitting, setIsCreateSubmitting] = useState(false);
+
+  // 添加批量编辑状态和函数
+  const [batchEditModalVisible, setBatchEditModalVisible] = useState(false);
+  const [batchEditForm] = Form.useForm();
 
   // --- 数据加载 ---
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      // 模拟API调用
-      const mockStocks = generateMockStocks();
+      // 使用真实API调用
+      const response = await getStocks();
       
-      // 处理数据，添加计算字段
-      const processedStocks: StockItem[] = mockStocks.map(stock => {
-        const available = stock.stock_num - stock.freeze_num;
-        let status: 'normal' | 'warning' | 'danger' = 'normal';
+      if (response && Array.isArray(response)) {
+        // 处理数据，添加计算字段并修复类型
+        const processedStocks: StockItem[] = response.map(stock => {
+          const available = stock.stock_num - stock.freeze_num;
+          let status: 'normal' | 'warning' | 'danger' = 'normal';
+          
+          if (stock.stock_num === 0) {
+            status = 'danger';
+          } else if (stock.stock_num <= stock.warn_num) {
+            status = 'warning';
+          }
+          
+          // 修复类型：确保 updated_at 是字符串
+          const updatedAt = typeof stock.updated_at === 'function' 
+            ? new Date().toISOString() 
+            : (stock.updated_at as any as string) || new Date().toISOString();
+            
+          // 修复其他时间字段
+          const lastInTime = stock.last_in_time || null;
+          const lastOutTime = stock.last_out_time || null;
+          
+          return {
+            ...stock,
+            updated_at: updatedAt,
+            last_in_time: lastInTime,
+            last_out_time: lastOutTime,
+            available_stock: available,
+            status
+          } as StockItem;
+        });
         
-        if (stock.stock_num === 0) {
-          status = 'danger';
-        } else if (stock.stock_num <= stock.warn_num) {
-          status = 'warning';
-        }
-        
-        return {
-          ...stock,
-          available_stock: available,
-          status
-        };
-      });
-      
-      setData(processedStocks);
-      
-      // 真实API调用（注释掉）
-      // const response = await getStocks();
-      // if (response && Array.isArray(response)) {
-      //   const processedStocks: StockItem[] = response.map(stock => {
-      //     const available = stock.stock_num - stock.freeze_num;
-      //     let status: 'normal' | 'warning' | 'danger' = 'normal';
-      //     
-      //     if (stock.stock_num === 0) {
-      //       status = 'danger';
-      //     } else if (stock.stock_num <= stock.warn_num) {
-      //       status = 'warning';
-      //     }
-      //     
-      //     return {
-      //       ...stock,
-      //       available_stock: available,
-      //       status
-      //     };
-      //   });
-      //   setData(processedStocks);
-      // }
+        setData(processedStocks);
+      } else {
+        message.warning('获取库存列表为空');
+        setData([]);
+      }
     } catch (error) {
       console.error('Error loading stocks:', error);
       message.error('获取库存列表失败');
+      setData([]);
     } finally {
       setLoading(false);
     }
@@ -175,7 +178,13 @@ const StockListPage: React.FC = () => {
 
   // --- 操作处理 ---
 
-  // 打开编辑
+  // 打开详情
+  const handleDetail = (record: StockItem) => {
+    setCurrentStock(record);
+    setDetailModalVisible(true);
+  };
+
+  // 打开编辑弹窗
   const handleEdit = (record: StockItem) => {
     setCurrentStock(record);
     editForm.setFieldsValue({
@@ -185,10 +194,14 @@ const StockListPage: React.FC = () => {
     setEditModalVisible(true);
   };
 
-  // 打开详情
-  const handleDetail = (record: StockItem) => {
-    setCurrentStock(record);
-    setDetailModalVisible(true);
+  // 跳转到编辑页面（带返回路径）
+  const handleNavigateToEdit = (record: StockItem) => {
+    navigate(`/goods/stock/edit/${record.stock_id}`, { 
+      state: { 
+        from: location.pathname + location.search,
+        stockData: record 
+      } 
+    });
   };
 
   // 提交更新
@@ -197,23 +210,35 @@ const StockListPage: React.FC = () => {
     
     setIsEditSubmitting(true);
     try {
-      // 模拟API调用
-      console.log('更新库存:', currentStock.config_id, values);
-      
-      // 真实API调用（注释掉）
-      // await updateStock(currentStock.config_id, values);
+      // 使用真实API调用
+      await updateStock(currentStock.config_id, {
+        stock_num: values.stock_num,
+        warn_num: values.warn_num
+      });
       
       // 更新本地数据
-      setData(prev => prev.map(item => 
-        item.stock_id === currentStock.stock_id 
-          ? { 
-              ...item, 
-              ...values,
-              available_stock: values.stock_num - item.freeze_num,
-              status: values.stock_num === 0 ? 'danger' : values.stock_num <= values.warn_num ? 'warning' : 'normal'
-            }
-          : item
-      ));
+      setData(prev => prev.map(item => {
+        if (item.stock_id === currentStock.stock_id) {
+          const available = values.stock_num - item.freeze_num;
+          let status: 'normal' | 'warning' | 'danger' = 'normal';
+          
+          if (values.stock_num === 0) {
+            status = 'danger';
+          } else if (values.stock_num <= values.warn_num) {
+            status = 'warning';
+          }
+          
+          return {
+            ...item,
+            stock_num: values.stock_num,
+            warn_num: values.warn_num,
+            updated_at: new Date().toISOString(),
+            available_stock: available,
+            status
+          };
+        }
+        return item;
+      }));
       
       message.success('库存配置已更新');
       setEditModalVisible(false);
@@ -225,57 +250,13 @@ const StockListPage: React.FC = () => {
     }
   };
 
-  // 提交创建
-  const onCreateSubmit = async (values: { config_id: string; stock_num: number; warn_num: number }) => {
-    setIsCreateSubmitting(true);
-    try {
-      // 查找配置
-      const config = findMockConfig(values.config_id);
-      if (!config) {
-        message.error('未找到对应的商品配置');
-        return;
-      }
-
-      // 模拟创建库存
-      const newStock: StockItem = {
-        stock_id: `stock-${Date.now()}`,
-        config_id: values.config_id,
-        product_id: config.product_id,
-        product_name: config.product_name,
-        config1: config.config1,
-        config2: config.config2,
-        config3: config.config3,
-        stock_num: values.stock_num,
-        warn_num: values.warn_num,
-        freeze_num: 0,
-        updated_at: new Date().toISOString(),
-        last_in_time: new Date().toISOString(),
-        last_out_time: null,
-        available_stock: values.stock_num,
-        status: values.stock_num === 0 ? 'danger' : values.stock_num <= values.warn_num ? 'warning' : 'normal'
-      };
-
-      // 添加到列表
-      setData(prev => [newStock, ...prev]);
-      
-      message.success('库存记录已创建');
-      setCreateModalVisible(false);
-      createForm.resetFields();
-    } catch (error) {
-      console.error('Error creating stock:', error);
-      message.error('创建库存失败');
-    } finally {
-      setIsCreateSubmitting(false);
-    }
-  };
-
-  // 单条删除
+  // 单条删除（根据API文档，没有删除库存的接口，暂时保留功能但注释掉API调用）
   const handleDelete = async (record: StockItem) => {
     try {
-      // 模拟删除
+      // 注意：API文档中没有删除库存的接口，这里只是前端移除
       console.log('删除库存:', record.stock_id);
       
-      // 从列表中移除
+      // 从列表中移除（前端模拟删除）
       setData(prev => prev.filter(item => item.stock_id !== record.stock_id));
       
       message.success('删除成功');
@@ -285,14 +266,14 @@ const StockListPage: React.FC = () => {
     }
   };
 
-  // 批量删除
+  // 批量删除（同样，API没有批量删除接口）
   const handleBatchDelete = async () => {
     if (selectedRowKeys.length === 0) return;
     try {
       // 模拟批量删除
       console.log('批量删除:', selectedRowKeys);
       
-      // 从列表中移除
+      // 从列表中移除（前端模拟删除）
       setData(prev => prev.filter(item => !selectedRowKeys.includes(item.stock_id)));
       
       message.success(`成功删除 ${selectedRowKeys.length} 条记录`);
@@ -303,9 +284,50 @@ const StockListPage: React.FC = () => {
     }
   };
 
-  // 跳转到编辑页面
-  const handleNavigateToEdit = (record: StockItem) => {
-    navigate(`/goods/stock/edit/${record.stock_id}`);
+// 批量编辑处理函数
+const handleBatchEdit = () => {
+  if (selectedRowKeys.length === 0) {
+    message.warning('请先选择要编辑的库存记录');
+    return;
+  }
+  setBatchEditModalVisible(true);
+};
+
+const handleBatchEditSubmit = async (values: { operation: 'set' | 'add' | 'subtract', value: number }) => {
+    setIsEditSubmitting(true);
+    try {
+      const selectedStocks = data.filter(item => selectedRowKeys.includes(item.stock_id));
+      
+      // 批量更新逻辑
+      const promises = selectedStocks.map(async (stock) => {
+        let newStockNum = stock.stock_num;
+        
+        if (values.operation === 'set') {
+          newStockNum = values.value;
+        } else if (values.operation === 'add') {
+          newStockNum = stock.stock_num + values.value;
+        } else if (values.operation === 'subtract') {
+          newStockNum = Math.max(0, stock.stock_num - values.value);
+        }
+        
+        await updateStock(stock.config_id, {
+          stock_num: newStockNum,
+          warn_num: stock.warn_num,
+        });
+      });
+      
+      await Promise.all(promises);
+      
+      message.success(`成功更新 ${selectedStocks.length} 条库存记录`);
+      setBatchEditModalVisible(false);
+      setSelectedRowKeys([]);
+      loadData(); // 重新加载数据
+    } catch (error) {
+      console.error('批量编辑失败:', error);
+      message.error('批量编辑失败');
+    } finally {
+      setIsEditSubmitting(false);
+    }
   };
 
   // --- 表格列定义 ---
@@ -425,40 +447,61 @@ const StockListPage: React.FC = () => {
       sorter: (a, b) => dayjs(a.updated_at).unix() - dayjs(b.updated_at).unix(),
       render: (t) => <span style={{ fontSize: 11, color: '#888' }}>{dayjs(t).format('YYYY-MM-DD HH:mm')}</span>
     },
+    // 更新表格的操作列定义
     {
       title: '操作',
       key: 'action',
-      width: 150,
+      width: 120,
       fixed: 'right',
       render: (_, record) => (
-        <Space split={<Divider type="vertical" />} size={0}>
-          <Button 
-            type="link" 
-            size="small" 
-            style={{ padding: '0 4px', fontSize: 12 }}
-            onClick={() => handleDetail(record)}
-          >
-            详情
-          </Button>
-          <Button 
-            type="link" 
-            size="small" 
-            style={{ padding: '0 4px', fontSize: 12 }}
-            onClick={() => handleNavigateToEdit(record)}
-          >
-            编辑
-          </Button>
+        <Space size="small">
+          <Tooltip title="快速编辑">
+            <Button 
+              type="link" 
+              size="small" 
+              icon={<EditOutlined />}
+              onClick={() => handleEdit(record)}
+              style={{ padding: '0 4px', fontSize: 12 }}
+            />
+          </Tooltip>
+          
+          <Tooltip title="详情">
+            <Button 
+              type="link" 
+              size="small" 
+              icon={<InfoCircleOutlined />}
+              onClick={() => handleDetail(record)}
+              style={{ padding: '0 4px', fontSize: 12 }}
+            />
+          </Tooltip>
+          
+          <Tooltip title="高级编辑">
+            <Button 
+              type="link" 
+              size="small" 
+              icon={<StockOutlined />}
+              onClick={() => handleNavigateToEdit(record)}
+              style={{ padding: '0 4px', fontSize: 12 }}
+            />
+          </Tooltip>
+          
           <Popconfirm
-            title="确定删除？"
+            title="确定删除此库存记录？"
             description="删除后可能影响在售状态"
             onConfirm={() => handleDelete(record)}
             okText="删除"
             cancelText="取消"
             okButtonProps={{ danger: true }}
           >
-            <Button type="link" size="small" danger style={{ padding: '0 4px', fontSize: 12 }}>
-              删除
-            </Button>
+            <Tooltip title="删除">
+              <Button 
+                type="link" 
+                size="small" 
+                danger
+                icon={<DeleteOutlined />}
+                style={{ padding: '0 4px', fontSize: 12 }}
+              />
+            </Tooltip>
           </Popconfirm>
         </Space>
       )
@@ -515,45 +558,60 @@ const StockListPage: React.FC = () => {
       {/* 2. 工具栏 */}
       <Card size="small" bordered={false} style={{ marginBottom: 8 }} bodyStyle={{ padding: '8px 12px' }}>
         <Row justify="space-between" align="middle" gutter={[8, 8]}>
-          {/* 左侧区域：新增库存、库存列表、批量删除 */}
+          {/* 左侧区域：添加库存按钮 */}
           <Col>
             <Space size="small">
+
               <span style={{ fontSize: 12, fontWeight: 600, color: '#262626' }}>
                 <FilterOutlined style={{ marginRight: 4 }} />
                 库存列表
               </span>
-              
-              {/* 新增库存按钮 (移到左侧) */}
+
               <Button 
-                type="primary"
+                type="primary" 
                 size="small" 
-                icon={<PlusOutlined />} 
-                onClick={() => {
-                  createForm.resetFields();
-                  setCreateModalVisible(true);
-                }}
+                icon={<StockOutlined />} 
+                onClick={() => navigate('/goods/stock/create', { state: { from: location.pathname } })}
               >
-                新增库存
+                添加库存
               </Button>
               
               {/* 批量操作按钮 */}
               {selectedRowKeys.length > 0 && (
-                <Popconfirm
-                  title={`确定要删除选中的 ${selectedRowKeys.length} 条库存记录吗？`}
-                  description="此操作不可恢复"
-                  onConfirm={handleBatchDelete}
-                  okText="确认删除"
-                  cancelText="取消"
-                  okButtonProps={{ danger: true }}
-                >
-                  <Button 
-                    size="small" 
-                    danger
-                    icon={<DeleteOutlined />}
+                <Space size="small">
+                  <Dropdown
+                    menu={{
+                      items: [
+                        {
+                          key: 'batch-edit',
+                          label: '批量编辑库存',
+                          icon: <EditOutlined />,
+                          onClick: () => handleBatchEdit()
+                        },
+                        {
+                          key: 'batch-warn',
+                          label: '批量设置预警值',
+                          icon: <WarningOutlined />,
+                          onClick: () => handleBatchEdit()
+                        },
+                        {
+                          type: 'divider',
+                        },
+                        {
+                          key: 'batch-delete',
+                          label: '批量删除',
+                          icon: <DeleteOutlined />,
+                          danger: true,
+                          onClick: () => handleBatchDelete()
+                        },
+                      ]
+                    }}
                   >
-                    批量删除 ({selectedRowKeys.length})
-                  </Button>
-                </Popconfirm>
+                    <Button size="small" icon={<FilterOutlined />}>
+                      批量操作 ({selectedRowKeys.length})
+                    </Button>
+                  </Dropdown>
+                </Space>
               )}
             </Space>
           </Col>
@@ -571,7 +629,7 @@ const StockListPage: React.FC = () => {
                 allowClear
               />
               
-              {/* 状态筛选框 (移到右侧) */}
+              {/* 状态筛选框 */}
               <Select 
                 value={filterStatus}
                 onChange={setFilterStatus}
@@ -611,7 +669,6 @@ const StockListPage: React.FC = () => {
             onChange: setSelectedRowKeys,
             columnWidth: 40
           }}
-          // 参考在线管理页面的分页设置
           pagination={{
             current: page,
             pageSize: pageSize,
@@ -699,7 +756,16 @@ const StockListPage: React.FC = () => {
               </Col>
             </Row>
             
-            <div style={{ marginTop: 8, fontSize: 11, color: '#888', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px dashed #f0f0f0', paddingTop: 8 }}>
+            <div style={{ 
+              marginTop: 8, 
+              fontSize: 11, 
+              color: '#888', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'space-between', 
+              borderTop: '1px dashed #f0f0f0', 
+              paddingTop: 8 
+            }}>
               <span>
                 <SafetyCertificateOutlined style={{ marginRight: 4, color: '#faad14' }} />
                 冻结库存: {currentStock.freeze_num}
@@ -716,89 +782,67 @@ const StockListPage: React.FC = () => {
         )}
       </Modal>
 
-      {/* 5. 新增/导入库存弹窗 */}
+      {/* 批量编辑模态框 */}
       <Modal
-        title={
-          <Space>
-            <ImportOutlined />
-            <span style={{ fontSize: 14 }}>新增/导入商品库存</span>
-          </Space>
-        }
-        open={createModalVisible}
-        onCancel={() => setCreateModalVisible(false)}
-        onOk={() => createForm.submit()}
-        confirmLoading={isCreateSubmitting}
-        okText="创建记录"
-        cancelText="取消"
-        width={360}
-        destroyOnClose
-        centered
-        bodyStyle={{ padding: '16px 20px' }}
+        title="批量编辑库存"
+        open={batchEditModalVisible}
+        onCancel={() => setBatchEditModalVisible(false)}
+        onOk={() => batchEditForm.submit()}
+        confirmLoading={isEditSubmitting}
+        width={400}
       >
         <Form
-          form={createForm}
+          form={batchEditForm}
           layout="vertical"
-          size="small"
-          onFinish={onCreateSubmit}
+          onFinish={handleBatchEditSubmit}
         >
-          <Alert 
-            message="提示" 
-            description="此功能用于手动为尚未建立库存记录的商品配置初始化数据。" 
-            type="info" 
-            showIcon 
-            style={{ marginBottom: 16, fontSize: 11 }}
+          <Alert
+            message={`已选择 ${selectedRowKeys.length} 条库存记录`}
+            type="info"
+            showIcon
+            style={{ marginBottom: 16 }}
           />
-
-          <Form.Item 
-            label={<span style={{ fontSize: 12 }}>关联商品配置 ID (Config ID)</span>}
-            name="config_id"
-            rules={[{ required: true, message: '请输入关联的商品配置 ID' }]}
-            tooltip="请前往商品管理页面复制对应的 Config ID"
+          
+          <Form.Item
+            label="操作类型"
+            name="operation"
+            rules={[{ required: true, message: '请选择操作类型' }]}
+            initialValue="set"
           >
-            <Input 
-              placeholder="例如: config-prod-1000-0" 
-              prefix={<StockOutlined style={{ color: '#bfbfbf' }} />}
+            <Select>
+              <Option value="set">设置为指定数量</Option>
+              <Option value="add">增加指定数量</Option>
+              <Option value="subtract">减少指定数量</Option>
+            </Select>
+          </Form.Item>
+          
+          <Form.Item
+            label="数量"
+            name="value"
+            rules={[
+              { required: true, message: '请输入数量' },
+              { type: 'number', min: 0, message: '数量不能为负数' },
+            ]}
+            initialValue={0}
+          >
+            <InputNumber
+              min={0}
+              max={999999}
+              style={{ width: '100%' }}
+              addonAfter="件"
             />
           </Form.Item>
-
-          <Row gutter={12}>
-            <Col span={12}>
-              <Form.Item 
-                label={<span style={{ fontSize: 12 }}>初始库存</span>}
-                name="stock_num"
-                rules={[
-                  { required: true, message: '请输入初始库存' },
-                  { type: 'number', min: 0, message: '库存数量不能为负数' },
-                ]}
-              >
-                <InputNumber 
-                  style={{ width: '100%' }} 
-                  min={0} 
-                  precision={0}
-                />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item 
-                label={<span style={{ fontSize: 12 }}>预警阈值</span>}
-                name="warn_num"
-                rules={[
-                  { required: true, message: '请输入预警阈值' },
-                  { type: 'number', min: 0, message: '预警阈值不能为负数' },
-                ]}
-              >
-                <InputNumber 
-                  style={{ width: '100%' }} 
-                  min={0} 
-                  precision={0}
-                />
-              </Form.Item>
-            </Col>
-          </Row>
+          
+          <Alert
+            message="注意"
+            description="此操作将影响所有选中的库存记录，操作不可逆，请谨慎操作。"
+            type="warning"
+            showIcon
+          />
         </Form>
       </Modal>
 
-      {/* 6. 详情弹窗 */}
+      {/* 5. 详情弹窗 */}
       <Modal
         title={
           <Space>

@@ -1,5 +1,3 @@
-/* eslint-disable prefer-const */
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
@@ -14,12 +12,12 @@ import {
   CheckCircleOutlined, StopOutlined, EyeOutlined, TagsOutlined,
   PictureOutlined, SettingOutlined
 } from '@ant-design/icons';
-import { Link } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import type { ColumnsType } from 'antd/es/table';
 import { useForm, Controller } from 'react-hook-form';
 import dayjs from 'dayjs';
 import type { 
-  BrandResponse, CategoryResponse, ProductStatus 
+  BrandResponse, CategoryResponse, ProductStatus, ProductListItem
 } from '../../../services/api-type';
 import { getImageUrl } from '../../../utils/imageUrl';
 import { globalMessage } from '../../../utils/globalMessage';
@@ -28,11 +26,6 @@ import {
   getBrands, getCategories, getProducts, updateProductStatus,
   getProductStats as apiGetProductStats
 } from '../../../services/api';
-// 导入模拟数据
-import { 
-  mockBrands, mockCategories,
-  generateMockProducts, mockProductStats 
-} from '../../../services/cyf-mockData';
 
 const { Text } = Typography;
 const { Option } = Select;
@@ -48,8 +41,10 @@ interface ProductStats {
 interface OptionItem { label: string; value: string; }
 
 const ProductListPage: React.FC = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<any[]>([]);
+  const [data, setData] = useState<ProductListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -57,135 +52,108 @@ const ProductListPage: React.FC = () => {
   const [stats, setStats] = useState<ProductStats>({ total: 0, normal: 0, off: 0, brands: 0 });
   const [brands, setBrands] = useState<OptionItem[]>([]);
   const [categories, setCategories] = useState<OptionItem[]>([]);
+  const [currentFilters, setCurrentFilters] = useState<any>({}); // 存储当前过滤条件
 
-  // 使用模拟数据标志
-  const useMockData = true;
-
-  const { control: filterControl, handleSubmit: handleFilterSubmit, reset: resetFilter } = useForm({
+  const { control: filterControl, handleSubmit: handleFilterSubmit, reset: resetFilter, getValues } = useForm({
     defaultValues: { keyword: '', status: '', brand_id: '', category_id: '' }
   });
 
   // 加载统计数据
   const loadStats = useCallback(async () => {
     try {
-      if (useMockData) {
-        setStats({
-          total: mockProductStats.total,
-          normal: mockProductStats.normal,
-          off: mockProductStats.off,
-          brands: mockProductStats.brands
-        });
-      } else {
-        const res = await apiGetProductStats();
-        // 修复：处理 API 返回数据，确保有 brands 属性
-        setStats({
-          total: res.total || 0,
-          normal: res.normal || 0,
-          off: res.off || 0,
-          brands: (res as any).brands || 0 // 类型断言，或者根据实际 API 调整
-        });
-      }
+      const res = await apiGetProductStats();
+      // 修复：处理 API 返回数据，确保有 brands 属性
+      setStats({
+        total: res.total || 0,
+        normal: res.normal || 0,
+        off: res.off || 0,
+        brands: (res as any).brands || 0
+      });
     } catch (error) {
       console.error("加载统计失败", error);
+      globalErrorHandler.handle(error, globalMessage.error);
     }
-  }, [useMockData]);
+  }, []);
 
   // 加载选项数据
   const loadOptions = useCallback(async () => {
     try {
-      if (useMockData) {
-        setBrands([
-          { label: '全部品牌', value: '' },
-          ...mockBrands.map((b: BrandResponse) => ({ label: b.name, value: b.brand_id }))
-        ]);
-        
-        setCategories([
-          { label: '全部品类', value: '' },
-          ...mockCategories.map((c: CategoryResponse) => ({ label: c.name, value: c.category_id }))
-        ]);
-      } else {
-        const [brandsRes, categoriesRes] = await Promise.all([
-          getBrands(),
-          getCategories(),
-        ]);
-        
-        setBrands([
-          { label: '全部品牌', value: '' },
-          ...(brandsRes?.map((b: BrandResponse) => ({ label: b.name, value: b.brand_id })) || [])
-        ]);
-        
-        setCategories([
-          { label: '全部品类', value: '' },
-          ...(categoriesRes?.map((c: CategoryResponse) => ({ label: c.name, value: c.category_id })) || [])
-        ]);
-      }
+      const [brandsRes, categoriesRes] = await Promise.all([
+        getBrands(),
+        getCategories(),
+      ]);
+      
+      setBrands([
+        { label: '全部品牌', value: '' },
+        ...(brandsRes?.map((b: BrandResponse) => ({ label: b.name, value: b.brand_id })) || [])
+      ]);
+      
+      setCategories([
+        { label: '全部品类', value: '' },
+        ...(categoriesRes?.map((c: CategoryResponse) => ({ label: c.name, value: c.category_id })) || [])
+      ]);
     } catch (error) {
       console.error("加载选项失败", error);
+      globalErrorHandler.handle(error, globalMessage.error);
     }
-  }, [useMockData]);
+  }, []);
 
   // 加载商品数据
   const loadData = useCallback(async (filters: any = {}) => {
     setLoading(true);
     try {
-      if (useMockData) {
-        // 使用模拟数据
-        let mockProducts = generateMockProducts(25);
+      const response = await getProducts({ 
+        category_id: filters.category_id,
+        brand_id: filters.brand_id,
+        status: filters.status
+      });
+      
+      if (response && Array.isArray(response)) {
+        let filteredData = response;
         
-        // 应用过滤条件
+        // 应用关键词过滤
         if (filters.keyword) {
-          mockProducts = mockProducts.filter(p => 
-            p.name.toLowerCase().includes(filters.keyword.toLowerCase()) || 
-            p.product_id.includes(filters.keyword)
+          const keyword = filters.keyword.toLowerCase();
+          filteredData = filteredData.filter(p => 
+            p.name.toLowerCase().includes(keyword) || 
+            (p.product_id && p.product_id.toLowerCase().includes(keyword))
           );
         }
-        if (filters.brand_id && filters.brand_id !== '') {
-          mockProducts = mockProducts.filter(p => p.brand_id === filters.brand_id);
-        }
-        if (filters.category_id && filters.category_id !== '') {
-          mockProducts = mockProducts.filter(p => p.category_id === filters.category_id);
-        }
-        if (filters.status && filters.status !== '') {
-          mockProducts = mockProducts.filter(p => p.status === filters.status);
-        }
         
-        const total = mockProducts.length;
+        setTotal(filteredData.length);
+        
+        // 前端分页
         const current = page;
         const size = pageSize;
         const start = (current - 1) * size;
-        const items = mockProducts.slice(start, start + size);
+        const items = filteredData.slice(start, start + size);
         
-        // 修复：确保数据结构与 API 一致
         setData(items || []);
-        setTotal(total || 0);
       } else {
-        const response = await getProducts({ 
-          ...filters, 
-          page, 
-          pageSize 
-        });
-        
-        // 修复：根据实际 API 响应结构调整
-        // 假设 API 返回 { items: [], total: number }
-        if (response && typeof response === 'object') {
-          setData(response.items || []);
-          setTotal(response.total || 0);
-        } else {
-          // 如果 API 直接返回数组
-          setData(Array.isArray(response) ? response : []);
-          setTotal(Array.isArray(response) ? response.length : 0);
-        }
+        setData([]);
+        setTotal(0);
       }
     } catch (error) {
       globalErrorHandler.handle(error, globalMessage.error);
+      setData([]);
+      setTotal(0);
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, useMockData]);
+  }, [page, pageSize]);
 
   // 刷新所有数据
   const refreshAll = () => {
-    loadData({});
+    const formValues = getValues();
+    const filters: any = {};
+    if (formValues.keyword) filters.keyword = formValues.keyword;
+    if (formValues.status) filters.status = formValues.status;
+    if (formValues.brand_id) filters.brand_id = formValues.brand_id;
+    if (formValues.category_id) filters.category_id = formValues.category_id;
+    
+    setCurrentFilters(filters);
+    setPage(1);
+    loadData(filters);
     loadStats();
   };
 
@@ -203,6 +171,8 @@ const ProductListPage: React.FC = () => {
     if (values.status) filters.status = values.status;
     if (values.brand_id) filters.brand_id = values.brand_id;
     if (values.category_id) filters.category_id = values.category_id;
+    
+    setCurrentFilters(filters);
     setPage(1);
     loadData(filters);
   };
@@ -210,24 +180,19 @@ const ProductListPage: React.FC = () => {
   const onReset = () => { 
     resetFilter(); 
     setPage(1); 
+    setCurrentFilters({});
     loadData({}); 
   };
 
-  // 删除商品（模拟）
+  // 删除商品
   const handleDelete = async (id: string) => {
     try {
       globalMessage.loading('正在删除...');
       
-      if (useMockData) {
-        // 模拟删除
-        setData(prev => prev.filter(item => item.product_id !== id));
-        globalMessage.success('商品已删除');
-      } else {
-        await updateProductStatus(id, '删除' as ProductStatus);
-        globalMessage.success('商品已删除');
-      }
+      await updateProductStatus(id, '下架' as ProductStatus);
+      globalMessage.success('商品已下架');
       
-      refreshAll();
+      loadData(currentFilters);
     } catch (error) {
       globalErrorHandler.handle(error, globalMessage.error);
     }
@@ -237,25 +202,20 @@ const ProductListPage: React.FC = () => {
   const handleBatchDelete = () => {
     if (selectedRowKeys.length === 0) return;
     Modal.confirm({
-      title: `确定删除 ${selectedRowKeys.length} 条商品？`,
-      okText: '确认删除',
+      title: `确定下架 ${selectedRowKeys.length} 条商品？`,
+      content: '下架后商品将不再显示在前台',
+      okText: '确认下架',
       okType: 'danger',
       cancelText: '取消',
       onOk: async () => {
         try {
-          if (useMockData) {
-            // 模拟批量删除
-            setData(prev => prev.filter(item => !selectedRowKeys.includes(item.product_id)));
-            globalMessage.success('批量删除成功');
-          } else {
-            await Promise.all(selectedRowKeys.map(id => 
-              updateProductStatus(id as string, '删除' as ProductStatus)
-            ));
-            globalMessage.success('批量删除成功');
-          }
+          await Promise.all(selectedRowKeys.map(id => 
+            updateProductStatus(id as string, '下架' as ProductStatus)
+          ));
+          globalMessage.success('批量下架成功');
           
           setSelectedRowKeys([]);
-          refreshAll();
+          loadData(currentFilters);
         } catch (err) {
           globalErrorHandler.handle(err, globalMessage.error);
         }
@@ -263,15 +223,44 @@ const ProductListPage: React.FC = () => {
     });
   };
 
+  // 导航到详情页，通过URL传递返回路径
+  const navigateToDetail = (productId: string, returnPath: string) => {
+    navigate(`/goods/detail/${productId}?return=${encodeURIComponent(returnPath)}`);
+  };
+
+  // 导航到编辑页
+  const navigateToEdit = (productId: string, returnPath: string) => {
+    navigate(`/goods/manage/edit/${productId}?return=${encodeURIComponent(returnPath)}`);
+  };
+
+  // 导航到SKU页
+  const navigateToSku = (productId: string, returnPath: string) => {
+    navigate(`/goods/manage/sku/${productId}?return=${encodeURIComponent(returnPath)}`);
+  };
+
+  // 导航到图库页
+  const navigateToGallery = (productId: string, returnPath: string) => {
+    navigate(`/goods/manage/gallery/${productId}?return=${encodeURIComponent(returnPath)}`);
+  };
+
   // 表格列定义
-  const columns: ColumnsType<any> = [
+  const columns: ColumnsType<ProductListItem> = [
     {
       title: 'ID',
       dataIndex: 'product_id',
       width: 120,
       fixed: 'left',
       ellipsis: true,
-      render: (id) => <Tooltip title={id}><Text copyable={{ text: id }} style={{ fontSize: 11 }}>{id}</Text></Tooltip>
+      render: (id) => (
+        <Tooltip title={id}>
+          <Text 
+            copyable={{ text: id }} 
+            style={{ fontSize: 11 }}
+          >
+            {id}
+          </Text>
+        </Tooltip>
+      )
     },
     {
       title: '主图',
@@ -298,7 +287,16 @@ const ProductListPage: React.FC = () => {
       render: (text, record) => (
         <div>
           <div style={{ fontWeight: 500, fontSize: 13 }}>{text}</div>
-          {record.sub_title && <div style={{ fontSize: 11, color: '#999' }}>{record.sub_title}</div>}
+          {record.sub_title && (
+            <div 
+              style={{ 
+                fontSize: 11, 
+                color: '#999' 
+              }}
+            >
+              {record.sub_title}
+            </div>
+          )}
         </div>
       )
     },
@@ -326,7 +324,11 @@ const ProductListPage: React.FC = () => {
       width: 80,
       render: (status) => (
         <Badge 
-          status={status === '正常' ? 'success' : (status === '下架' ? 'warning' : 'default')} 
+          status={
+            status === '正常' 
+              ? 'success' 
+              : (status === '下架' ? 'warning' : 'default')
+          } 
           text={status} 
           style={{ fontSize: '11px' }} 
         />
@@ -342,15 +344,51 @@ const ProductListPage: React.FC = () => {
       title: '创建时间',
       dataIndex: 'created_at',
       width: 140,
-      sorter: (a, b) => dayjs(a.created_at).unix() - dayjs(b.created_at).unix(),
-      render: (t) => <span style={{ fontSize: 11, color: '#888' }}>{dayjs(t).format('YYYY-MM-DD HH:mm')}</span>
+      sorter: (a, b) => {
+        // 修复：确保传入dayjs的是有效的日期字符串
+        const aTime = dayjs(a.created_at as string | number | Date | dayjs.Dayjs | null | undefined).unix();
+        const bTime = dayjs(b.created_at as string | number | Date | dayjs.Dayjs | null | undefined).unix();
+        return aTime - bTime;
+      },
+      render: (t) => {
+        // 修复：确保传入dayjs的是有效的日期字符串
+        const date = dayjs(t as string | number | Date | dayjs.Dayjs | null | undefined);
+        return (
+          <span 
+            style={{ 
+              fontSize: 11, 
+              color: '#888' 
+            }}
+          >
+            {date.isValid() ? date.format('YYYY-MM-DD HH:mm') : '无效日期'}
+          </span>
+        );
+      }
     },
     {
       title: '更新时间',
       dataIndex: 'updated_at',
       width: 140,
-      sorter: (a, b) => dayjs(a.updated_at).unix() - dayjs(b.updated_at).unix(),
-      render: (t) => <span style={{ fontSize: 11, color: '#888' }}>{dayjs(t).format('YYYY-MM-DD HH:mm')}</span>
+      sorter: (a, b) => {
+        // 修复：确保传入dayjs的是有效的日期字符串
+        const aTime = dayjs(a.updated_at as unknown as string | number | Date | dayjs.Dayjs | null | undefined).unix();
+        const bTime = dayjs(b.updated_at as unknown as string | number | Date | dayjs.Dayjs | null | undefined).unix();
+        return aTime - bTime;
+      },
+      render: (t) => {
+        // 修复：确保传入dayjs的是有效的日期字符串
+        const date = dayjs(t as string | number | Date | dayjs.Dayjs | null | undefined);
+        return (
+          <span 
+            style={{ 
+              fontSize: 11, 
+              color: '#888' 
+            }}
+          >
+            {date.isValid() ? date.format('YYYY-MM-DD HH:mm') : '无效日期'}
+          </span>
+        );
+      }
     },
     {
       title: '操作',
@@ -358,59 +396,63 @@ const ProductListPage: React.FC = () => {
       width: 200,
       fixed: 'right',
       render: (_, record) => {
-        // 当前页面路径
-        const currentPath = window.location.pathname + window.location.search;
+        // 当前页面路径，用于返回时定位
+        const currentPath = `${location.pathname}${location.search}`;
         
         return (
           <Space size={2}>
             <Tooltip title="查看详情">
-              <Link 
-                to={{
-                  pathname: `/goods/detail/${record.product_id}`,
-                  state: { from: currentPath }
-                } as any} // 修复：使用类型断言解决 state 类型问题
-              >
-                <Button type="text" size="small" icon={<EyeOutlined />} />
-              </Link>
+              <Button 
+                type="text" 
+                size="small" 
+                icon={<EyeOutlined />}
+                onClick={() => navigateToDetail(record.product_id, currentPath)}
+              />
             </Tooltip>
             
             <Tooltip title="编辑信息">
-              <Link 
-                to={{
-                  pathname: `/goods/manage/edit/${record.product_id}`,
-                  state: { from: currentPath }
-                } as any}
-              >
-                <Button type="text" size="small" icon={<EditOutlined />} />
-              </Link>
+              <Button 
+                type="text" 
+                size="small" 
+                icon={<EditOutlined />}
+                onClick={() => navigateToEdit(record.product_id, currentPath)}
+              />
             </Tooltip>
             
             <Tooltip title="SKU规格">
-              <Link 
-                to={{
-                  pathname: `/goods/manage/sku/${record.product_id}`,
-                  state: { from: currentPath }
-                } as any}
-              >
-                <Button type="text" size="small" icon={<SettingOutlined />} />
-              </Link>
+              <Button 
+                type="text" 
+                size="small" 
+                icon={<SettingOutlined />}
+                onClick={() => navigateToSku(record.product_id, currentPath)}
+              />
             </Tooltip>
             
             <Tooltip title="图库管理">
-              <Link 
-                to={{
-                  pathname: `/goods/manage/gallery/${record.product_id}`,
-                  state: { from: currentPath }
-                } as any}
-              >
-                <Button type="text" size="small" icon={<PictureOutlined />} />
-              </Link>
+              <Button 
+                type="text" 
+                size="small" 
+                icon={<PictureOutlined />}
+                onClick={() => navigateToGallery(record.product_id, currentPath)}
+              />
             </Tooltip>
             
             <Divider type="vertical" />
             
-            <Popconfirm title="确定删除？" onConfirm={() => handleDelete(record.product_id)} okText="是" cancelText="否">
-              <Button type="text" size="small" danger icon={<DeleteOutlined />} />
+            <Popconfirm 
+              title="确定下架此商品？" 
+              description="下架后商品将不再显示在前台"
+              onConfirm={() => handleDelete(record.product_id)} 
+              okText="确认下架" 
+              cancelText="取消"
+              okButtonProps={{ danger: true }}
+            >
+              <Button 
+                type="text" 
+                size="small" 
+                danger 
+                icon={<DeleteOutlined />} 
+              />
             </Popconfirm>
           </Space>
         );
@@ -419,10 +461,23 @@ const ProductListPage: React.FC = () => {
   ];
 
   return (
-    <div style={{ padding: 8, backgroundColor: '#f0f2f5', minHeight: '100vh' }}>
-      <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
+    <div 
+      style={{ 
+        padding: 8, 
+        backgroundColor: '#f0f2f5', 
+        minHeight: '100vh' 
+      }}
+    >
+      <Row 
+        gutter={[12, 12]} 
+        style={{ marginBottom: 12 }}
+      >
         <Col span={6}>
-          <Card size="small" bordered={false} bodyStyle={{ padding: 12 }}>
+          <Card 
+            size="small" 
+            bordered={false} 
+            bodyStyle={{ padding: 12 }}
+          >
             <Statistic 
               title={<span style={{ fontSize: 11 }}>商品总量</span>} 
               value={stats.total} 
@@ -432,27 +487,45 @@ const ProductListPage: React.FC = () => {
           </Card>
         </Col>
         <Col span={6}>
-          <Card size="small" bordered={false} bodyStyle={{ padding: 12 }}>
+          <Card 
+            size="small" 
+            bordered={false} 
+            bodyStyle={{ padding: 12 }}
+          >
             <Statistic 
               title={<span style={{ fontSize: 11 }}>在售商品</span>} 
               value={stats.normal} 
               prefix={<CheckCircleOutlined />} 
-              valueStyle={{ fontSize: 20, color: '#52c41a' }} 
+              valueStyle={{ 
+                fontSize: 20, 
+                color: '#52c41a' 
+              }} 
             />
           </Card>
         </Col>
         <Col span={6}>
-          <Card size="small" bordered={false} bodyStyle={{ padding: 12 }}>
+          <Card 
+            size="small" 
+            bordered={false} 
+            bodyStyle={{ padding: 12 }}
+          >
             <Statistic 
               title={<span style={{ fontSize: 11 }}>已下架</span>} 
               value={stats.off} 
               prefix={<StopOutlined />} 
-              valueStyle={{ fontSize: 20, color: '#faad14' }} 
+              valueStyle={{ 
+                fontSize: 20, 
+                color: '#faad14' 
+              }} 
             />
           </Card>
         </Col>
         <Col span={6}>
-          <Card size="small" bordered={false} bodyStyle={{ padding: 12 }}>
+          <Card 
+            size="small" 
+            bordered={false} 
+            bodyStyle={{ padding: 12 }}
+          >
             <Statistic 
               title={<span style={{ fontSize: 11 }}>合作品牌</span>} 
               value={stats.brands || 0} 
@@ -463,15 +536,29 @@ const ProductListPage: React.FC = () => {
         </Col>
       </Row>
 
-      <Card size="small" bordered={false} style={{ marginBottom: 12 }}>
-        <Row justify="space-between" align="middle" gutter={[8, 8]}>
+      <Card 
+        size="small" 
+        bordered={false} 
+        style={{ marginBottom: 12 }}
+      >
+        <Row 
+          justify="space-between" 
+          align="middle" 
+          gutter={[8, 8]}
+        >
           <Col>
             <Space size="small">
-              <Link to="/goods/manage/create">
-                <Button type="primary" size="small" icon={<PlusOutlined />}>
-                  录入商品
-                </Button>
-              </Link>
+              <Button 
+                type="primary" 
+                size="small" 
+                icon={<PlusOutlined />}
+                onClick={() => {
+                  const currentPath = `${location.pathname}${location.search}`;
+                  navigate(`/goods/manage/create?return=${encodeURIComponent(currentPath)}`);
+                }}
+              >
+                录入商品
+              </Button>
               <Button 
                 danger 
                 size="small" 
@@ -479,7 +566,14 @@ const ProductListPage: React.FC = () => {
                 disabled={selectedRowKeys.length === 0} 
                 onClick={handleBatchDelete}
               >
-                批量删除
+                批量下架
+              </Button>
+              <Button 
+                size="small" 
+                icon={<ReloadOutlined />}
+                onClick={refreshAll}
+              >
+                刷新
               </Button>
             </Space>
           </Col>
@@ -546,14 +640,22 @@ const ProductListPage: React.FC = () => {
                       <Option value="">全部状态</Option>
                       <Option value="正常">在售</Option>
                       <Option value="下架">下架</Option>
-                      <Option value="删除">删除</Option>
                     </Select>
                   )} 
                 />
-                <Button type="primary" size="small" icon={<SearchOutlined />} htmlType="submit">
+                <Button 
+                  type="primary" 
+                  size="small" 
+                  icon={<SearchOutlined />} 
+                  htmlType="submit"
+                >
                   查询
                 </Button>
-                <Button size="small" icon={<ReloadOutlined />} onClick={onReset}>
+                <Button 
+                  size="small" 
+                  icon={<ReloadOutlined />} 
+                  onClick={onReset}
+                >
                   重置
                 </Button>
               </Space>
@@ -562,7 +664,11 @@ const ProductListPage: React.FC = () => {
         </Row>
       </Card>
 
-      <Card size="small" bordered={false} bodyStyle={{ padding: 0 }}>
+      <Card 
+        size="small" 
+        bordered={false} 
+        bodyStyle={{ padding: 0 }}
+      >
         <Table
           columns={columns}
           dataSource={data}

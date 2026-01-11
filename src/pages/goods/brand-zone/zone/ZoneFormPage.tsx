@@ -1,6 +1,5 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Card, 
   Row, 
@@ -19,58 +18,24 @@ import {
   ArrowLeftOutlined,
   SaveOutlined
 } from '@ant-design/icons';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { globalMessage } from '../../../../utils/globalMessage';
 import * as api from '../../../../services/api';
 import type { CategoryResponse, CategoryStatus } from '../../../../services/api-type';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
-const { TextArea } = Input;
 
-// 模拟分类数据
-const generateMockCategories = (): CategoryResponse[] => {
-  return [
-    {
-      category_id: 'cat_001',
-      name: '笔记本专区',
-      code: 'ZONE01',
-      parent_id: null,
-      status: '启用',
-    },
-    {
-      category_id: 'cat_002',
-      name: '游戏本专区',
-      code: 'ZONE02',
-      parent_id: null,
-      status: '启用',
-    },
-    {
-      category_id: 'cat_003',
-      name: '商务本专区',
-      code: 'ZONE03',
-      parent_id: null,
-      status: '启用',
-    },
-    {
-      category_id: 'cat_011',
-      name: '笔记本专区 - 入门级',
-      code: 'ZONE01_SUB01',
-      parent_id: 'cat_001',
-      status: '启用',
-    },
-    {
-      category_id: 'cat_012',
-      name: '笔记本专区 - 性能级',
-      code: 'ZONE01_SUB02',
-      parent_id: 'cat_001',
-      status: '启用',
-    },
-  ];
-};
+interface CategoryFormData {
+  name: string;
+  code: string;
+  parent_id?: string | null;
+  status: CategoryStatus;
+}
 
 const ZoneFormPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { id } = useParams<{ id?: string }>();
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
@@ -80,8 +45,11 @@ const ZoneFormPage: React.FC = () => {
   const [categories, setCategories] = useState<CategoryResponse[]>([]);
   const [treeData, setTreeData] = useState<any[]>([]);
 
+  // 获取来源页面（优先从state，否则使用默认路径）
+  const fromPath = location.state?.from || '/goods/zone';
+  
   // 构建树形选择数据
-  const buildTreeSelectData = (catList: CategoryResponse[]) => {
+  const buildTreeSelectData = useCallback((catList: CategoryResponse[]) => {
     const map = new Map();
     const result: any[] = [];
     
@@ -107,7 +75,52 @@ const ZoneFormPage: React.FC = () => {
     });
     
     return result;
-  };
+  }, [id]);
+
+  // 获取分类列表
+  const fetchCategories = useCallback(async () => {
+    try {
+      setLoading(true);
+      // 调用真实API获取分类列表
+      const catList = await api.getCategories();
+      setCategories(catList);
+      setTreeData(buildTreeSelectData(catList));
+    } catch (error) {
+      console.error('获取分类列表失败:', error);
+      globalMessage.error('获取分类列表失败');
+    } finally {
+      setLoading(false);
+    }
+  }, [buildTreeSelectData]);
+
+  // 获取专区数据（编辑模式）
+  const fetchCategoryData = useCallback(async (categoryId: string) => {
+    setLoading(true);
+    try {
+      // 从API获取所有分类，然后查找指定的分类
+      const categories = await api.getCategories();
+      const category = categories.find((c: CategoryResponse) => c.category_id === categoryId);
+      
+      if (category) {
+        setCategoryData(category);
+        form.setFieldsValue({
+          name: category.name,
+          code: category.code,
+          parent_id: category.parent_id,
+          status: category.status,
+        });
+      } else {
+        globalMessage.error('未找到专区信息');
+        navigate(fromPath);
+      }
+    } catch (error) {
+      console.error('获取专区数据失败:', error);
+      globalMessage.error('获取专区数据失败');
+      navigate(fromPath);
+    } finally {
+      setLoading(false);
+    }
+  }, [form, navigate, fromPath]);
 
   // 根据路由参数判断模式
   useEffect(() => {
@@ -121,80 +134,7 @@ const ZoneFormPage: React.FC = () => {
       });
     }
     fetchCategories();
-  }, [id]);
-
-  // 获取分类列表
-  const fetchCategories = async () => {
-    try {
-      const response = await api.getCategories();
-      let catList = response?.data || [];
-      
-      if (catList.length === 0) {
-        catList = generateMockCategories();
-      }
-      
-      setCategories(catList);
-      setTreeData(buildTreeSelectData(catList));
-    } catch (error) {
-      console.error('获取分类列表失败:', error);
-      const mockCategories = generateMockCategories();
-      setCategories(mockCategories);
-      setTreeData(buildTreeSelectData(mockCategories));
-    }
-  };
-
-  // 获取专区数据（编辑模式）
-  const fetchCategoryData = async (categoryId: string) => {
-    setLoading(true);
-    try {
-      // 从API获取所有分类，然后查找指定的分类
-      const response = await api.getCategories();
-      const categories = response?.data || [];
-      const category = categories.find(c => c.category_id === categoryId);
-      
-      if (category) {
-        setCategoryData(category);
-        form.setFieldsValue({
-          name: category.name,
-          code: category.code,
-          parent_id: category.parent_id,
-          status: category.status,
-        });
-      } else {
-        // 使用模拟数据
-        const mockCategories = generateMockCategories();
-        const mockCategory = mockCategories.find(c => c.category_id === categoryId);
-        if (mockCategory) {
-          setCategoryData(mockCategory);
-          form.setFieldsValue({
-            name: mockCategory.name,
-            code: mockCategory.code,
-            parent_id: mockCategory.parent_id,
-            status: mockCategory.status,
-          });
-        } else {
-          globalMessage.error('未找到专区信息');
-          navigate('/goods/zone');
-        }
-      }
-    } catch (error) {
-      console.error('获取专区数据失败:', error);
-      // 使用模拟数据
-      const mockCategories = generateMockCategories();
-      const mockCategory = mockCategories.find(c => c.category_id === categoryId);
-      if (mockCategory) {
-        setCategoryData(mockCategory);
-        form.setFieldsValue({
-          name: mockCategory.name,
-          code: mockCategory.code,
-          parent_id: mockCategory.parent_id,
-          status: mockCategory.status,
-        });
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [id, form, fetchCategoryData, fetchCategories]);
 
   // 表单提交
   const handleSubmit = async () => {
@@ -202,19 +142,33 @@ const ZoneFormPage: React.FC = () => {
       setSubmitting(true);
       const values = await form.validateFields();
       
-      // 模拟API调用
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // 准备API数据
+      const apiData: CategoryFormData = {
+        name: values.name,
+        code: values.code,
+        parent_id: values.parent_id || null,
+        status: values.status
+      };
       
+      // 调用API
       if (isEditMode && id) {
+        // 更新分类
+        await api.updateCategory(id, apiData);
         globalMessage.success('专区更新成功');
       } else {
+        // 创建分类
+        await api.createCategory(apiData);
         globalMessage.success('专区创建成功');
       }
       
-      navigate('/goods/zone');
-    } catch (error) {
-      console.error('表单验证失败:', error);
-      globalMessage.error('请检查表单数据');
+      navigate(fromPath);
+    } catch (error: any) {
+      console.error('表单提交失败:', error);
+      if (error.response?.data?.message) {
+        globalMessage.error(error.response.data.message);
+      } else {
+        globalMessage.error(isEditMode ? '更新专区失败' : '创建专区失败');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -222,7 +176,9 @@ const ZoneFormPage: React.FC = () => {
 
   // 生成专区编码
   const generateZoneCode = () => {
-    const maxCode = categories.reduce((max, cat) => {
+    // 过滤出顶级分类（parent_id为null或undefined）
+    const topLevelCategories = categories.filter(cat => !cat.parent_id);
+    const maxCode = topLevelCategories.reduce((max, cat) => {
       const match = cat.code.match(/ZONE(\d+)/);
       if (match) {
         const num = parseInt(match[1], 10);
@@ -255,10 +211,13 @@ const ZoneFormPage: React.FC = () => {
         <Row justify="space-between" align="middle">
           <Col>
             <Space size="middle">
-              <Link to="/goods/zone">
-                <Button type="text" icon={<ArrowLeftOutlined />} size="small">
-                </Button>
-              </Link>
+              <Button 
+                type="text" 
+                icon={<ArrowLeftOutlined />} 
+                size="small"
+                onClick={() => navigate(fromPath)}
+              >
+              </Button>
               <Title level={4} style={{ margin: 0 }}>
                 {isEditMode ? '编辑专区' : '新增专区'}
               </Title>
@@ -266,9 +225,12 @@ const ZoneFormPage: React.FC = () => {
           </Col>
           <Col>
             <Space>
-              <Link to="/goods/zone">
-                <Button size="small">取消</Button>
-              </Link>
+              <Button 
+                size="small" 
+                onClick={() => navigate(fromPath)}
+              >
+                取消
+              </Button>
               <Button 
                 type="primary" 
                 icon={<SaveOutlined />} 
@@ -382,29 +344,6 @@ const ZoneFormPage: React.FC = () => {
               </Form.Item>
             </Col>
           </Row>
-
-          {isEditMode && categoryData && (
-            <div style={{ marginTop: 20, padding: 12, backgroundColor: '#fafafa', borderRadius: 4 }}>
-              <Row gutter={16}>
-                <Col span={12}>
-                  <div>
-                    <Text type="secondary">创建时间：</Text>
-                    <Text style={{ marginLeft: 8 }}>
-                      {new Date().toLocaleDateString()} {/* 模拟时间 */}
-                    </Text>
-                  </div>
-                </Col>
-                <Col span={12}>
-                  <div>
-                    <Text type="secondary">最后更新：</Text>
-                    <Text style={{ marginLeft: 8 }}>
-                      {new Date().toLocaleDateString()} {/* 模拟时间 */}
-                    </Text>
-                  </div>
-                </Col>
-              </Row>
-            </div>
-          )}
 
           <div style={{ marginTop: 20, padding: 16, backgroundColor: '#f6ffed', borderRadius: 4 }}>
             <Text type="success" style={{ fontSize: 13 }}>

@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Card, 
   Row, 
@@ -10,7 +10,6 @@ import {
   Space, 
   Typography, 
   Upload, 
-  message,
   Form,
   Image,
   Alert,
@@ -21,86 +20,49 @@ import {
   UploadOutlined,
   SaveOutlined
 } from '@ant-design/icons';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { getImageUrl } from '../../../../utils/imageUrl';
 import { globalMessage } from '../../../../utils/globalMessage';
 import * as api from '../../../../services/api';
-import type { BrandResponse, CreateBrandRequest, UpdateBrandRequest, BrandStatus } from '../../../../services/api-type';
+import type { BrandResponse, BrandStatus } from '../../../../services/api-type';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
 const { TextArea } = Input;
 
-// 生成模拟品牌数据（仅用于演示）
-const generateMockBrands = (): BrandResponse[] => {
-  const logos = [
-    'https://api.placeholder.com/100?text=Lenovo',
-    'https://api.placeholder.com/100?text=ThinkPad',
-  ];
-  
-  return [
-    {
-      brand_id: 'brand_001',
-      name: '联想',
-      code: 'BRAND001',
-      status: '启用',
-      description: '这是联想品牌的详细描述',
-      remark: '联想合作品牌，需重点关注',
-      logo: logos[0],
-      creator_id: 'admin',
-      created_at: dayjs().subtract(30, 'day').toISOString(),
-      updated_at: dayjs().subtract(1, 'day').toISOString(),
-    },
-    {
-      brand_id: 'brand_002',
-      name: 'ThinkPad',
-      code: 'BRAND002',
-      status: '启用',
-      description: '这是ThinkPad品牌的详细描述',
-      remark: '高端商务系列',
-      logo: logos[1],
-      creator_id: 'admin',
-      created_at: dayjs().subtract(20, 'day').toISOString(),
-      updated_at: dayjs().toISOString(),
-    },
-  ];
-};
+interface BrandFormData {
+  name: string;
+  code: string;
+  status: BrandStatus;
+  description?: string;
+  remark?: string;
+  logoFile?: File;
+}
 
 const BrandFormPage: React.FC = () => {
   const navigate = useNavigate();
-  const { id } = useParams<{ id?: string }>(); // 使用路由参数
+  const location = useLocation();
+  const { id } = useParams<{ id?: string }>();
+  
+  // 获取来源页面（优先从state，否则使用默认路径）
+  const fromPath = location.state?.from || '/goods/brand';
+  
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
-  const [brandId, setBrandId] = useState<string>('');
-  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoFile, setLogoFile] = useState<File | undefined>(undefined);
   const [logoPreview, setLogoPreview] = useState<string>('');
   const [brandData, setBrandData] = useState<BrandResponse | null>(null);
 
-  // 根据路由参数判断模式
-  useEffect(() => {
-    if (id) {
-      setIsEditMode(true);
-      setBrandId(id);
-      fetchBrandData(id);
-    } else {
-      // 新增模式，设置默认值
-      form.setFieldsValue({
-        status: '启用'
-      });
-    }
-  }, [id]);
-
   // 获取品牌数据（编辑模式）
-  const fetchBrandData = async (id: string) => {
+  const fetchBrandData = useCallback(async (brandId: string) => {
     setLoading(true);
     try {
-      // 尝试从API获取品牌数据
-      const response = await api.getBrands();
-      const brands = response?.data || [];
-      const brand = brands.find(b => b.brand_id === id);
+      // 尝试从API获取品牌数据，API直接返回BrandResponse[]
+      const brands = await api.getBrands();
+      const brand = brands.find((b: BrandResponse) => b.brand_id === brandId);
       
       if (brand) {
         setBrandData(brand);
@@ -113,57 +75,42 @@ const BrandFormPage: React.FC = () => {
           remark: brand.remark || ''
         });
       } else {
-        // 如果没有找到，使用模拟数据（演示用）
-        const mockBrands = generateMockBrands();
-        const mockBrand = mockBrands.find(b => b.brand_id === id);
-        if (mockBrand) {
-          setBrandData(mockBrand);
-          setLogoPreview(mockBrand.logo || '');
-          form.setFieldsValue({
-            name: mockBrand.name,
-            code: mockBrand.code,
-            status: mockBrand.status,
-            description: mockBrand.description || '',
-            remark: mockBrand.remark || ''
-          });
-        } else {
-          message.error('未找到品牌信息');
-          navigate('/goods/brand');
-        }
+        globalMessage.error('未找到品牌信息');
+        navigate(fromPath);
       }
     } catch (error) {
       console.error('获取品牌数据失败:', error);
-      message.error('获取品牌数据失败，使用演示数据');
-      // 使用模拟数据
-      const mockBrands = generateMockBrands();
-      const mockBrand = mockBrands.find(b => b.brand_id === id);
-      if (mockBrand) {
-        setBrandData(mockBrand);
-        setLogoPreview(mockBrand.logo || '');
-        form.setFieldsValue({
-          name: mockBrand.name,
-          code: mockBrand.code,
-          status: mockBrand.status,
-          description: mockBrand.description || '',
-          remark: mockBrand.remark || ''
-        });
-      }
+      globalMessage.error('获取品牌数据失败');
+      navigate(fromPath);
     } finally {
       setLoading(false);
     }
-  };
+  }, [form, navigate, fromPath]);
+
+  // 根据路由参数判断模式
+  useEffect(() => {
+    if (id) {
+      setIsEditMode(true);
+      fetchBrandData(id);
+    } else {
+      // 新增模式，设置默认值
+      form.setFieldsValue({
+        status: '启用'
+      });
+    }
+  }, [id, fetchBrandData, form]);
 
   // Logo上传处理
   const handleLogoUpload = (file: File) => {
     const isImage = file.type.startsWith('image/');
     if (!isImage) {
-      message.error('只能上传图片文件');
+      globalMessage.error('只能上传图片文件');
       return false;
     }
     
     const isLt5M = file.size / 1024 / 1024 < 5;
     if (!isLt5M) {
-      message.error('图片大小不能超过5MB');
+      globalMessage.error('图片大小不能超过5MB');
       return false;
     }
     
@@ -178,58 +125,76 @@ const BrandFormPage: React.FC = () => {
     return false;
   };
 
+  // Logo移除处理
+  const handleLogoRemove = () => {
+    setLogoFile(undefined);
+    setLogoPreview('');
+    return true;
+  };
+
   // 表单提交
   const handleSubmit = async () => {
     try {
       setSubmitting(true);
       const values = await form.validateFields();
       
-      if (isEditMode && brandId) {
+      if (isEditMode && id) {
         // 编辑现有品牌
-        const formData: UpdateBrandRequest = {
+        const updateData: BrandFormData = {
           name: values.name,
           code: values.code,
           status: values.status as BrandStatus,
           description: values.description || undefined,
           remark: values.remark || undefined,
+          logoFile: logoFile
         };
         
         try {
-          await api.updateBrand(brandId, { ...formData, logoFile });
+          await api.updateBrand(id, updateData);
           globalMessage.success('品牌更新成功');
-          navigate('/goods/brand'); // 返回品牌列表
-        } catch (error) {
+          navigate(fromPath);
+        } catch (error: any) {
           console.error('更新品牌失败:', error);
-          globalMessage.success('品牌更新成功（本地演示）');
-          navigate('/goods/brand'); // 返回品牌列表
+          if (error.response?.data?.message) {
+            globalMessage.error(error.response.data.message);
+          } else {
+            globalMessage.error('更新品牌失败');
+          }
         }
       } else {
         // 新增品牌
-        const formData: CreateBrandRequest = {
+        const createData: BrandFormData = {
           name: values.name,
           code: values.code,
           status: values.status as BrandStatus,
           description: values.description || undefined,
           remark: values.remark || undefined,
+          logoFile: logoFile
         };
         
         try {
-          await api.createBrand({ ...formData, logoFile });
+          await api.createBrand(createData);
           globalMessage.success('品牌创建成功');
-          navigate('/goods/brand'); // 返回品牌列表
-        } catch (error) {
+          navigate(fromPath);
+        } catch (error: any) {
           console.error('创建品牌失败:', error);
-          globalMessage.success('品牌创建成功（本地演示）');
-          navigate('/goods/brand'); // 返回品牌列表
+          if (error.response?.data?.message) {
+            globalMessage.error(error.response.data.message);
+          } else {
+            globalMessage.error('创建品牌失败');
+          }
         }
       }
     } catch (error) {
       console.error('表单验证失败:', error);
-      message.error('请检查表单数据');
+      globalMessage.error('请检查表单数据');
     } finally {
       setSubmitting(false);
     }
   };
+
+  // 计算是否显示品牌信息
+  const showBrandInfo = isEditMode && brandData;
 
   if (loading) {
     return (
@@ -251,10 +216,13 @@ const BrandFormPage: React.FC = () => {
         <Row justify="space-between" align="middle">
           <Col>
             <Space size="middle">
-              <Link to="/goods/brand">
-                <Button type="text" icon={<ArrowLeftOutlined />} size="small">
-                </Button>
-              </Link>
+              <Button 
+                type="text" 
+                icon={<ArrowLeftOutlined />} 
+                size="small"
+                onClick={() => navigate(fromPath)}
+              >
+              </Button>
               <Title level={4} style={{ margin: 0 }}>
                 {isEditMode ? '编辑品牌' : '新增品牌'}
               </Title>
@@ -262,9 +230,12 @@ const BrandFormPage: React.FC = () => {
           </Col>
           <Col>
             <Space>
-              <Link to="/goods/brand">
-                <Button size="small">取消</Button>
-              </Link>
+              <Button 
+                size="small" 
+                onClick={() => navigate(fromPath)}
+              >
+                取消
+              </Button>
               <Button 
                 type="primary" 
                 icon={<SaveOutlined />} 
@@ -285,7 +256,7 @@ const BrandFormPage: React.FC = () => {
         bordered={false}
         bodyStyle={{ padding: 20 }}
       >
-        {isEditMode && brandData && (
+        {showBrandInfo && (
           <Alert
             message={
               <Space>
@@ -330,7 +301,7 @@ const BrandFormPage: React.FC = () => {
               >
                 <Input 
                   placeholder="输入品牌编码" 
-                  disabled={isEditMode} // 编辑模式下不允许修改编码
+                  disabled={isEditMode}
                 />
               </Form.Item>
             </Col>
@@ -358,10 +329,7 @@ const BrandFormPage: React.FC = () => {
                 maxCount={1}
                 accept="image/*"
                 beforeUpload={handleLogoUpload}
-                onRemove={() => {
-                  setLogoFile(null);
-                  setLogoPreview('');
-                }}
+                onRemove={handleLogoRemove}
                 fileList={logoFile ? [{ 
                   uid: '-1', 
                   name: logoFile.name, 
@@ -389,7 +357,7 @@ const BrandFormPage: React.FC = () => {
                 </div>
               )}
               
-              {!logoPreview && isEditMode && brandData?.logo && (
+              {!logoPreview && showBrandInfo && brandData?.logo && (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                   <Image 
                     src={getImageUrl(brandData.logo)} 
@@ -433,7 +401,7 @@ const BrandFormPage: React.FC = () => {
             />
           </Form.Item>
 
-          {isEditMode && brandData && (
+          {showBrandInfo && brandData?.created_at && (
             <div style={{ marginTop: 20, padding: 12, backgroundColor: '#fafafa', borderRadius: 4 }}>
               <Row gutter={16}>
                 <Col span={12}>
@@ -448,14 +416,16 @@ const BrandFormPage: React.FC = () => {
                     </Text>
                   </div>
                 </Col>
-                <Col span={12}>
-                  <div>
-                    <Text type="secondary">最后更新：</Text>
-                    <Text style={{ marginLeft: 8 }}>
-                      {dayjs(brandData.updated_at).format('YYYY-MM-DD HH:mm:ss')}
-                    </Text>
-                  </div>
-                </Col>
+                {brandData.updated_at && (
+                  <Col span={12}>
+                    <div>
+                      <Text type="secondary">最后更新：</Text>
+                      <Text style={{ marginLeft: 8 }}>
+                        {dayjs(brandData.updated_at).format('YYYY-MM-DD HH:mm:ss')}
+                      </Text>
+                    </div>
+                  </Col>
+                )}
               </Row>
             </div>
           )}

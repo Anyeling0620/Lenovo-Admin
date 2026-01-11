@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
@@ -12,94 +11,59 @@ import {
   Space, 
   Tag, 
   Statistic,
-  Modal,
   Popconfirm,
   Tooltip,
-  Typography,
-  Form,
-  InputNumber,
-  message,
-  Badge,
+  Image,
   Divider,
-  Descriptions,
-  Image
+  Spin,
+  Modal,
+  message
 } from 'antd';
 import { 
   SearchOutlined, 
   ReloadOutlined, 
   EditOutlined, 
   DeleteOutlined,
-  PlusOutlined,
   SettingOutlined,
   CheckCircleOutlined,
   StopOutlined,
   EyeOutlined,
-  ShoppingOutlined,
-  DollarOutlined,
-  AppstoreOutlined
+  AppstoreOutlined,
+  ExclamationCircleOutlined
 } from '@ant-design/icons';
-import { Link, useNavigate } from 'react-router-dom';
-import dayjs from 'dayjs';
+import { useNavigate } from 'react-router-dom';
 
 // API
 import * as api from '../../../services/api';
-import type { ProductConfigResponse, ProductConfigStatus } from '../../../services/api-type';
+import type { 
+  ProductConfigResponse, 
+  ProductConfigStatus,
+  ProductListItem,
+  StockResponse 
+} from '../../../services/api-type';
 import { globalMessage } from '../../../utils/globalMessage';
 import { getImageUrl } from '../../../utils/imageUrl';
 
-const { Title, Text } = Typography;
 const { Option } = Select;
+const { confirm } = Modal;
 
-// 模拟数据生成函数
-const generateMockConfigs = (): ProductConfigResponse[] => {
-  const configs: ProductConfigResponse[] = [];
-  const statuses: ProductConfigStatus[] = ['下架', '正常'];
-  const products = [
-    { id: 'prod_001', name: '拯救者 Y9000P 2024' },
-    { id: 'prod_002', name: '小新 Pro 16 2024款' },
-    { id: 'prod_003', name: 'ThinkPad X1 Carbon' },
-    { id: 'prod_004', name: 'YOGA Air 14s' },
-    { id: 'prod_005', name: '联想 1TB 固态硬盘' },
-  ];
-  
-  const colors = ['冰魄白', '钛晶灰', '星际黑', '烈焰红', '深海蓝'];
-  const memories = ['8GB', '16GB', '32GB', '64GB'];
-  const storages = ['256GB', '512GB', '1TB', '2TB'];
-  
-  for (let i = 1; i <= 30; i++) {
-    const product = products[Math.floor(Math.random() * products.length)];
-    const status = statuses[Math.floor(Math.random() * statuses.length)];
-    
-    configs.push({
-      product_config_id: `config_${i.toString().padStart(3, '0')}`,
-      product_id: product.id,
-      config1: colors[Math.floor(Math.random() * colors.length)],
-      config2: memories[Math.floor(Math.random() * memories.length)],
-      config3: storages[Math.floor(Math.random() * storages.length)],
-      sale_price: Math.floor(Math.random() * 10000) + 3000,
-      original_price: Math.floor(Math.random() * 12000) + 4000,
-      status,
-      image: i % 3 === 0 ? `config_${i}.jpg` : null,
-      stock: {
-        stock_id: `stock_${i}`,
-        stock_num: Math.floor(Math.random() * 100) + 10,
-        warn_num: 10,
-        freeze_num: Math.floor(Math.random() * 5)
-      },
-      // 模拟字段
-      product_name: product.name,
-      created_at: dayjs().subtract(Math.floor(Math.random() * 30), 'day').toISOString()
-    });
-  }
-  
-  return configs;
-};
+// 扩展类型以包含额外信息
+interface ExtendedProductConfigResponse extends ProductConfigResponse {
+  product_name?: string;
+  category_name?: string;
+  brand_name?: string;
+  stock_num?: number;
+  warn_num?: number;
+  freeze_num?: number;
+}
 
 const ConfigListPage: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<ProductConfigResponse[]>([]);
-  const [filteredData, setFilteredData] = useState<ProductConfigResponse[]>([]);
+  const [configs, setConfigs] = useState<ExtendedProductConfigResponse[]>([]);
+  const [filteredConfigs, setFilteredConfigs] = useState<ExtendedProductConfigResponse[]>([]);
+  const [, setProducts] = useState<ProductListItem[]>([]);
+  const [, setStocks] = useState<StockResponse[]>([]);
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   
   // 搜索和过滤
@@ -107,27 +71,70 @@ const ConfigListPage: React.FC = () => {
   const [searchStatus, setSearchStatus] = useState<string>('');
   const [searchProduct, setSearchProduct] = useState<string>('');
 
-  // 加载数据
+  // 加载所有数据
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      // 这里应该调用API获取所有配置，但API可能需要逐个商品获取
-      // 先使用模拟数据
-      const mockConfigs = generateMockConfigs();
-      setData(mockConfigs);
-      applyFilters(mockConfigs);
-    } catch (error) { 
-      console.log('API调用失败，使用模拟数据');
-      const mockConfigs = generateMockConfigs();
-      setData(mockConfigs);
-      applyFilters(mockConfigs);
-    } finally { 
-      setLoading(false); 
+      // 1. 获取所有商品
+      const productsResponse = await api.getProducts();
+      setProducts(productsResponse);
+      
+      // 2. 获取所有库存信息
+      const stocksResponse = await api.getStocks();
+      setStocks(stocksResponse);
+      
+      // 3. 为每个商品获取其配置
+      const allConfigs: ExtendedProductConfigResponse[] = [];
+      
+      // 使用 Promise.all 并行获取所有商品的配置
+      const configPromises = productsResponse.map(async (product) => {
+        try {
+          const productConfigs = await api.getProductConfigs(product.product_id);
+          
+          // 为每个配置添加商品信息和库存信息
+          const enrichedConfigs = productConfigs.map(config => {
+            const stockInfo = stocksResponse.find(stock => 
+              stock.config_id === config.product_config_id
+            );
+            
+            return {
+              ...config,
+              product_name: product.name,
+              category_name: product.category_name,
+              brand_name: product.brand_name,
+              stock_num: stockInfo?.stock_num || 0,
+              warn_num: stockInfo?.warn_num || 0,
+              freeze_num: stockInfo?.freeze_num || 0
+            };
+          });
+          
+          return enrichedConfigs;
+        } catch (error) {
+          console.error(`获取商品 ${product.product_id} 的配置失败:`, error);
+          return [];
+        }
+      });
+      
+      const configsArrays = await Promise.all(configPromises);
+      
+      // 合并所有配置
+      configsArrays.forEach(configArray => {
+        allConfigs.push(...configArray);
+      });
+      
+      setConfigs(allConfigs);
+      setFilteredConfigs(allConfigs);
+      
+    } catch (error) {
+      console.error('加载数据失败:', error);
+      globalMessage.error('加载数据失败');
+    } finally {
+      setLoading(false);
     }
   }, []);
 
   // 应用过滤条件
-  const applyFilters = (configs: ProductConfigResponse[]) => {
+  const applyFilters = useCallback(() => {
     let filtered = [...configs];
     
     if (searchStatus) {
@@ -137,7 +144,7 @@ const ConfigListPage: React.FC = () => {
     if (searchProduct) {
       const productName = searchProduct.toLowerCase();
       filtered = filtered.filter(config => 
-        (config as any).product_name.toLowerCase().includes(productName)
+        config.product_name?.toLowerCase().includes(productName)
       );
     }
     
@@ -150,55 +157,133 @@ const ConfigListPage: React.FC = () => {
       );
     }
     
-    setFilteredData(filtered);
-  };
+    setFilteredConfigs(filtered);
+  }, [configs, searchKeyword, searchStatus, searchProduct]);
 
-  // 单行删除
-  const handleDelete = async (id: string) => {
-    try {
-      // 模拟API调用
-      await api.deleteProductConfig(id);
-      globalMessage.success('配置已删除');
-      setData(prev => prev.filter(config => config.product_config_id !== id));
-    } catch (err) { 
-      console.log('API调用失败，更新本地数据');
-      setData(prev => prev.filter(config => config.product_config_id !== id));
-      globalMessage.success('配置已删除（本地演示）');
-    }
-  };
-
-  // 查看配置详情
-  const handleViewDetail = (config: ProductConfigResponse) => {
-    navigate(`/goods/manage/sku/${config.product_id}`);
-  };
-
-  // 编辑配置
-  const handleEdit = (config: ProductConfigResponse) => {
-    // 这里应该跳转到编辑页面，暂时使用详情页
-    handleViewDetail(config);
-  };
-
+  // 加载数据
   useEffect(() => { 
     loadData(); 
   }, [loadData]);
 
+  // 当过滤条件变化时重新应用过滤
   useEffect(() => {
-    applyFilters(data);
-  }, [data, searchKeyword, searchStatus, searchProduct]);
+    applyFilters();
+  }, [searchKeyword, searchStatus, searchProduct, configs, applyFilters]);
+
+  // 单行删除
+  const handleDelete = async (configId: string) => {
+    confirm({
+      title: '确定删除该配置吗？',
+      icon: <ExclamationCircleOutlined />,
+      content: '删除配置将同时删除关联的库存信息，此操作不可恢复。',
+      onOk: async () => {
+        try {
+          await api.deleteProductConfig(configId);
+          globalMessage.success('配置已删除');
+          
+          // 更新本地数据
+          setConfigs(prev => prev.filter(config => config.product_config_id !== configId));
+          
+        } catch (err) {
+          console.error('删除配置失败:', err);
+          globalMessage.error('删除配置失败');
+        }
+      }
+    });
+  };
+
+  // 批量删除
+  const handleBatchDelete = async () => {
+    if (selectedRowKeys.length === 0) {
+      message.warning('请选择要删除的配置');
+      return;
+    }
+
+    confirm({
+      title: `确定删除选中的 ${selectedRowKeys.length} 个配置吗？`,
+      icon: <ExclamationCircleOutlined />,
+      content: '删除配置将同时删除关联的库存信息，此操作不可恢复。',
+      onOk: async () => {
+        setLoading(true);
+        try {
+          // 批量删除
+          const deletePromises = selectedRowKeys.map(id => 
+            api.deleteProductConfig(id as string)
+          );
+          
+          await Promise.all(deletePromises);
+          
+          globalMessage.success(`成功删除 ${selectedRowKeys.length} 个配置`);
+          
+          // 重新加载数据
+          await loadData();
+          
+          // 清空选择
+          setSelectedRowKeys([]);
+          
+        } catch (err) {
+          console.error('批量删除失败:', err);
+          globalMessage.error('批量删除失败');
+        } finally {
+          setLoading(false);
+        }
+      }
+    });
+  };
+
+  // 查看配置详情
+  const handleViewDetail = (config: ExtendedProductConfigResponse) => {
+    navigate(`/goods/manage/sku/${config.product_id}`, {
+      state: { 
+        configId: config.product_config_id,
+        from: window.location.pathname + window.location.search 
+      }
+    });
+  };
+
+  // 编辑配置
+  const handleEdit = (config: ExtendedProductConfigResponse) => {
+    navigate(`/goods/manage/configs/edit/${config.product_config_id}`, {
+      state: { 
+        productId: config.product_id,
+        from: window.location.pathname + window.location.search 
+      }
+    });
+  };
+
+  // 更新配置状态
+  const handleUpdateStatus = async (configId: string, newStatus: ProductConfigStatus) => {
+    try {
+      await api.updateProductConfigStatus(configId, newStatus);
+      globalMessage.success('状态更新成功');
+      
+      // 更新本地数据
+      setConfigs(prev => prev.map(config => 
+        config.product_config_id === configId 
+          ? { ...config, status: newStatus }
+          : config
+      ));
+      
+    } catch (error) {
+      console.error('更新状态失败:', error);
+      globalMessage.error('更新状态失败');
+    }
+  };
 
   // 表格列定义
-  const columns: any[] = [
+  const columns = [
     { 
       title: '商品信息', 
       key: 'product_info', 
-      width: 200,
-      render: (_: any, record: ProductConfigResponse) => (
+      width: 180,
+      render: (_: any, record: ExtendedProductConfigResponse) => (
         <div>
-          <div style={{ fontWeight: 500, fontSize: '12px' }}>
-            {(record as any).product_name || '未知商品'}
+          <div style={{ fontWeight: 500, fontSize: '12px', marginBottom: 2 }}>
+            {record.product_name || '未知商品'}
           </div>
           <div style={{ fontSize: '10px', color: '#999' }}>
-            ID: {record.product_id}
+            <div>品牌: {record.brand_name}</div>
+            <div>品类: {record.category_name}</div>
           </div>
         </div>
       ) 
@@ -206,8 +291,8 @@ const ConfigListPage: React.FC = () => {
     { 
       title: '配置规格', 
       key: 'config_spec', 
-      width: 180,
-      render: (_: any, record: ProductConfigResponse) => (
+      width: 160,
+      render: (_: any, record: ExtendedProductConfigResponse) => (
         <div>
           <div style={{ fontSize: '11px' }}>
             <Tag color="blue" style={{ fontSize: '10px', margin: '2px' }}>{record.config1}</Tag>
@@ -217,7 +302,7 @@ const ConfigListPage: React.FC = () => {
             )}
           </div>
           <div style={{ fontSize: '10px', color: '#999', marginTop: 2 }}>
-            配置ID: {record.product_config_id}
+            ID: {record.product_config_id}
           </div>
         </div>
       ) 
@@ -226,29 +311,43 @@ const ConfigListPage: React.FC = () => {
       title: '价格', 
       key: 'price', 
       width: 120,
-      render: (_: any, record: ProductConfigResponse) => (
-        <div>
-          <div style={{ fontSize: '12px', fontWeight: 600, color: '#f5222d' }}>
-            ¥{typeof record.sale_price === 'string' ? record.sale_price : record.sale_price.toLocaleString()}
+      render: (_: any, record: ExtendedProductConfigResponse) => {
+        const salePrice = typeof record.sale_price === 'string' 
+          ? parseFloat(record.sale_price) 
+          : record.sale_price;
+        const originalPrice = typeof record.original_price === 'string'
+          ? parseFloat(record.original_price)
+          : record.original_price;
+          
+        return (
+          <div>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: '#f5222d' }}>
+              ¥{salePrice.toFixed(2)}
+            </div>
+            <div style={{ fontSize: '10px', color: '#999', textDecoration: 'line-through' }}>
+              ¥{originalPrice.toFixed(2)}
+            </div>
           </div>
-          <div style={{ fontSize: '10px', color: '#999', textDecoration: 'line-through' }}>
-            ¥{typeof record.original_price === 'string' ? record.original_price : record.original_price.toLocaleString()}
-          </div>
-        </div>
-      ) 
+        );
+      }
     },
     { 
       title: '库存', 
       key: 'stock', 
       width: 100,
-      render: (_: any, record: ProductConfigResponse) => (
+      render: (_: any, record: ExtendedProductConfigResponse) => (
         <div>
           <div style={{ fontSize: '12px', fontWeight: 600 }}>
-            {record.stock?.stock_num || 0}
+            {record.stock_num || 0}
           </div>
           <div style={{ fontSize: '10px', color: '#faad14' }}>
-            冻结: {record.stock?.freeze_num || 0}
+            预警: {record.warn_num || 10}
           </div>
+          {record.freeze_num && record.freeze_num > 0 && (
+            <div style={{ fontSize: '10px', color: '#ff4d4f' }}>
+              冻结: {record.freeze_num}
+            </div>
+          )}
         </div>
       ) 
     },
@@ -256,25 +355,39 @@ const ConfigListPage: React.FC = () => {
       title: '状态', 
       dataIndex: 'status', 
       key: 'status', 
-      width: 80,
-      render: (status: ProductConfigStatus) => (
-        <Tag color={status === '正常' ? 'success' : 'default'} style={{ fontSize: '11px' }}>
-          {status === '正常' ? <CheckCircleOutlined /> : <StopOutlined />} {status}
-        </Tag>
+      width: 100,
+      render: (status: ProductConfigStatus, record: ExtendedProductConfigResponse) => (
+        <Popconfirm
+          title={`确定${status === '正常' ? '下架' : '启用'}该配置吗？`}
+          onConfirm={() => handleUpdateStatus(
+            record.product_config_id, 
+            status === '正常' ? '下架' : '正常'
+          )}
+        >
+          <Tag 
+            color={status === '正常' ? 'success' : 'default'} 
+            style={{ fontSize: '11px', cursor: 'pointer' }}
+          >
+            {status === '正常' ? <CheckCircleOutlined /> : <StopOutlined />} {status}
+          </Tag>
+        </Popconfirm>
       ) 
     },
     { 
       title: '图片', 
       key: 'image', 
       width: 60,
-      render: (_: any, record: ProductConfigResponse) => (
+      render: (_: any, record: ExtendedProductConfigResponse) => (
         record.image ? (
           <Image 
             src={getImageUrl(record.image)} 
             width={30} 
             height={30} 
             style={{ borderRadius: 4, objectFit: 'cover' }}
-            preview={false}
+            preview={{
+              mask: '预览',
+              src: getImageUrl(record.image)
+            }}
           />
         ) : (
           <div style={{ 
@@ -295,8 +408,8 @@ const ConfigListPage: React.FC = () => {
       title: '操作',
       key: 'action',
       width: 120,
-      fixed: 'right',
-      render: (_: any, record: ProductConfigResponse) => (
+      fixed: 'right' as const,
+      render: (_: any, record: ExtendedProductConfigResponse) => (
         <Space size="small">
           <Tooltip title="查看详情">
             <Button 
@@ -327,18 +440,35 @@ const ConfigListPage: React.FC = () => {
 
   // 获取统计信息
   const getStats = () => {
-    const total = data.length;
-    const active = data.filter(config => config.status === '正常').length;
-    const inactive = data.filter(config => config.status === '下架').length;
-    const lowStock = data.filter(config => (config.stock?.stock_num || 0) <= 10).length;
+    const total = configs.length;
+    const active = configs.filter(config => config.status === '正常').length;
+    const inactive = configs.filter(config => config.status === '下架').length;
+    const lowStock = configs.filter(config => (config.stock_num || 0) <= (config.warn_num || 10)).length;
     
     return { total, active, inactive, lowStock };
   };
 
   const stats = getStats();
 
-  // 获取商品列表（用于筛选）
-  const productOptions = Array.from(new Set(data.map(item => (item as any).product_name))).filter(Boolean);
+  // 重置搜索条件
+  const handleReset = () => {
+    setSearchKeyword('');
+    setSearchStatus('');
+    setSearchProduct('');
+  };
+
+  if (loading && configs.length === 0) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh' 
+      }}>
+        <Spin tip="加载配置数据..." size="large" />
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: 16, backgroundColor: '#f0f2f5', minHeight: '100vh' }}>
@@ -389,7 +519,7 @@ const ConfigListPage: React.FC = () => {
       {/* 搜索栏 */}
       <Card size="small" bordered={false} style={{ marginBottom: 16 }}>
         <Row gutter={[12, 12]} justify="space-between">
-          <Col span={24}>
+          <Col flex="auto">
             <Space wrap>
               <Input 
                 placeholder="商品名称" 
@@ -423,21 +553,43 @@ const ConfigListPage: React.FC = () => {
                 type="primary" 
                 size="small" 
                 icon={<SearchOutlined />} 
-                onClick={() => applyFilters(data)}
+                onClick={() => applyFilters()}
               >
                 查询
               </Button>
               <Button 
                 size="small" 
                 icon={<ReloadOutlined />} 
-                onClick={() => {
-                  setSearchKeyword('');
-                  setSearchStatus('');
-                  setSearchProduct('');
-                  applyFilters(data);
-                }}
+                onClick={handleReset}
               >
                 重置
+              </Button>
+            </Space>
+          </Col>
+          <Col>
+            <Space>
+              {selectedRowKeys.length > 0 && (
+                <Popconfirm
+                  title={`确定删除选中的 ${selectedRowKeys.length} 个配置吗？`}
+                  onConfirm={handleBatchDelete}
+                >
+                  <Button 
+                    type="primary" 
+                    danger 
+                    size="small"
+                    icon={<DeleteOutlined />}
+                  >
+                    批量删除 ({selectedRowKeys.length})
+                  </Button>
+                </Popconfirm>
+              )}
+              <Button 
+                size="small" 
+                icon={<ReloadOutlined />} 
+                onClick={loadData}
+                loading={loading}
+              >
+                刷新
               </Button>
             </Space>
           </Col>
@@ -448,7 +600,7 @@ const ConfigListPage: React.FC = () => {
       <Card size="small" bordered={false}>
         <Table
           columns={columns}
-          dataSource={filteredData}
+          dataSource={filteredConfigs}
           rowKey="product_config_id"
           loading={loading}
           size="small"
@@ -456,7 +608,7 @@ const ConfigListPage: React.FC = () => {
             selectedRowKeys, 
             onChange: (keys) => setSelectedRowKeys(keys) 
           }}
-          scroll={{ x: 900 }}
+          scroll={{ x: 1000 }}
           pagination={{
             showTotal: (total) => `共 ${total} 条`,
             showSizeChanger: true,
@@ -469,10 +621,11 @@ const ConfigListPage: React.FC = () => {
 
       {/* 操作提示 */}
       <div style={{ marginTop: 16, fontSize: '12px', color: '#8c8c8c' }}>
-        <Divider orientation="left">操作说明</Divider>
+        <Divider style={{ fontSize: '12px' }}>操作说明</Divider>
         <ul>
-          <li>配置管理主要用于管理商品的不同规格版本（如颜色、内存、存储等）</li>
+          <li>配置管理用于管理商品的不同规格版本（如颜色、内存、存储等）</li>
           <li>每个配置可以独立设置价格、库存和状态</li>
+          <li>点击配置状态标签可以快速切换启用/下架状态</li>
           <li>点击"查看详情"可以查看配置的详细信息</li>
           <li>可以通过商品管理页面的"SKU管理"功能批量管理配置</li>
         </ul>

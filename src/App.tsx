@@ -55,9 +55,11 @@ import StockListPage from "./pages/goods/stock/StockListPage.tsx";
 import StockEditPage from "./pages/goods/stock/StockEditPage.tsx";
 import ZoneFormPage from "./pages/goods/brand-zone/zone/ZoneFormPage.tsx";
 import ConfigListPage from "./pages/goods/Productmanage/configs.tsx";
-import TagListPage from "./pages/goods/Productmanage/tags.tsx";
+
 import AnalyticsPage from "./pages/goods/overview/analytics.tsx";
 import ProductDetailPage from "./pages/goods/Productmanage/ProductDetailPages.tsx";
+import TagFormPage from "./pages/goods/Productmanage/tag/TagFormPage.tsx";
+import TagListPage from "./pages/goods/Productmanage/tag/TagListPage.tsx";
 
 //import ShelfListPage from './pages/goods/shelf/ShelfListPage';
 
@@ -126,12 +128,15 @@ export default function App() {
           <Route path="/goods/stock" element={<StockListPage />} />
           <Route path="/goods/stock/edit/:stockId" element={<StockEditPage />} />
           <Route path="/goods/stock/create" element={<StockCreatePage />} />
-          <Route path="/goods/tags" element={<TagListPage />} />
+          {/* <Route path="/goods/tags" element={<TagListPage />} /> */}
           <Route path="/goods/configs" element={<ConfigListPage />} />
           {/* <Route path="/goods/shelf" element={<ShelfListPage />} />
           <Route path="/goods/shelf/detail/:shelfId" element={<ShelfListPage />} /> */}
           <Route path="/goods/analytics" element={<AnalyticsPage />} />
           <Route path="/goods/analytics/sales" element={<AnalyticsPage />} />
+          <Route path="/goods/tag" element={<TagListPage />} />
+          <Route path="/goods/tag/create" element={<TagFormPage />} />
+          <Route path="/goods/tag/edit/:id" element={<TagFormPage />} />
 
           
           

@@ -232,6 +232,8 @@ export interface UpdateBrandRequest {
 }
 
 export interface CategoryResponse {
+  updated_at: boolean | CategoryResponse | null
+  created_at: string
   category_id: string;
   name: string;
   code: string;
@@ -240,6 +242,8 @@ export interface CategoryResponse {
 }
 
 export interface ProductListItem {
+  sub_title: any
+  updated_at(updated_at: any): unknown
   product_id: string;
   name: string;
   brand_id: string;
@@ -271,6 +275,7 @@ export interface ProductUpdateRequest {
 }
 
 export interface TagResponse {
+  remark: any
   tag_id: string;
   name: string;
   priority: number;

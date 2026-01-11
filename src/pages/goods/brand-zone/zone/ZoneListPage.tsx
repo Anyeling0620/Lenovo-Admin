@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useCallback } from 'react';
@@ -46,7 +47,7 @@ import { globalMessage } from '../../../../utils/globalMessage';
 import * as api from '../../../../services/api';
 import type { CategoryResponse, CategoryStatus } from '../../../../services/api-type';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 const { Option } = Select;
 const { DirectoryTree } = Tree;
 
@@ -79,6 +80,8 @@ const generateMockCategories = (): CategoryResponse[] => {
       code: `ZONE${(index + 1).toString().padStart(2, '0')}`,
       parent_id: null,
       status,
+      updated_at: null,
+      created_at: ''
     });
     id++;
     
@@ -92,6 +95,8 @@ const generateMockCategories = (): CategoryResponse[] => {
         code: `ZONE${(index + 1).toString().padStart(2, '0')}_SUB${(j + 1).toString().padStart(2, '0')}`,
         parent_id: `cat_${(id - 1).toString().padStart(3, '0')}`,
         status: subStatus,
+        updated_at: null,
+        created_at: ''
       });
       id++;
     }
@@ -107,7 +112,7 @@ const ZoneListPage: React.FC = () => {
   const [filteredData, setFilteredData] = useState<CategoryResponse[]>([]);
   const [treeData, setTreeData] = useState<any[]>([]);
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<CategoryResponse | null>(null);
+  const [, setSelectedCategory] = useState<CategoryResponse | null>(null);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [searchStatus, setSearchStatus] = useState<string>('');
   const [viewModalVisible, setViewModalVisible] = useState(false);
@@ -118,7 +123,7 @@ const ZoneListPage: React.FC = () => {
     setLoading(true);
     try {
       const response = await api.getCategories(filters.status);
-      let categories = response?.data || [];
+      let categories = response || []; // 修改这里：直接使用response，而不是response?.data
       
       if (categories.length === 0) {
         console.log('使用模拟专区数据');
@@ -234,12 +239,43 @@ const ZoneListPage: React.FC = () => {
   // 单行删除
   const handleDelete = async (id: string) => {
     try {
-      // 这里应该调用API删除分类，但API中没有删除分类的接口
-      // 暂时模拟删除
+      // 找到要删除的专区
+      const categoryToDelete = data.find(cat => cat.category_id === id);
+      if (!categoryToDelete) return;
+      
+      // 获取所有需要更新的分类ID（包括所有子级）
+      const idsToUpdate: string[] = [id];
+      
+      // 递归获取所有子级ID
+      const getAllChildrenIds = (parentId: string): string[] => {
+        const children = data.filter(cat => cat.parent_id === parentId);
+        const childIds: string[] = [];
+        children.forEach(child => {
+          childIds.push(child.category_id);
+          childIds.push(...getAllChildrenIds(child.category_id));
+        });
+        return childIds;
+      };
+      
+      // 如果是父级分类，获取所有子级ID
+      const isParentCategory = data.some(cat => cat.parent_id === id);
+      if (isParentCategory) {
+        const childrenIds = getAllChildrenIds(id);
+        idsToUpdate.push(...childrenIds);
+      }
+      
+      // 去重
+      const uniqueIds = Array.from(new Set(idsToUpdate));
+      
+      // 模拟API调用
       await new Promise(resolve => setTimeout(resolve, 500));
-      globalMessage.success('专区已禁用');
+      globalMessage.success(`已禁用${uniqueIds.length}个专区`);
+      
+      // 更新状态
       setData(prev => prev.map(cat => 
-        cat.category_id === id ? { ...cat, status: '禁用' as CategoryStatus } : cat
+        uniqueIds.includes(cat.category_id) 
+          ? { ...cat, status: '禁用' as CategoryStatus } 
+          : cat
       ));
     } catch (err) { 
       message.error('操作失败');
@@ -249,17 +285,59 @@ const ZoneListPage: React.FC = () => {
   // 批量删除
   const handleBatchDelete = async () => {
     if (selectedRowKeys.length === 0) return;
-    try {
-      // 模拟批量禁用
-      await new Promise(resolve => setTimeout(resolve, 500));
-      globalMessage.success(`成功禁用 ${selectedRowKeys.length} 个专区`);
-      setData(prev => prev.map(cat => 
-        selectedRowKeys.includes(cat.category_id) ? { ...cat, status: '禁用' as CategoryStatus } : cat
-      ));
-      setSelectedRowKeys([]);
-    } catch (err) { 
-      message.error('操作失败');
-    }
+    
+    // 获取所有要删除的分类ID（包括子级）
+    const idsToUpdate: string[] = [];
+    
+    const getAllChildrenIds = (parentId: string): string[] => {
+      const children = data.filter(cat => cat.parent_id === parentId);
+      const childIds: string[] = [];
+      children.forEach(child => {
+        childIds.push(child.category_id);
+        childIds.push(...getAllChildrenIds(child.category_id));
+      });
+      return childIds;
+    };
+    
+    // 遍历选中的分类
+    selectedRowKeys.forEach(categoryId => {
+      idsToUpdate.push(categoryId as string);
+      
+      // 如果是父级分类，获取所有子级ID
+      const isParentCategory = data.some(cat => cat.parent_id === categoryId);
+      if (isParentCategory) {
+        const childrenIds = getAllChildrenIds(categoryId as string);
+        idsToUpdate.push(...childrenIds);
+      }
+    });
+    
+    // 去重
+    const uniqueIds = Array.from(new Set(idsToUpdate));
+    
+    Modal.confirm({
+      title: `确定禁用这${uniqueIds.length}个专区吗？`,
+      content: '禁用的专区将不在前台展示，同时其所有子分类也会被禁用。',
+      okText: '确认禁用',
+      okType: 'danger',
+      cancelText: '取消',
+      async onOk() {
+        try {
+          // 模拟API调用
+          await new Promise(resolve => setTimeout(resolve, 500));
+          globalMessage.success(`成功禁用 ${uniqueIds.length} 个专区`);
+          
+          // 更新状态
+          setData(prev => prev.map(cat => 
+            uniqueIds.includes(cat.category_id) 
+              ? { ...cat, status: '禁用' as CategoryStatus } 
+              : cat
+          ));
+          setSelectedRowKeys([]);
+        } catch (err) { 
+          message.error('操作失败');
+        }
+      }
+    });
   };
 
   // 查看专区详情
@@ -317,12 +395,24 @@ const ZoneListPage: React.FC = () => {
       title: '状态', 
       dataIndex: 'status', 
       key: 'status', 
-      width: 80,
-      render: (status: CategoryStatus) => (
-        <Tag color={status === '启用' ? 'success' : 'default'} style={{ fontSize: 11 }}>
-          {status}
-        </Tag>
-      ) 
+      width: 100,
+      render: (status: CategoryStatus, record) => {
+        const isEnabled = status === '启用';
+        const text = isEnabled ? '启用' : '禁用';
+        const color = isEnabled ? 'success' : 'default';
+        
+        return (
+          <Space>
+            <Tag 
+              color={color} 
+              style={{ fontSize: 11, cursor: 'pointer' }}
+              onClick={() => handleToggleStatus(record.category_id, record.status)}
+            >
+              {text}
+            </Tag>
+          </Space>
+        );
+      }
     },
     { 
       title: '父级专区', 
@@ -341,7 +431,7 @@ const ZoneListPage: React.FC = () => {
     {
       title: '操作',
       key: 'action',
-      width: 130, // 稍微增加宽度以容纳查看按钮
+      width: 130,
       render: (_, record) => (
         <Space size="small">
           <Tooltip title="查看详情">
@@ -353,7 +443,12 @@ const ZoneListPage: React.FC = () => {
             />
           </Tooltip>
           <Tooltip title="编辑">
-            <Link to={`/goods/zone/edit/${record.category_id}`}>
+            <Link 
+              to={{
+                pathname: `/goods/zone/edit/${record.category_id}`,
+                state: { from: window.location.pathname + window.location.search }
+              } as any} // 使用类型断言解决state类型问题
+            >
               <Button type="text" size="small" icon={<EditOutlined />} />
             </Link>
           </Tooltip>
@@ -367,6 +462,63 @@ const ZoneListPage: React.FC = () => {
       )
     }
   ];
+
+  // 添加状态切换函数
+  const handleToggleStatus = async (id: string, currentStatus: CategoryStatus) => {
+    const newStatus: CategoryStatus = currentStatus === '启用' ? '禁用' : '启用';
+    
+    // 获取所有需要更新的分类ID（包括所有子级）
+    const idsToUpdate: string[] = [id];
+    
+    // 递归获取所有子级ID
+    const getAllChildrenIds = (parentId: string): string[] => {
+      const children = data.filter(cat => cat.parent_id === parentId);
+      const childIds: string[] = [];
+      children.forEach(child => {
+        childIds.push(child.category_id);
+        childIds.push(...getAllChildrenIds(child.category_id));
+      });
+      return childIds;
+    };
+    
+    // 如果是父级分类，获取所有子级ID
+    const isParentCategory = data.some(cat => cat.parent_id === id);
+    if (isParentCategory) {
+      const childrenIds = getAllChildrenIds(id);
+      idsToUpdate.push(...childrenIds);
+    }
+    
+    // 去重
+    const uniqueIds = Array.from(new Set(idsToUpdate));
+    
+    const action = newStatus === '启用' ? '启用' : '禁用';
+    
+    Modal.confirm({
+      title: `确定${action}这${uniqueIds.length}个专区吗？`,
+      content: isParentCategory 
+        ? `这是一个${action}操作，将同时${action}所有子分类。`
+        : `确定${action}这个专区吗？`,
+      okText: `确认${action}`,
+      okType: newStatus === '启用' ? 'primary' : 'danger',
+      cancelText: '取消',
+      async onOk() {
+        try {
+          // 模拟API调用
+          await new Promise(resolve => setTimeout(resolve, 500));
+          globalMessage.success(`${action}成功`);
+          
+          // 更新状态
+          setData(prev => prev.map(cat => 
+            uniqueIds.includes(cat.category_id) 
+              ? { ...cat, status: newStatus } 
+              : cat
+          ));
+        } catch (err) { 
+          message.error('操作失败');
+        }
+      }
+    });
+  };
 
   // 获取统计信息
   const getStats = () => {
@@ -452,7 +604,12 @@ const ZoneListPage: React.FC = () => {
         <Row justify="space-between" align="middle" style={{ width: '100%' }}>
           <Col>
             <Space size="small">
-              <Link to="/goods/zone/create">
+              <Link 
+                to={{
+                  pathname: "/goods/zone/create",
+                  state: { from: window.location.pathname + window.location.search }
+                } as any} // 使用类型断言解决state类型问题
+              >
                 <Button type="primary" size="small" icon={<PlusOutlined />}>
                   新增专区
                 </Button>
@@ -534,7 +691,7 @@ const ZoneListPage: React.FC = () => {
             <DirectoryTree
               treeData={treeData}
               defaultExpandAll
-              onSelect={(keys, { node }: any) => {
+              onSelect={(_keys: React.Key[], { node }: any) => {
                 if (node.data) {
                   setSelectedCategory(node.data);
                   setSearchKeyword(node.data.name);
@@ -558,7 +715,7 @@ const ZoneListPage: React.FC = () => {
                 selectedRowKeys, 
                 onChange: (keys) => setSelectedRowKeys(keys) 
               }}
-              scroll={{ x: 750 }} // 增加滚动宽度以适应新按钮
+              scroll={{ x: 750 }}
               pagination={{
                 showTotal: (total) => `共 ${total} 条`,
                 showSizeChanger: true,

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import request from '../utils/request';
-import type { AdminLoginRequest, AdminProfileResponse, UpdateAdminProfileRequest, UserListItem, AdminListItem, IdentityWithPermissions, PermissionMenuItem, ResetPasswordRequest, BrandResponse, CreateBrandRequest, CategoryResponse, ProductCreateRequest, ProductUpdateRequest, ProductListItem, ProductDetailResponse, TagCreateRequest, TagUpdateRequest, TagResponse, ProductTagBindRequest, ProductConfigCreateRequest, ProductConfigUpdateRequest, ProductConfigResponse, ProductStatsResponse, StockResponse, StockUpdateRequest, ShelfProductResponse, ShelfProductCreateRequest, ShelfFlagsRequest, ShelfProductItemCreateRequest, ShelfProductItemUpdateRequest, ShelfCarouselRequest, ShelfStatsResponse, HomePushRequest, HomePushResponse, NewPushResponse, ShelfStatusRequest, CouponResponse, CouponCenterResponse, CouponCreateRequest, CouponCenterRequest, CouponUserResponse, CouponStatsResponse, VoucherResponse, VoucherCreateRequest, VoucherUserResponse, IssueVoucherRequest, SeckillRoundResponse, SeckillRoundCreateRequest, SeckillProductCreateRequest, SeckillConfigCreateRequest, OrderListItem, OrderDetailResponse, AfterSaleResponse, AfterSaleHandleRequest, ComplaintResponse, ComplaintHandleRequest, ServiceSessionResponse, ServiceMessageResponse, AdminLoginResponse, AdminPermissionResponse } from './api-type';
+import type { AdminLoginRequest, AdminProfileResponse, UpdateAdminProfileRequest, UserListItem, AdminListItem, IdentityWithPermissions, PermissionMenuItem, ResetPasswordRequest, BrandResponse, CreateBrandRequest, CategoryResponse, ProductCreateRequest, ProductUpdateRequest, ProductListItem, ProductDetailResponse, TagCreateRequest, TagUpdateRequest, TagResponse, ProductTagBindRequest, ProductConfigCreateRequest, ProductConfigUpdateRequest, ProductConfigResponse, ProductStatsResponse, StockResponse, StockUpdateRequest, ShelfProductResponse, ShelfProductCreateRequest, ShelfFlagsRequest, ShelfProductItemCreateRequest, ShelfProductItemUpdateRequest, ShelfCarouselRequest, ShelfStatsResponse, HomePushRequest, HomePushResponse, NewPushResponse, ShelfStatusRequest, CouponResponse, CouponCenterResponse, CouponCreateRequest, CouponCenterRequest, CouponUserResponse, CouponStatsResponse, VoucherResponse, VoucherCreateRequest, VoucherUserResponse, IssueVoucherRequest, SeckillRoundResponse, SeckillRoundCreateRequest, SeckillProductCreateRequest, SeckillConfigCreateRequest, OrderListItem, OrderDetailResponse, AfterSaleResponse, AfterSaleHandleRequest, ComplaintResponse, ComplaintHandleRequest, ServiceSessionResponse, ServiceMessageResponse, AdminLoginResponse, AdminPermissionResponse, CategoryStatus } from './api-type';
 
 
 const toFormData = (
@@ -218,6 +218,13 @@ export const updateProductBanner = (bannerId: string, data: { imageFile?: File; 
   return request.uploadPatch<null>(`/banners/${bannerId}`, fd);
 };
 
+//新增
+export const createCategory = (data: { name: string; code: string; parent_id?: string | null; status?: CategoryStatus }) =>
+  request.post<{ category_id: string }>('/categories', data);
+
+export const updateCategory = (categoryId: string, data: { name?: string; code?: string; parent_id?: string | null; status?: CategoryStatus }) =>
+  request.patch<null>(`/categories/${categoryId}`, data);
+
 // 货架 / 上架
 export const getShelfProducts = (params?: { category_id?: string; status?: string }) =>
   request.get<ShelfProductResponse[]>('/shelf/products', { params });
@@ -300,7 +307,7 @@ export const addSeckillConfigApi = (data: SeckillConfigCreateRequest) =>
   request.post<{ seckill_product_config_id: string }>('/marketing/seckill-configs', data);
 
 // 订单 / 售后
-export const getOrders = () => request.get<OrderListItem[]>('/orders');
+export const getOrders = (p0?: { page: number; page_size: number; }) => request.get<OrderListItem[]>('/orders');
 export const getOrderDetailApi = (orderId: string) =>
   request.get<OrderDetailResponse>(`/orders/${orderId}`);
 export const cancelOrder = (orderId: string) =>
