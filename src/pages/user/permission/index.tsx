@@ -388,7 +388,7 @@ const PermissionManagement: React.FC = () => {
 
   return (
     <div style={{ height: 'calc(100vh - 64px)', display: 'flex', flexDirection: 'column', padding: '16px' }}>
-      <Row gutter={[16, 16]} style={{ flex: 1, overflow: 'hidden' }}>
+      <Row gutter={[16, 16]} style={{ flex: 1, overflow: 'hidden', maxHeight: 'calc(100vh - 96px)' }}>
         {/* 左侧权限树 */}
         <Col xs={24} md={10} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
           <Card 
@@ -402,8 +402,8 @@ const PermissionManagement: React.FC = () => {
                 新增权限
               </Button>
             }
-            style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
-            bodyStyle={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+            style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+            bodyStyle={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: '16px' }}
           >
             <div style={{ marginBottom: '16px', flexShrink: 0 }}>
               <Form form={filterForm} layout="inline">
@@ -434,7 +434,7 @@ const PermissionManagement: React.FC = () => {
               </Form>
             </div>
             
-            <div style={{ flex: 1, overflow: 'auto', border: '1px solid #d9d9d9', borderRadius: '4px', padding: '16px', maxHeight: 'calc(100vh - 300px)' }}>
+            <div style={{ flex: 1, overflow: 'auto', border: '1px solid #d9d9d9', borderRadius: '4px', padding: '16px' }}>
               <Tree
                 treeData={treeData}
                 expandedKeys={expandedKeys}
@@ -474,8 +474,8 @@ const PermissionManagement: React.FC = () => {
                 </div>
               </div>
             }
-            style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', marginLeft: '8px' }}
-            bodyStyle={{ flex: 1, overflow: 'hidden', padding: '16px' }}
+            style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', marginLeft: '8px' }}
+            bodyStyle={{ flex: 1, overflow: 'hidden', padding: 0 }}
           >
             <Table
               columns={columns}
@@ -490,7 +490,7 @@ const PermissionManagement: React.FC = () => {
                 showTotal: (total) => `共 ${total} 条`,
               }}
               size="middle"
-              scroll={{ y: 'calc(100vh - 320px)', x: 'max-content' }}
+              scroll={{ y: 'calc(100vh - 280px)', x: 'max-content' }}
             />
           </Card>
         </Col>
