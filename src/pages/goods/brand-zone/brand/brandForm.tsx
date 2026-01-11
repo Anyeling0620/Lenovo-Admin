@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
@@ -13,7 +14,8 @@ import {
   Form,
   Image,
   Alert,
-  Spin
+  Spin,
+  message
 } from 'antd';
 import { 
   ArrowLeftOutlined,
@@ -25,7 +27,7 @@ import dayjs from 'dayjs';
 import { getImageUrl } from '../../../../utils/imageUrl';
 import { globalMessage } from '../../../../utils/globalMessage';
 import * as api from '../../../../services/api';
-import type { BrandResponse, BrandStatus } from '../../../../services/api-type';
+import type { BrandResponse, BrandStatus, CreateBrandRequest } from '../../../../services/api-type';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -55,12 +57,24 @@ const BrandFormPage: React.FC = () => {
   const [logoFile, setLogoFile] = useState<File | undefined>(undefined);
   const [logoPreview, setLogoPreview] = useState<string>('');
   const [brandData, setBrandData] = useState<BrandResponse | null>(null);
+  const [brandCodeExists, setBrandCodeExists] = useState<string[]>([]);
+
+  // 获取所有品牌编码用于验证
+  const fetchAllBrands = useCallback(async () => {
+    try {
+      const brands = await api.getBrands();
+      const codes = brands.map((b: BrandResponse) => b.code);
+      setBrandCodeExists(codes);
+    } catch (error) {
+      console.error('获取品牌列表失败:', error);
+    }
+  }, []);
 
   // 获取品牌数据（编辑模式）
   const fetchBrandData = useCallback(async (brandId: string) => {
     setLoading(true);
     try {
-      // 尝试从API获取品牌数据，API直接返回BrandResponse[]
+      // 从API获取所有品牌，然后查找特定品牌
       const brands = await api.getBrands();
       const brand = brands.find((b: BrandResponse) => b.brand_id === brandId);
       
@@ -78,9 +92,10 @@ const BrandFormPage: React.FC = () => {
         globalMessage.error('未找到品牌信息');
         navigate(fromPath);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('获取品牌数据失败:', error);
-      globalMessage.error('获取品牌数据失败');
+      const errorMessage = error.response?.data?.message || '获取品牌数据失败';
+      globalMessage.error(errorMessage);
       navigate(fromPath);
     } finally {
       setLoading(false);
@@ -97,21 +112,23 @@ const BrandFormPage: React.FC = () => {
       form.setFieldsValue({
         status: '启用'
       });
+      // 获取所有品牌编码用于验证
+      fetchAllBrands();
     }
-  }, [id, fetchBrandData, form]);
+  }, [id, fetchBrandData, form, fetchAllBrands]);
 
   // Logo上传处理
   const handleLogoUpload = (file: File) => {
     const isImage = file.type.startsWith('image/');
     if (!isImage) {
-      globalMessage.error('只能上传图片文件');
-      return false;
+      message.error('只能上传图片文件');
+      return Upload.LIST_IGNORE;
     }
     
     const isLt5M = file.size / 1024 / 1024 < 5;
     if (!isLt5M) {
-      globalMessage.error('图片大小不能超过5MB');
-      return false;
+      message.error('图片大小不能超过5MB');
+      return Upload.LIST_IGNORE;
     }
     
     setLogoFile(file);
@@ -122,7 +139,7 @@ const BrandFormPage: React.FC = () => {
     };
     reader.readAsDataURL(file);
     
-    return false;
+    return false; // 阻止自动上传
   };
 
   // Logo移除处理
@@ -130,6 +147,30 @@ const BrandFormPage: React.FC = () => {
     setLogoFile(undefined);
     setLogoPreview('');
     return true;
+  };
+
+  // 验证品牌编码唯一性
+  const validateBrandCode = async (_: any, value: string) => {
+    if (!value) {
+      return Promise.resolve();
+    }
+    
+    // 编辑模式下，如果编码没有改变，则不需要验证
+    if (isEditMode && brandData && value === brandData.code) {
+      return Promise.resolve();
+    }
+    
+    // 检查编码是否已存在
+    if (brandCodeExists.includes(value)) {
+      return Promise.reject(new Error('品牌编码已存在'));
+    }
+    
+    // 检查编码格式
+    if (!/^[A-Za-z0-9_-]+$/.test(value)) {
+      return Promise.reject(new Error('品牌编码只能包含字母、数字、下划线和连字符'));
+    }
+    
+    return Promise.resolve();
   };
 
   // 表单提交
@@ -140,7 +181,7 @@ const BrandFormPage: React.FC = () => {
       
       if (isEditMode && id) {
         // 编辑现有品牌
-        const updateData: BrandFormData = {
+        const updateData: Partial<CreateBrandRequest> & { logoFile?: File } = {
           name: values.name,
           code: values.code,
           status: values.status as BrandStatus,
@@ -150,25 +191,28 @@ const BrandFormPage: React.FC = () => {
         };
         
         try {
+          // 移除undefined字段
+          Object.keys(updateData).forEach(key => {
+            if (updateData[key as keyof typeof updateData] === undefined) {
+              delete updateData[key as keyof typeof updateData];
+            }
+          });
+          
           await api.updateBrand(id, updateData);
           globalMessage.success('品牌更新成功');
           navigate(fromPath);
         } catch (error: any) {
           console.error('更新品牌失败:', error);
-          if (error.response?.data?.message) {
-            globalMessage.error(error.response.data.message);
-          } else {
-            globalMessage.error('更新品牌失败');
-          }
+          const errorMessage = error.response?.data?.message || '更新品牌失败';
+          globalMessage.error(errorMessage);
         }
       } else {
         // 新增品牌
-        const createData: BrandFormData = {
+        const createData: CreateBrandRequest & { logoFile?: File } = {
           name: values.name,
           code: values.code,
           status: values.status as BrandStatus,
           description: values.description || undefined,
-          remark: values.remark || undefined,
           logoFile: logoFile
         };
         
@@ -178,11 +222,8 @@ const BrandFormPage: React.FC = () => {
           navigate(fromPath);
         } catch (error: any) {
           console.error('创建品牌失败:', error);
-          if (error.response?.data?.message) {
-            globalMessage.error(error.response.data.message);
-          } else {
-            globalMessage.error('创建品牌失败');
-          }
+          const errorMessage = error.response?.data?.message || '创建品牌失败';
+          globalMessage.error(errorMessage);
         }
       }
     } catch (error) {
@@ -195,6 +236,11 @@ const BrandFormPage: React.FC = () => {
 
   // 计算是否显示品牌信息
   const showBrandInfo = isEditMode && brandData;
+
+  // 处理返回
+  const handleBack = () => {
+    navigate(fromPath);
+  };
 
   if (loading) {
     return (
@@ -220,9 +266,8 @@ const BrandFormPage: React.FC = () => {
                 type="text" 
                 icon={<ArrowLeftOutlined />} 
                 size="small"
-                onClick={() => navigate(fromPath)}
-              >
-              </Button>
+                onClick={handleBack}
+              />
               <Title level={4} style={{ margin: 0 }}>
                 {isEditMode ? '编辑品牌' : '新增品牌'}
               </Title>
@@ -232,7 +277,7 @@ const BrandFormPage: React.FC = () => {
             <Space>
               <Button 
                 size="small" 
-                onClick={() => navigate(fromPath)}
+                onClick={handleBack}
               >
                 取消
               </Button>
@@ -275,6 +320,9 @@ const BrandFormPage: React.FC = () => {
           form={form}
           layout="vertical"
           size="middle"
+          initialValues={{
+            status: '启用'
+          }}
         >
           <Row gutter={24}>
             <Col span={12}>
@@ -286,7 +334,11 @@ const BrandFormPage: React.FC = () => {
                   { max: 50, message: '名称不能超过50个字符' }
                 ]}
               >
-                <Input placeholder="输入品牌名称" />
+                <Input 
+                  placeholder="输入品牌名称" 
+                  maxLength={50}
+                  allowClear
+                />
               </Form.Item>
             </Col>
             
@@ -295,12 +347,14 @@ const BrandFormPage: React.FC = () => {
                 label="品牌编码"
                 name="code"
                 rules={[
-                  { required: !isEditMode, message: '请输入品牌编码' },
-                  { max: 50, message: '编码不能超过50个字符' }
+                  { required: true, message: '请输入品牌编码' },
+                  { validator: validateBrandCode }
                 ]}
               >
                 <Input 
                   placeholder="输入品牌编码" 
+                  maxLength={50}
+                  allowClear
                   disabled={isEditMode}
                 />
               </Form.Item>
@@ -314,7 +368,7 @@ const BrandFormPage: React.FC = () => {
                 name="status"
                 rules={[{ required: true, message: '请选择状态' }]}
               >
-                <Select>
+                <Select placeholder="请选择状态">
                   <Option value="启用">启用</Option>
                   <Option value="禁用">禁用</Option>
                   <Option value="下架">下架</Option>
@@ -323,7 +377,11 @@ const BrandFormPage: React.FC = () => {
             </Col>
           </Row>
 
-          <Form.Item label="Logo 图片">
+          <Form.Item 
+            label="Logo 图片"
+            required={!isEditMode}
+            extra="支持 JPG、PNG 格式，大小不超过 5MB"
+          >
             <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
               <Upload
                 maxCount={1}
@@ -333,14 +391,20 @@ const BrandFormPage: React.FC = () => {
                 fileList={logoFile ? [{ 
                   uid: '-1', 
                   name: logoFile.name, 
-                  status: 'done', 
-                  originFileObj: logoFile 
-                } as any] : []}
+                  status: 'done'
+                }] : []}
                 showUploadList={{
                   showRemoveIcon: true,
+                  showPreviewIcon: false
                 }}
+                listType="picture-card"
               >
-                <Button icon={<UploadOutlined />}>选择图片</Button>
+                {!logoFile && !(isEditMode && brandData?.logo) && (
+                  <div>
+                    <UploadOutlined />
+                    <div style={{ marginTop: 8 }}>上传Logo</div>
+                  </div>
+                )}
               </Upload>
               
               {logoPreview && (
@@ -350,14 +414,15 @@ const BrandFormPage: React.FC = () => {
                     width={80} 
                     height={80} 
                     style={{ borderRadius: 4, objectFit: 'contain' }} 
+                    preview={false}
                   />
                   <span style={{ fontSize: 12, color: '#999', marginTop: 4 }}>
-                    预览
+                    新Logo预览
                   </span>
                 </div>
               )}
               
-              {!logoPreview && showBrandInfo && brandData?.logo && (
+              {!logoPreview && isEditMode && brandData?.logo && (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                   <Image 
                     src={getImageUrl(brandData.logo)} 
@@ -365,6 +430,7 @@ const BrandFormPage: React.FC = () => {
                     height={80} 
                     style={{ borderRadius: 4, objectFit: 'contain' }} 
                     fallback="https://api.placeholder.com/80?text=LOGO"
+                    preview={false}
                   />
                   <span style={{ fontSize: 12, color: '#999', marginTop: 4 }}>
                     当前Logo
@@ -372,36 +438,37 @@ const BrandFormPage: React.FC = () => {
                 </div>
               )}
             </div>
-            <div style={{ fontSize: 12, color: '#999', marginTop: 8 }}>
-              支持 JPG、PNG 格式，大小不超过 5MB
-            </div>
           </Form.Item>
 
           <Form.Item
             label="品牌描述"
             name="description"
+            extra="最多500个字符"
           >
             <TextArea 
               rows={3}
               placeholder="详细功能或背景描述" 
               maxLength={500}
               showCount
+              allowClear
             />
           </Form.Item>
 
           <Form.Item
             label="备注 (内部可见)"
             name="remark"
+            extra="最多200个字符"
           >
             <TextArea 
               rows={2}
               placeholder="补充说明信息" 
               maxLength={200}
               showCount
+              allowClear
             />
           </Form.Item>
 
-          {showBrandInfo && brandData?.created_at && (
+          {showBrandInfo && (
             <div style={{ marginTop: 20, padding: 12, backgroundColor: '#fafafa', borderRadius: 4 }}>
               <Row gutter={16}>
                 <Col span={12}>

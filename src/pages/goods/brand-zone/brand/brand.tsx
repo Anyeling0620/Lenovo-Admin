@@ -17,8 +17,7 @@ import {
   Descriptions,
   Image,
   Badge,
-  Typography
-} from 'antd';
+  Typography} from 'antd';
 import { 
   SearchOutlined, 
   ReloadOutlined, 
@@ -63,7 +62,7 @@ const BrandListPage: React.FC = () => {
   const [searchKeyword, setSearchKeyword] = useState('');
   const [searchStatus, setSearchStatus] = useState<string>('');
 
-  // 加载数据
+  // 加载数据 - 使用真实API
   const loadData = useCallback(async (filters: TableFilter = {}) => {
     setLoading(true);
     try {
@@ -73,9 +72,10 @@ const BrandListPage: React.FC = () => {
       setFilteredData(brands);
       setTotal(brands.length);
       setSelectedRowKeys([]);
-    } catch (error) { 
+    } catch (error: any) { 
       console.error('获取品牌数据失败:', error);
-      globalMessage.error('获取品牌数据失败');
+      const errorMessage = error.response?.data?.message || '获取品牌数据失败';
+      globalMessage.error(errorMessage);
     } finally { 
       setLoading(false); 
     }
@@ -85,7 +85,7 @@ const BrandListPage: React.FC = () => {
   const applyFilters = useCallback((brands: BrandResponse[], filters: TableFilter) => {
     let filtered = [...brands];
     
-    if (filters.status) {
+    if (filters.status && filters.status !== '') {
       filtered = filtered.filter(brand => brand.status === filters.status);
     }
     
@@ -106,7 +106,7 @@ const BrandListPage: React.FC = () => {
     setSearchKeyword(values.keyword || '');
     setSearchStatus(values.status || '');
     setPage(1);
-    applyFilters(data, { status: values.status });
+    loadData({ status: values.status });
   };
 
   // 重置搜索
@@ -114,8 +114,7 @@ const BrandListPage: React.FC = () => {
     setSearchKeyword('');
     setSearchStatus('');
     setPage(1);
-    setFilteredData(data);
-    setTotal(data.length);
+    loadData(); // 重新加载所有数据
   };
 
   useEffect(() => { 
@@ -133,9 +132,10 @@ const BrandListPage: React.FC = () => {
     return filteredData.slice(start, end);
   }, [filteredData, page, pageSize]);
 
-  // 单行删除
+  // 单行删除（下架）
   const handleDelete = async (id: string) => {
     try {
+      // 使用真实API更新品牌状态为"下架"
       await api.updateBrand(id, { status: '下架' as BrandStatus });
       globalMessage.success('品牌已下架');
       
@@ -143,38 +143,45 @@ const BrandListPage: React.FC = () => {
       setData(prev => prev.map(brand => 
         brand.brand_id === id ? { ...brand, status: '下架' as BrandStatus } : brand
       ));
+      
+      // 重新加载数据以确保数据一致性
+      loadData({ status: searchStatus });
     } catch (error: any) { 
       console.error('下架品牌失败:', error);
-      if (error.response?.data?.message) {
-        globalMessage.error(error.response.data.message);
-      } else {
-        globalMessage.error('下架品牌失败');
-      }
+      const errorMessage = error.response?.data?.message || '下架品牌失败';
+      globalMessage.error(errorMessage);
     }
   };
 
-  // 批量删除
+  // 批量删除（下架）
   const handleBatchDelete = async () => {
     if (selectedRowKeys.length === 0) return;
     
-    try {
-      await Promise.all(selectedRowKeys.map(id => 
-        api.updateBrand(String(id), { status: '下架' as BrandStatus })
-      ));
-      globalMessage.success(`成功下架 ${selectedRowKeys.length} 个品牌`);
-      
-      // 更新本地数据
-      setData(prev => prev.map(brand => 
-        selectedRowKeys.includes(brand.brand_id) ? { ...brand, status: '下架' as BrandStatus } : brand
-      ));
-    } catch (error: any) { 
-      console.error('批量下架品牌失败:', error);
-      if (error.response?.data?.message) {
-        globalMessage.error(error.response.data.message);
-      } else {
-        globalMessage.error('批量下架品牌失败');
+    Modal.confirm({
+      title: `确认下架 ${selectedRowKeys.length} 个品牌吗？`,
+      content: '下架后这些品牌将不再显示在前台',
+      okText: '确认',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          // 批量下架品牌
+          const promises = selectedRowKeys.map(id => 
+            api.updateBrand(String(id), { status: '下架' as BrandStatus })
+          );
+          
+          await Promise.all(promises);
+          globalMessage.success(`成功下架 ${selectedRowKeys.length} 个品牌`);
+          
+          // 重新加载数据
+          loadData({ status: searchStatus });
+          setSelectedRowKeys([]);
+        } catch (error: any) { 
+          console.error('批量下架品牌失败:', error);
+          const errorMessage = error.response?.data?.message || '批量下架品牌失败';
+          globalMessage.error(errorMessage);
+        }
       }
-    }
+    });
   };
 
   // 获取当前路径和查询参数
@@ -201,6 +208,12 @@ const BrandListPage: React.FC = () => {
     };
   };
 
+  // 处理状态筛选器变化
+  const handleStatusChange = (value: string) => {
+    setSearchStatus(value);
+    loadData({ status: value });
+  };
+
   // --- 表格列定义 ---
   const columns: ColumnsType<BrandResponse> = [
     { 
@@ -208,9 +221,9 @@ const BrandListPage: React.FC = () => {
       dataIndex: 'logo', 
       key: 'logo', 
       width: 60, 
-      render: (logo: string) => (
+      render: (logo: string | null) => (
         <Image 
-          src={getImageUrl(logo)} 
+          src={logo ? getImageUrl(logo) : 'https://api.placeholder.com/30?text=LOGO'} 
           width={30} 
           height={30} 
           style={{ objectFit: 'contain', borderRadius: 4 }} 
@@ -238,7 +251,7 @@ const BrandListPage: React.FC = () => {
       render: (status: BrandStatus) => {
         const statusConfig: Record<BrandStatus, { color: string, text: string }> = {
           '启用': { color: 'success', text: '启用' },
-          '禁用': { color: 'default', text: '禁用' },
+          '禁用': { color: 'warning', text: '禁用' },
           '下架': { color: 'error', text: '下架' }
         };
         const config = statusConfig[status] || { color: 'default', text: status };
@@ -250,8 +263,8 @@ const BrandListPage: React.FC = () => {
       dataIndex: 'description', 
       key: 'description', 
       width: 180, 
-      render: (desc: string) => (
-        <Tooltip title={desc}>
+      render: (desc: string | null | undefined) => (
+        <Tooltip title={desc || '-'}>
           <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11 }}>
             {desc || '-'}
           </div>
@@ -263,7 +276,7 @@ const BrandListPage: React.FC = () => {
       dataIndex: 'remark', 
       key: 'remark', 
       width: 120, 
-      render: (remark: string) => (
+      render: (remark: string | null | undefined) => (
         <div style={{ fontSize: 11, color: '#faad14' }}>
           {remark || '-'}
         </div>
@@ -274,7 +287,7 @@ const BrandListPage: React.FC = () => {
       dataIndex: 'creator_id', 
       key: 'creator', 
       width: 80, 
-      render: (creator: string) => (
+      render: (creator: string | undefined) => (
         <div style={{ fontSize: 11 }}>
           {creator || '-'}
         </div>
@@ -292,7 +305,7 @@ const BrandListPage: React.FC = () => {
       dataIndex: 'updated_at', 
       key: 'updatedAt', 
       width: 140, 
-      render: (updated_at: string) => updated_at ? dayjs(updated_at).format('YYYY-MM-DD HH:mm') : '-' 
+      render: (updated_at: string | undefined) => updated_at ? dayjs(updated_at).format('YYYY-MM-DD HH:mm') : '-' 
     },
     {
       title: '操作',
@@ -323,12 +336,16 @@ const BrandListPage: React.FC = () => {
               />
             </Link>
           </Tooltip>
-          <Popconfirm 
-            title="确定下架该品牌吗？" 
-            onConfirm={() => handleDelete(record.brand_id)}
-          >
-            <Button type="text" size="small" danger icon={<DeleteOutlined />} />
-          </Popconfirm>
+          {record.status !== '下架' && (
+            <Popconfirm 
+              title="确定下架该品牌吗？" 
+              onConfirm={() => handleDelete(record.brand_id)}
+              okText="确定"
+              cancelText="取消"
+            >
+              <Button type="text" size="small" danger icon={<DeleteOutlined />} />
+            </Popconfirm>
+          )}
         </Space>
       )
     }
@@ -345,6 +362,14 @@ const BrandListPage: React.FC = () => {
     
     return { enabledCount, disabledCount, offCount, recentCount };
   }, [data]);
+
+  // 处理分页变化
+  const handlePaginationChange = (newPage: number, newPageSize?: number) => {
+    setPage(newPage);
+    if (newPageSize) {
+      setPageSize(newPageSize);
+    }
+  };
 
   return (
     <div style={{ padding: 8, backgroundColor: '#f0f2f5', minHeight: '100vh' }}>
@@ -383,7 +408,7 @@ const BrandListPage: React.FC = () => {
         <Col xs={24} sm={12} md={6}>
           <Card size="small" bordered={false}>
             <Statistic 
-              title={<span style={{ fontSize: 12 }}>异常状态</span>} 
+              title={<span style={{ fontSize: 12 }}>已下架</span>} 
               value={stats.offCount} 
               prefix={<InfoCircleOutlined />} 
               valueStyle={{ color: '#ff4d4f', fontSize: 20 }} 
@@ -408,20 +433,15 @@ const BrandListPage: React.FC = () => {
                   新增品牌
                 </Button>
               </Link>
-              <Popconfirm 
-                title={`确定下架 ${selectedRowKeys.length} 个品牌吗？`} 
-                onConfirm={handleBatchDelete} 
-                disabled={selectedRowKeys.length === 0}
+              <Button 
+                danger 
+                size="small" 
+                disabled={selectedRowKeys.length === 0} 
+                icon={<DeleteOutlined />}
+                onClick={handleBatchDelete}
               >
-                <Button 
-                  danger 
-                  size="small" 
-                  disabled={selectedRowKeys.length === 0} 
-                  icon={<DeleteOutlined />}
-                >
-                  批量下架
-                </Button>
-              </Popconfirm>
+                批量下架
+              </Button>
             </Space>
           </Col>
           <Col>
@@ -440,7 +460,7 @@ const BrandListPage: React.FC = () => {
                 size="small" 
                 style={{ width: 100, fontSize: 12 }}
                 value={searchStatus}
-                onChange={(value) => setSearchStatus(value)}
+                onChange={handleStatusChange}
                 allowClear
               >
                 <Option value="">全部</Option>
@@ -484,14 +504,9 @@ const BrandListPage: React.FC = () => {
           pagination={{
             current: page,
             pageSize: pageSize,
-            total: filteredData.length,
+            total: total,
             showTotal: (total) => `共 ${total} 条`,
-            onChange: (newPage, newPageSize) => {
-              setPage(newPage);
-              if (newPageSize) {
-                setPageSize(newPageSize);
-              }
-            },
+            onChange: handlePaginationChange,
             showSizeChanger: true,
             showQuickJumper: true,
             size: 'small',
@@ -525,7 +540,7 @@ const BrandListPage: React.FC = () => {
             <Descriptions.Item label="业务状态">
               <Tag color={
                 selectedBrand.status === '启用' ? 'green' : 
-                selectedBrand.status === '禁用' ? 'default' : 'red'
+                selectedBrand.status === '禁用' ? 'orange' : 'red'
               }>
                 {selectedBrand.status}
               </Tag>
