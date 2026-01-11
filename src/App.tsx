@@ -55,7 +55,6 @@ import StockListPage from "./pages/goods/stock/StockListPage.tsx";
 import StockEditPage from "./pages/goods/stock/StockEditPage.tsx";
 import ZoneFormPage from "./pages/goods/brand-zone/zone/ZoneFormPage.tsx";
 import ConfigListPage from "./pages/goods/Productmanage/configs.tsx";
-
 import AnalyticsPage from "./pages/goods/overview/analytics.tsx";
 import ProductDetailPage from "./pages/goods/Productmanage/ProductDetailPages.tsx";
 import TagFormPage from "./pages/goods/Productmanage/tag/TagFormPage.tsx";

@@ -427,7 +427,7 @@ const GoodsOverview: React.FC = () => {
       suffix: '个',
       desc: '低于安全库存',
       warning: true,
-      onClick: () => navigate('/goods/configs', { state: buildRouteState() })
+      onClick: () => navigate('/goods/stock', { state: buildRouteState() })
     },
     {
       title: '合作品牌',
