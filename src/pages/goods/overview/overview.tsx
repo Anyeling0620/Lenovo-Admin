@@ -40,7 +40,7 @@ import {
   CheckCircleOutlined,
   StopOutlined
 } from '@ant-design/icons';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import dayjs from 'dayjs';
 
 // 导入工具函数
@@ -107,6 +107,15 @@ interface BrandDistribution {
 
 const GoodsOverview: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation(); // 添加这行来获取location
+  
+  // 构建返回状态函数
+  const buildRouteState = () => {
+    return { 
+      from: location.pathname + location.search 
+    };
+  };
+  
   const [loading, setLoading] = useState(true);
   
   // 真实数据状态
@@ -390,7 +399,7 @@ const GoodsOverview: React.FC = () => {
     loadData();
   }, [loadData]);
 
-  // 统计卡片配置
+  // 统计卡片配置 - 修改标签卡片
   const statCards = [
     {
       title: '商品总数',
@@ -399,7 +408,7 @@ const GoodsOverview: React.FC = () => {
       color: '#1890ff',
       suffix: '个',
       desc: '全部商品数量',
-      onClick: () => navigate('/goods/manage/list', { state: { from: 'overview' } })
+      onClick: () => navigate('/goods/manage/list', { state: buildRouteState() })
     },
     {
       title: '在售商品',
@@ -418,7 +427,7 @@ const GoodsOverview: React.FC = () => {
       suffix: '个',
       desc: '低于安全库存',
       warning: true,
-      onClick: () => navigate('/goods/configs', { state: { from: 'overview' } })
+      onClick: () => navigate('/goods/configs', { state: buildRouteState() })
     },
     {
       title: '合作品牌',
@@ -427,7 +436,7 @@ const GoodsOverview: React.FC = () => {
       color: '#722ed1',
       suffix: '个',
       desc: '品牌合作伙伴',
-      onClick: () => navigate('/goods/brand', { state: { from: 'overview' } })
+      onClick: () => navigate('/goods/brand', { state: buildRouteState() })
     },
     {
       title: '商品品类',
@@ -436,7 +445,7 @@ const GoodsOverview: React.FC = () => {
       color: '#13c2c2',
       suffix: '类',
       desc: '分类体系',
-      onClick: () => navigate('/goods/zone', { state: { from: 'overview' } })
+      onClick: () => navigate('/goods/zone', { state: buildRouteState() })
     },
     {
       title: '标签总数',
@@ -445,7 +454,7 @@ const GoodsOverview: React.FC = () => {
       color: '#eb2f96',
       suffix: '个',
       desc: '商品标签',
-      onClick: () => navigate('/goods/tags', { state: { from: 'overview' } })
+      onClick: () => navigate('/goods/tag', { state: buildRouteState() }) // 修改这里，跳转到tag管理页面
     },
     {
       title: 'SKU总数',
@@ -454,7 +463,7 @@ const GoodsOverview: React.FC = () => {
       color: '#fa8c16',
       suffix: '款',
       desc: '库存单位',
-      onClick: () => navigate('/goods/configs', { state: { from: 'overview' } })
+      onClick: () => navigate('/goods/configs', { state: buildRouteState() })
     },
     {
       title: '今日订单',
@@ -463,7 +472,7 @@ const GoodsOverview: React.FC = () => {
       color: '#f5222d',
       suffix: '单',
       desc: '今日新增',
-      onClick: () => navigate('/orders', { state: { from: 'overview' } })
+      onClick: () => navigate('/orders', { state: buildRouteState() })
     }
   ];
 
@@ -560,7 +569,7 @@ const GoodsOverview: React.FC = () => {
               type="text" 
               size="small" 
               icon={<EyeOutlined />}
-              onClick={() => navigate(`/goods/manage/detail/${record.product_id}`, { state: { from: 'overview' } })}
+              onClick={() => navigate(`/goods/manage/detail/${record.product_id}`, { state: buildRouteState() })}
             />
           </Tooltip>
           <Tooltip title="编辑">
@@ -568,7 +577,7 @@ const GoodsOverview: React.FC = () => {
               type="text" 
               size="small" 
               icon={<EditOutlined />}
-              onClick={() => navigate(`/goods/manage/edit/${record.product_id}`, { state: { from: 'overview' } })}
+              onClick={() => navigate(`/goods/manage/edit/${record.product_id}`, { state: buildRouteState() })}
             />
           </Tooltip>
         </Space>
@@ -655,7 +664,7 @@ const GoodsOverview: React.FC = () => {
         <Button 
           type="link" 
           size="small" 
-          onClick={() => navigate(`/goods/stock/edit/${record.product_config_id}`, { state: { from: 'overview' } })}
+          onClick={() => navigate(`/goods/stock/edit/${record.product_config_id}`, { state: buildRouteState() })}
         >
           补货
         </Button>
@@ -663,55 +672,55 @@ const GoodsOverview: React.FC = () => {
     }
   ];
 
-  // 快捷操作按钮
+  // 快捷操作按钮 - 修改标签管理按钮
   const quickActions = [
     { 
       label: '发布商品', 
       icon: <PlusOutlined />, 
       color: '#1890ff',
-      onClick: () => navigate('/goods/manage/create', { state: { from: 'overview' } })
+      onClick: () => navigate('/goods/manage/create', { state: buildRouteState() })
     },
     { 
       label: '品牌管理', 
       icon: <CrownOutlined />, 
       color: '#722ed1',
-      onClick: () => navigate('/goods/brand', { state: { from: 'overview' } })
+      onClick: () => navigate('/goods/brand', { state: buildRouteState() })
     },
     { 
       label: '品类管理', 
       icon: <ClusterOutlined />, 
       color: '#13c2c2',
-      onClick: () => navigate('/goods/zone', { state: { from: 'overview' } })
+      onClick: () => navigate('/goods/zone', { state: buildRouteState() })
     },
     { 
       label: '库存管理', 
       icon: <StockOutlined />, 
       color: '#fa8c16',
-      onClick: () => navigate('/goods/stock', { state: { from: 'overview' } })
+      onClick: () => navigate('/goods/stock', { state: buildRouteState() })
     },
     { 
       label: '标签管理', 
       icon: <TagsOutlined />, 
       color: '#eb2f96',
-      onClick: () => navigate('/goods/tags', { state: { from: 'overview' } })
+      onClick: () => navigate('/goods/tag', { state: buildRouteState() }) // 修改这里，跳转到tag管理页面
     },
     { 
       label: '配置管理', 
       icon: <SettingOutlined />, 
       color: '#52c41a',
-      onClick: () => navigate('/goods/configs', { state: { from: 'overview' } })
+      onClick: () => navigate('/goods/configs', { state: buildRouteState() })
     },
     { 
       label: '上架管理', 
       icon: <ShopOutlined />, 
       color: '#f5222d',
-      onClick: () => navigate('/goods/shelf', { state: { from: 'overview' } })
+      onClick: () => navigate('/goods/shelf', { state: buildRouteState() })
     },
     { 
       label: '数据分析', 
       icon: <LineChartOutlined />, 
       color: '#fa8c16',
-      onClick: () => navigate('/goods/analytics', { state: { from: 'overview' } })
+      onClick: () => navigate('/goods/analytics', { state: buildRouteState() })
     }
   ];
 
@@ -744,7 +753,7 @@ const GoodsOverview: React.FC = () => {
           <Text type="secondary" style={{ fontSize: '12px' }}>
             数据更新于: {dayjs().format('YYYY-MM-DD HH:mm')}
             <span style={{ marginLeft: 12, color: '#8c8c8c' }}>
-              品牌: {brands.filter(b => b.status === '启用').length} 个 | 品类: {categories.filter(c => c.status === '启用').length} 类 | 商品: {products.length} 个
+              品牌: {brands.filter(b => b.status === '启用').length} 个 | 品类: {categories.filter(c => c.status === '启用').length} 类 | 商品: {products.length} 个 | 标签: {tags.filter(t => t.status === '启用').length} 个
             </span>
           </Text>
         </div>
@@ -762,7 +771,7 @@ const GoodsOverview: React.FC = () => {
             type="primary" 
             size="small" 
             icon={<PlusOutlined />}
-            onClick={() => navigate('/goods/manage/create', { state: { from: 'overview' } })}
+            onClick={() => navigate('/goods/manage/create', { state: buildRouteState() })}
           >
             发布新商品
           </Button>
@@ -852,7 +861,7 @@ const GoodsOverview: React.FC = () => {
                 bordered={false}
                 style={{ borderRadius: '6px', width: '100%' }}
                 extra={
-                  <Link to="/orders" state={{ from: 'overview' }}>
+                  <Link to="/orders" state={buildRouteState()}>
                     <Button type="link" size="small" style={{ fontSize: '12px' }}>
                       查看订单
                     </Button>
@@ -873,7 +882,7 @@ const GoodsOverview: React.FC = () => {
                   <div style={{ textAlign: 'center', padding: '20px' }}>
                     <ShoppingCartOutlined style={{ fontSize: 24, color: '#8c8c8c' }} />
                     <div style={{ marginTop: 8, color: '#8c8c8c' }}>暂无销售数据</div>
-                    <Link to="/orders" state={{ from: 'overview' }}>
+                    <Link to="/orders" state={buildRouteState()}>
                       <Button type="link" size="small">查看订单</Button>
                     </Link>
                   </div>
@@ -894,7 +903,7 @@ const GoodsOverview: React.FC = () => {
                 bordered={false}
                 style={{ borderRadius: '6px', width: '100%' }}
                 extra={
-                  <Link to="/goods/configs" state={{ from: 'overview' }}>
+                  <Link to="/goods/configs" state={buildRouteState()}>
                     <Button type="link" size="small" style={{ fontSize: '12px' }}>
                       管理库存
                     </Button>
@@ -925,7 +934,7 @@ const GoodsOverview: React.FC = () => {
                 bordered={false}
                 style={{ borderRadius: '6px', width: '100%' }}
                 extra={
-                  <Link to="/goods/zone" state={{ from: 'overview' }}>
+                  <Link to="/goods/zone" state={buildRouteState()}>
                     <Button type="link" size="small" style={{ fontSize: '12px' }}>
                       管理品类
                     </Button>
@@ -947,7 +956,7 @@ const GoodsOverview: React.FC = () => {
                             style={{ borderRadius: '4px', borderLeft: `4px solid ${color}` }}
                             bodyStyle={{ padding: '12px' }}
                             hoverable
-                            onClick={() => navigate(`/goods/manage/list?category_id=${category.category_id}`, { state: { from: 'overview' } })}
+                            onClick={() => navigate(`/goods/manage/list?category_id=${category.category_id}`, { state: buildRouteState() })}
                           >
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                               <div>
@@ -1088,7 +1097,7 @@ const GoodsOverview: React.FC = () => {
                 bordered={false}
                 style={{ borderRadius: '6px', width: '100%' }}
                 extra={
-                  <Link to="/goods/brand" state={{ from: 'overview' }}>
+                  <Link to="/goods/brand" state={buildRouteState()}>
                     <Button type="link" size="small" style={{ fontSize: '12px' }}>
                       管理品牌
                     </Button>
@@ -1116,6 +1125,74 @@ const GoodsOverview: React.FC = () => {
                   <div style={{ textAlign: 'center', padding: '20px' }}>
                     <CrownOutlined style={{ fontSize: 24, color: '#8c8c8c' }} />
                     <div style={{ marginTop: 8, color: '#8c8c8c' }}>暂无品牌数据</div>
+                  </div>
+                )}
+              </Card>
+
+              {/* 标签统计 */}
+              <Card 
+                title={<span style={{ fontSize: '14px', fontWeight: 500 }}>标签统计</span>}
+                size="small"
+                bordered={false}
+                style={{ borderRadius: '6px', width: '100%' }}
+                extra={
+                  <Link to="/goods/tag" state={buildRouteState()}>
+                    <Button type="link" size="small" style={{ fontSize: '12px' }}>
+                      管理标签
+                    </Button>
+                  </Link>
+                }
+              >
+                <Row gutter={[12, 12]} style={{ padding: '8px 0' }}>
+                  <Col span={12}>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: '24px', fontWeight: 600, color: '#1890ff' }}>
+                        {tags.filter(t => t.status === '启用').length}
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#8c8c8c' }}>启用标签</div>
+                    </div>
+                  </Col>
+                  <Col span={12}>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: '24px', fontWeight: 600, color: '#52c41a' }}>
+                        {tags.filter(t => t.priority <= 10).length}
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#8c8c8c' }}>高优先级标签</div>
+                    </div>
+                  </Col>
+                </Row>
+                {tags.length > 0 ? (
+                  <div style={{ marginTop: '12px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 500, marginBottom: '8px' }}>
+                      常用标签
+                    </div>
+                    <Space size={[4, 8]} wrap>
+                      {tags
+                        .filter(t => t.status === '启用')
+                        .sort((a, b) => a.priority - b.priority)
+                        .slice(0, 6)
+                        .map(tag => (
+                          <Tag 
+                            key={tag.tag_id}
+                            color={tag.priority <= 5 ? 'orange' : 'blue'}
+                            style={{ fontSize: '11px', borderRadius: '12px' }}
+                          >
+                            {tag.name}
+                          </Tag>
+                        ))}
+                    </Space>
+                    <div style={{ marginTop: '8px' }}>
+                      <Link to="/goods/tag" state={buildRouteState()}>
+                        <Button type="link" size="small" style={{ fontSize: '11px' }}>
+                          查看全部标签 →
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '20px' }}>
+                    <TagsOutlined style={{ fontSize: 24, color: '#8c8c8c' }} />
+                    <div style={{ marginTop: 8, color: '#8c8c8c' }}>暂无标签数据</div>
                   </div>
                 )}
               </Card>
