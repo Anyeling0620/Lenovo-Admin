@@ -28,10 +28,15 @@ const service: AxiosInstance = axios.create({
 })
 service.interceptors.request.use(
     (config: InternalAxiosRequestConfig) => {
-        // 如果 url 不以 http 开头，且不以 /admin 开头，才添加前缀
+        // 统一管理端接口前缀：
+        // - 仅对“相对路径”(不以 / 开头)补 /admin
+        // - 对以 / 开头的绝对路径(例如 /system/*、/login、/user/*)保持原样
+        // 这样避免把已经是绝对路径的接口错误地拼成 /admin/xxx
         if (config.url && !config.url.startsWith('http')) {
-            if (!config.url.startsWith('/admin')) {
-                config.url = '/admin' + config.url;
+            if (!config.url.startsWith('/') && !config.url.startsWith('admin/')) {
+                config.url = '/admin/' + config.url;
+            } else if (config.url.startsWith('admin/')) {
+                config.url = '/' + config.url;
             }
         }
         
