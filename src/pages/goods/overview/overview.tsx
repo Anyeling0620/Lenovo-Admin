@@ -214,13 +214,18 @@ const GoodsOverview: React.FC = () => {
             };
           }
           
-          productSalesMap[item.product_id].sales_count += item.quantity;
+          // 确保价格是数字类型
+          const unitPrice = Number(item.pay_amount_snapshot) || 0;
+          const quantity = item.quantity || 0;
+          const itemTotal = unitPrice * quantity; // ✅ 正确：单价 × 数量
+          
+          productSalesMap[item.product_id].sales_count += quantity;
           productSalesMap[item.product_id].order_count += 1;
-          productSalesMap[item.product_id].revenue += item.pay_amount_snapshot as number;
+          productSalesMap[item.product_id].revenue += itemTotal; // ✅ 正确
           
           if (isToday) {
-            todaySalesCount += item.quantity;
-            todayRevenue += item.pay_amount_snapshot as number;
+            todaySalesCount += quantity;
+            todayRevenue += itemTotal; // ✅ 正确
           }
         });
       });

@@ -78,6 +78,9 @@ const ProductDetailPage: React.FC = () => {
   const [productDetail, setProductDetail] = useState<ProductDetailData | null>(null);
   const [activeTab, setActiveTab] = useState('basic');
 
+  // 获取当前页面路径，用于返回
+  const currentPath = window.location.pathname + window.location.search;
+  
   // 获取来源页面，如果没有则使用默认页面
   const fromPath = (location.state as any)?.from || '/goods/manage/list';
 
@@ -109,6 +112,11 @@ const ProductDetailPage: React.FC = () => {
   const handleBack = () => {
     navigate(fromPath);
   };
+
+  // 获取返回状态，确保能返回到当前页面
+  const getBackState = () => ({
+    from: currentPath
+  });
 
   // 处理价格显示
   const formatPrice = (price: number | string) => {
@@ -143,6 +151,17 @@ const ProductDetailPage: React.FC = () => {
       default:
         return 'default';
     }
+  };
+
+  // 处理库存编辑跳转
+  const handleStockEdit = (stockId: string | undefined) => {
+    if (!stockId) {
+      globalMessage.warning('该SKU暂无库存信息');
+      return;
+    }
+    navigate(`/goods/stock/edit/${stockId}`, {
+      state: getBackState()
+    });
   };
 
   useEffect(() => {
@@ -206,7 +225,7 @@ const ProductDetailPage: React.FC = () => {
                   <Button 
                     type="primary"
                     onClick={() => navigate(`/goods/manage/edit/${productDetail.product_id}`, {
-                      state: { from: window.location.pathname + window.location.search }
+                      state: getBackState()
                     })}
                   >
                     编辑商品
@@ -478,13 +497,16 @@ const ProductDetailPage: React.FC = () => {
                             <Space>
                               <Button 
                                 size="small"
-                                onClick={() => navigate(`/goods/manage/sku/edit/${config.product_config_id}`)}
+                                onClick={() => navigate(`/goods/manage/sku/edit/${config.product_config_id}`, {
+                                  state: getBackState()
+                                })}
                               >
                                 编辑
                               </Button>
                               <Button 
                                 size="small"
-                                onClick={() => navigate(`/goods/manage/sku/stock/${config.product_config_id}`)}
+                                onClick={() => handleStockEdit(config.stock?.stock_id)}
+                                disabled={!config.stock}
                               >
                                 管理库存
                               </Button>
@@ -514,14 +536,14 @@ const ProductDetailPage: React.FC = () => {
           <Space>
             <Button
               onClick={() => navigate(`/goods/manage/sku/${productDetail.product_id}`, {
-                state: { from: window.location.pathname + window.location.search }
+                state: getBackState()
               })}
             >
               管理SKU
             </Button>
             <Button
               onClick={() => navigate(`/goods/manage/gallery/${productDetail.product_id}`, {
-                state: { from: window.location.pathname + window.location.search }
+                state: getBackState()
               })}
             >
               管理图库
@@ -529,7 +551,7 @@ const ProductDetailPage: React.FC = () => {
             <Button
               type="primary"
               onClick={() => navigate(`/goods/manage/shelf/${productDetail.product_id}`, {
-                state: { from: window.location.pathname + window.location.search }
+                state: getBackState()
               })}
             >
               上架商品
