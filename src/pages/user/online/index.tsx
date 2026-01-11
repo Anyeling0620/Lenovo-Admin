@@ -125,6 +125,42 @@ const OnlineManagement: React.FC = () => {
     return `${Math.floor(duration / 86400)}天${Math.floor((duration % 86400) / 3600)}小时`;
   };
 
+  // 解析User-Agent字符串为友好的设备名称
+  const parseDeviceName = (deviceName: string): string => {
+    if (!deviceName || deviceName === '未知设备') return '未知设备';
+    
+    // 如果不是User-Agent字符串，直接返回
+    if (!deviceName.startsWith('Mozilla/') && deviceName.length < 50) {
+      return deviceName;
+    }
+    
+    const ua = deviceName;
+    let browser = '未知浏览器';
+    let os = '未知系统';
+    
+    // 解析浏览器（顺序很重要）
+    if (ua.includes('Edg/') || ua.includes('Edge/')) browser = 'Edge';
+    else if (ua.includes('Chrome/')) browser = 'Chrome';
+    else if (ua.includes('Firefox/')) browser = 'Firefox';
+    else if (ua.includes('Safari/') && !ua.includes('Chrome')) browser = 'Safari';
+    else if (ua.includes('OPR/') || ua.includes('Opera/')) browser = 'Opera';
+    
+    // 解析操作系统
+    if (ua.includes('Windows NT 10.0')) os = 'Windows 10/11';
+    else if (ua.includes('Windows NT 6.3')) os = 'Windows 8.1';
+    else if (ua.includes('Windows NT 6.2')) os = 'Windows 8';
+    else if (ua.includes('Windows NT 6.1')) os = 'Windows 7';
+    else if (ua.includes('Windows NT')) os = 'Windows';
+    else if (ua.includes('Mac OS X')) os = 'macOS';
+    else if (ua.includes('Android')) os = 'Android';
+    else if (ua.includes('iPhone')) os = 'iPhone';
+    else if (ua.includes('iPad')) os = 'iPad';
+    else if (ua.includes('Linux') && ua.includes('X11')) os = 'Linux';
+    else if (ua.includes('Linux')) os = 'Linux';
+    
+    return `${browser} (${os})`;
+  };
+
   // 用户表格列定义
   const userColumns: ColumnsType<OnlineUser> = [
     {
@@ -142,7 +178,7 @@ const OnlineManagement: React.FC = () => {
     {
       title: '设备',
       key: 'device',
-      width: 200,
+      width: 250,
       render: (_, record) => {
         // 更精确的设备类型判断
         const deviceType = record.deviceType?.toLowerCase() || '';
@@ -153,12 +189,15 @@ const OnlineManagement: React.FC = () => {
                         deviceType === 'phone';
         const deviceTypeName = isMobile ? '手机' : '电脑';
         
+        // 使用解析函数获取友好的设备名称
+        const displayName = parseDeviceName(record.deviceName);
+        
         return (
           <div className="flex items-center">
             {isMobile ? <MobileOutlined className="mr-2 text-green-500" /> : <DesktopOutlined className="mr-2 text-blue-500" />}
             <div>
-              <div className="text-sm font-medium">{record.deviceName || '未知设备'}</div>
-              <div className="text-xs text-gray-500">{deviceTypeName} ({record.deviceType || '未知'})</div>
+              <div className="text-sm font-medium">{displayName}</div>
+              <div className="text-xs text-gray-500">{deviceTypeName}</div>
             </div>
           </div>
         );
@@ -227,7 +266,7 @@ const OnlineManagement: React.FC = () => {
     {
       title: '设备',
       key: 'device',
-      width: 200,
+      width: 250,
       render: (_, record) => {
         // 更精确的设备类型判断
         const deviceType = record.deviceType?.toLowerCase() || '';
@@ -238,12 +277,15 @@ const OnlineManagement: React.FC = () => {
                         deviceType === 'phone';
         const deviceTypeName = isMobile ? '手机' : '电脑';
         
+        // 使用解析函数获取友好的设备名称
+        const displayName = parseDeviceName(record.deviceName);
+        
         return (
           <div className="flex items-center">
             {isMobile ? <MobileOutlined className="mr-2 text-green-500" /> : <DesktopOutlined className="mr-2 text-blue-500" />}
             <div>
-              <div className="text-sm font-medium">{record.deviceName || '未知设备'}</div>
-              <div className="text-xs text-gray-500">{deviceTypeName} ({record.deviceType || '未知'})</div>
+              <div className="text-sm font-medium">{displayName}</div>
+              <div className="text-xs text-gray-500">{deviceTypeName}</div>
             </div>
           </div>
         );
@@ -312,7 +354,7 @@ const OnlineManagement: React.FC = () => {
     {
       title: '设备',
       key: 'device',
-      width: 200,
+      width: 250,
       render: (_, record) => {
         // 更精确的设备类型判断
         const deviceType = record.deviceType?.toLowerCase() || '';
@@ -323,12 +365,15 @@ const OnlineManagement: React.FC = () => {
                         deviceType === 'phone';
         const deviceTypeName = isMobile ? '手机' : '电脑';
         
+        // 使用解析函数获取友好的设备名称
+        const displayName = parseDeviceName(record.deviceName);
+        
         return (
           <div className="flex items-center">
             {isMobile ? <MobileOutlined className="mr-2 text-green-500" /> : <DesktopOutlined className="mr-2 text-blue-500" />}
             <div>
-              <div className="text-sm font-medium">{record.deviceName || '未知设备'}</div>
-              <div className="text-xs text-gray-500">{deviceTypeName} ({record.deviceType || '未知'})</div>
+              <div className="text-sm font-medium">{displayName}</div>
+              <div className="text-xs text-gray-500">{deviceTypeName}</div>
             </div>
           </div>
         );
