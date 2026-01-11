@@ -75,6 +75,8 @@ export const kickAdminOffline = (adminId: string) =>
   request.post<null>(`/system/admins/${adminId}/logout`);
 export const disableAdmin = (adminId: string) =>
   request.post<null>(`/system/admins/${adminId}/disable`);
+export const enableAdmin = (adminId: string) =>
+  request.post<null>(`/system/admins/${adminId}/enable`);
 export const updateAdminIdentityExpire = (adminId: string, identityId: string, data: { expire_time: string | null }) =>
   request.patch<null>(`/system/admins/${adminId}/identities/${identityId}/expire`, data);
 export const updateIdentityStatus = (identityId: string, data: { status: string }) =>
@@ -307,7 +309,8 @@ export const addSeckillConfigApi = (data: SeckillConfigCreateRequest) =>
   request.post<{ seckill_product_config_id: string }>('/marketing/seckill-configs', data);
 
 // 订单 / 售后
-export const getOrders = (p0?: { page: number; page_size: number; }) => request.get<OrderListItem[]>('/orders');
+export const getOrders = (params?: { page: number; page_size: number }) =>
+  request.get<OrderListItem[]>('/orders', { params });
 export const getOrderDetailApi = (orderId: string) =>
   request.get<OrderDetailResponse>(`/orders/${orderId}`);
 export const cancelOrder = (orderId: string) =>

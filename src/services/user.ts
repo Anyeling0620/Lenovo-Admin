@@ -1,5 +1,11 @@
 import request from "../utils/request";
-import { API_PATHS } from "./api-paths";
+import {
+  bindAdminIdentity,
+  getIdentitiesWithPermissions,
+  getOnlineAdmins,
+  getPermissionMenu,
+  unbindAdminIdentity,
+} from "./api";
 
 // 后端(lenovo-shop-server)管理端用户列表返回结构
 // 对应：GET /admin/clients
@@ -382,7 +388,7 @@ export const deleteAdmin = async (adminId: string): Promise<void> => {
  */
 export const resetAdminPassword = async (adminId: string, newPassword: string): Promise<void> => {
   // 后端期望的字段名是 new_password (蛇形命名)
-  await request.post(`${API_PATHS.USER.ADMIN_DETAIL}/${adminId}/reset-password`, { new_password: newPassword });
+  await request.post(`/system/admins/${adminId}/reset-password`, { new_password: newPassword });
 };
 
 // ==================== 权限管理 ====================
@@ -415,8 +421,17 @@ export interface PermissionListParams {
  * @returns 权限列表数据
  */
 export const getPermissionList = async (params?: PermissionListParams): Promise<Permission[]> => {
-  const response = await request.get<Permission[]>(API_PATHS.USER.PERMISSION_LIST, { params });
-  return response;
+  // 后端当前提供的是菜单/权限树：GET /admin/system/permissions
+  // 这里先复用该接口；如需按 type/module/status 过滤，前端自行过滤
+  const menu = await getPermissionMenu();
+  if (!params) return menu as unknown as Permission[];
+  // 仅做轻量过滤（避免破坏现有页面逻辑）
+  return (menu as unknown as Array<Permission & { module?: string; status?: string; type?: string }>).filter(p => {
+    if (params.type && p.type !== params.type) return false;
+    if (params.module && p.module !== params.module) return false;
+    if (params.status && p.status !== params.status) return false;
+    return true;
+  });
 };
 
 /**
@@ -424,8 +439,8 @@ export const getPermissionList = async (params?: PermissionListParams): Promise<
  * @returns 权限树结构数据，包含父子关系
  */
 export const getPermissionTree = async (): Promise<Permission[]> => {
-  const response = await request.get<Permission[]>(API_PATHS.USER.PERMISSION_TREE);
-  return response;
+  // 后端已返回树结构
+  return (await getPermissionMenu()) as unknown as Permission[];
 };
 
 /**
@@ -447,8 +462,9 @@ export interface CreatePermissionParams {
  * @returns 新创建的权限数据
  */
 export const createPermission = async (data: CreatePermissionParams): Promise<Permission> => {
-  const response = await request.post<Permission>(API_PATHS.USER.PERMISSION_CREATE, data);
-  return response;
+  void data;
+  // 后端 admin.routes.ts 暂无权限 CRUD 接口
+  throw new Error('Backend route not implemented: create permission');
 };
 
 /**
@@ -458,7 +474,9 @@ export const createPermission = async (data: CreatePermissionParams): Promise<Pe
  * @returns Promise<void>
  */
 export const updatePermission = async (permissionId: string, data: Partial<CreatePermissionParams>): Promise<void> => {
-  await request.put(`${API_PATHS.USER.PERMISSION_UPDATE}/${permissionId}`, data);
+  void permissionId;
+  void data;
+  throw new Error('Backend route not implemented: update permission');
 };
 
 /**
@@ -467,7 +485,8 @@ export const updatePermission = async (permissionId: string, data: Partial<Creat
  * @returns Promise<void>
  */
 export const deletePermission = async (permissionId: string): Promise<void> => {
-  await request.delete(`${API_PATHS.USER.PERMISSION_DELETE}/${permissionId}`);
+  void permissionId;
+  throw new Error('Backend route not implemented: delete permission');
 };
 
 // ==================== 身份（角色）管理 ====================
@@ -531,7 +550,9 @@ export const getIdentityList = async (params: IdentityListParams): Promise<Ident
     name: item.identity_name,
     code: item.identity_code,
     description: item.description || undefined,
-    isSystem: item.is_system,
+  // 后端 IdentityWithPermissions 当前不返回 is_system 字段（见 lenovo-shop-server/src/types/admin/api.type.ts）
+  // 这里先按非系统角色处理（不影响管理员列表/绑定身份等核心功能）
+  isSystem: false,
     status: item.status === '启用' ? 'ACTIVE' : 'INACTIVE',
     createdAt: '', // 后端未返回创建时间
     permissions: []
@@ -576,8 +597,21 @@ export const getIdentityList = async (params: IdentityListParams): Promise<Ident
  * @returns 身份详情数据
  */
 export const getIdentityDetail = async (identityId: string): Promise<Identity> => {
-  const response = await request.get<Identity>(`${API_PATHS.USER.IDENTITY_DETAIL}/${identityId}`);
-  return response;
+  const list = await getIdentitiesWithPermissions();
+  const hit = list.find(i => i.identity_id === identityId);
+  if (!hit) throw new Error(`Identity not found: ${identityId}`);
+
+  return {
+    id: hit.identity_id,
+    name: hit.identity_name,
+    code: hit.identity_code,
+    description: hit.description || undefined,
+  // getIdentitiesWithPermissions() 的返回结构中该字段为 snake_case
+  isSystem: (hit as unknown as { is_system: boolean }).is_system,
+    status: hit.status === '启用' ? 'ACTIVE' : 'INACTIVE',
+    createdAt: '',
+    permissions: [],
+  };
 };
 
 /**
@@ -598,8 +632,9 @@ export interface CreateIdentityParams {
  * @returns 新创建的身份数据
  */
 export const createIdentity = async (data: CreateIdentityParams): Promise<Identity> => {
-  const response = await request.post<Identity>(API_PATHS.USER.IDENTITY_CREATE, data);
-  return response;
+  void data;
+  // 后端 admin.routes.ts 暂无 identity CRUD 接口
+  throw new Error('Backend route not implemented: create identity');
 };
 
 /**
@@ -609,7 +644,9 @@ export const createIdentity = async (data: CreateIdentityParams): Promise<Identi
  * @returns Promise<void>
  */
 export const updateIdentity = async (identityId: string, data: Partial<CreateIdentityParams>): Promise<void> => {
-  await request.put(`${API_PATHS.USER.IDENTITY_UPDATE}/${identityId}`, data);
+  void identityId;
+  void data;
+  throw new Error('Backend route not implemented: update identity');
 };
 
 /**
@@ -618,7 +655,8 @@ export const updateIdentity = async (identityId: string, data: Partial<CreateIde
  * @returns Promise<void>
  */
 export const deleteIdentity = async (identityId: string): Promise<void> => {
-  await request.delete(`${API_PATHS.USER.IDENTITY_DELETE}/${identityId}`);
+  void identityId;
+  throw new Error('Backend route not implemented: delete identity');
 };
 
 /**
@@ -628,7 +666,9 @@ export const deleteIdentity = async (identityId: string): Promise<void> => {
  * @returns Promise<void>
  */
 export const assignPermissionsToIdentity = async (identityId: string, permissionIds: string[]): Promise<void> => {
-  await request.post(API_PATHS.USER.IDENTITY_PERMISSION_ASSIGN, { identityId, permissionIds });
+  void identityId;
+  void permissionIds;
+  throw new Error('Backend route not implemented: assign permissions to identity');
 };
 
 /**
@@ -638,7 +678,9 @@ export const assignPermissionsToIdentity = async (identityId: string, permission
  * @returns Promise<void>
  */
 export const revokePermissionsFromIdentity = async (identityId: string, permissionIds: string[]): Promise<void> => {
-  await request.post(API_PATHS.USER.IDENTITY_PERMISSION_REVOKE, { identityId, permissionIds });
+  void identityId;
+  void permissionIds;
+  throw new Error('Backend route not implemented: revoke permissions from identity');
 };
 
 // ==================== 管理员-身份关联 ====================
@@ -650,7 +692,8 @@ export const revokePermissionsFromIdentity = async (identityId: string, permissi
  * @returns Promise<void>
  */
 export const assignIdentityToAdmin = async (adminId: string, identityId: string): Promise<void> => {
-  await request.post(API_PATHS.USER.ADMIN_IDENTITY_ASSIGN, { adminId, identityId });
+  // admin.routes.ts: POST /system/admins/:admin_id/identities
+  await bindAdminIdentity(adminId, { identity_id: identityId });
 };
 
 /**
@@ -660,7 +703,8 @@ export const assignIdentityToAdmin = async (adminId: string, identityId: string)
  * @returns Promise<void>
  */
 export const revokeIdentityFromAdmin = async (adminId: string, identityId: string): Promise<void> => {
-  await request.post(API_PATHS.USER.ADMIN_IDENTITY_REVOKE, { adminId, identityId });
+  // admin.routes.ts: DELETE /system/admins/:admin_id/identities/:identity_id
+  await unbindAdminIdentity(adminId, identityId);
 };
 
 // ==================== 在线管理 ====================
@@ -708,8 +752,14 @@ export interface OnlineListResponse {
  * @returns 在线用户列表响应数据
  */
 export const getOnlineList = async (): Promise<OnlineListResponse> => {
-  const response = await request.get<OnlineListResponse>(API_PATHS.USER.ONLINE_LIST);
-  return response;
+  // admin.routes.ts: GET /system/admins/online
+  const admins = await getOnlineAdmins();
+  return {
+    users: [],
+    admins: admins as unknown as OnlineAdmin[],
+    totalUsers: 0,
+    totalAdmins: Array.isArray(admins) ? admins.length : 0,
+  };
 };
 
 /**
@@ -719,7 +769,10 @@ export const getOnlineList = async (): Promise<OnlineListResponse> => {
  * @returns Promise<void>
  */
 export const forceLogout = async (sessionId: string, userType: 'USER' | 'ADMIN'): Promise<void> => {
-  await request.post(API_PATHS.USER.ONLINE_FORCE_LOGOUT, { sessionId, userType });
+  void sessionId;
+  void userType;
+  // TODO: Implement force logout API
+  throw new Error('Backend route not implemented: force logout');
 };
 
 // ==================== 登录记录 ====================
@@ -766,8 +819,9 @@ export interface LoginRecordResponse {
  * @returns 登录记录响应数据
  */
 export const getLoginRecords = async (params: LoginRecordParams): Promise<LoginRecordResponse> => {
-  const response = await request.get<LoginRecordResponse>(API_PATHS.USER.LOGIN_RECORDS, { params });
-  return response;
+  void params;
+  // TODO: Implement get login records API
+  throw new Error('Backend route not implemented: login records');
 };
 
 // ==================== 商品专区 ====================

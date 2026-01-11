@@ -14,6 +14,10 @@ import {
   Tooltip,
   Badge
 } from 'antd';
+import type { BadgeProps } from 'antd';
+
+type IdName = { id: string; name: string };
+type CategoryApiItem = { category_id: string; name: string };
 import { 
   SearchOutlined, 
   ReloadOutlined, 
@@ -26,8 +30,8 @@ import type { ColumnsType } from 'antd/es/table';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { 
-  getAdminList, 
+import {
+  getAdminList,
   createAdmin,
   resetAdminPassword,
   getIdentityList,
@@ -35,7 +39,7 @@ import {
   type AdminListParams,
   type CreateAdminParams
 } from '../../../services/user';
-import { getCategories } from '../../../services/api';
+import { disableAdmin, getCategories } from '../../../services/api';
 import { globalMessage } from '../../../utils/globalMessage';
 import { globalErrorHandler } from '../../../utils/globalAxiosErrorHandler';
 
@@ -113,7 +117,9 @@ const AdminListPage: React.FC = () => {
   const loadCategories = async () => {
     try {
       const response = await getCategories();
-      setCategories(response.map((item: any) => ({ id: item.category_id, name: item.name })));
+      setCategories(
+        (response as CategoryApiItem[]).map((item) => ({ id: item.category_id, name: item.name }))
+      );
     } catch (error) {
       console.error('Failed to load categories:', error);
     }
@@ -164,6 +170,29 @@ const AdminListPage: React.FC = () => {
     } catch (error) {
       globalErrorHandler.handle(error, globalMessage.error);
     }
+  };
+
+  // 禁用管理员（按需求：禁用后不允许再启用）
+  // API（见 src/services/api.ts 与 src/services/API文档.md）：
+  // - POST /system/admins/{adminId}/disable
+  const handleDisableAdmin = async (admin: Admin) => {
+    // 已禁用/封禁：按钮会置灰，不允许再次操作
+    if (admin.status === 'INACTIVE' || admin.status === 'BANNED') return;
+    Modal.confirm({
+      title: '确定禁用该管理员？',
+      content: '禁用后，该管理员将无法继续登录后台，且当前系统不支持再次启用。',
+      okText: '禁用',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await disableAdmin(admin.id);
+          globalMessage.success('已禁用');
+          loadAdminList();
+        } catch (error) {
+          globalErrorHandler.handle(error, globalMessage.error);
+        }
+      },
+    });
   };
 
   // 生成随机密码
@@ -242,14 +271,18 @@ const AdminListPage: React.FC = () => {
       width: 200,
       render: (identities) => (
         <Space size={[0, 4]} wrap>
-          {identities?.slice(0, 2).map((identity: any) => (
+          {(
+            identities as IdName[] | undefined
+          )?.slice(0, 2).map((identity) => (
             <Tag key={identity.id} color="blue">
               {identity.name}
             </Tag>
           ))}
-          {identities?.length > 2 && (
-            <Tooltip title={identities.slice(2).map((i: any) => i.name).join(', ')}>
-              <Tag>+{identities.length - 2}</Tag>
+          {(((identities as IdName[] | undefined)?.length ?? 0) > 2) && (
+            <Tooltip
+              title={(identities as IdName[]).slice(2).map(i => i.name).join(', ')}
+            >
+              <Tag>+{(identities as IdName[]).length - 2}</Tag>
             </Tooltip>
           )}
         </Space>
@@ -262,14 +295,18 @@ const AdminListPage: React.FC = () => {
       width: 200,
       render: (categories) => (
         <Space size={[0, 4]} wrap>
-          {categories?.slice(0, 2).map((category: any) => (
+          {(
+            categories as IdName[] | undefined
+          )?.slice(0, 2).map((category) => (
             <Tag key={category.id} color="green">
               {category.name}
             </Tag>
           ))}
-          {categories?.length > 2 && (
-            <Tooltip title={categories.slice(2).map((c: any) => c.name).join(', ')}>
-              <Tag>+{categories.length - 2}</Tag>
+          {(((categories as IdName[] | undefined)?.length ?? 0) > 2) && (
+            <Tooltip
+              title={(categories as IdName[]).slice(2).map(c => c.name).join(', ')}
+            >
+              <Tag>+{(categories as IdName[]).length - 2}</Tag>
             </Tooltip>
           )}
         </Space>
@@ -287,7 +324,7 @@ const AdminListPage: React.FC = () => {
           BANNED: { color: 'error', text: '封禁' },
         };
         const config = statusMap[status as keyof typeof statusMap] || statusMap.INACTIVE;
-        return <Badge status={config.color as any} text={config.text} />;
+  return <Badge status={config.color as BadgeProps['status']} text={config.text} />;
       },
     },
     {
@@ -309,6 +346,14 @@ const AdminListPage: React.FC = () => {
               icon={<KeyOutlined />}
               onClick={() => handleResetPassword(record)}
               disabled={record.status === 'BANNED'}
+            />
+          </Tooltip>
+      <Tooltip title={record.status === 'INACTIVE' ? '已禁用（不可操作）' : record.status === 'BANNED' ? '封禁（不可操作）' : '禁用'}>
+            <Button
+              type="text"
+              icon={<LockOutlined />}
+        onClick={() => handleDisableAdmin(record)}
+        disabled={record.status === 'INACTIVE' || record.status === 'BANNED'}
             />
           </Tooltip>
         </Space>
