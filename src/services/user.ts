@@ -437,17 +437,29 @@ export const getPermissionList = async (params?: PermissionListParams): Promise<
   // 使用后端真实接口 GET /admin/system/permissions
   const menu = await getPermissionMenu();
   
+  console.log('🔍 后端返回的原始权限数据:', menu);
+  
   // 转换字段名：permission_id -> id, permission_name -> name, parent_id -> parentId
-  const permissions: Permission[] = (menu as PermissionMenuItemResponse[]).map((item) => ({
-    id: item.permission_id,
-    name: item.permission_name,
-    code: item.code,
-    type: item.type as 'MENU' | 'BUTTON' | 'API',
-    module: item.module,
-    parentId: item.parent_id,
-    status: (item.status as 'ACTIVE' | 'INACTIVE') || 'ACTIVE',
-    children: []
-  }));
+  const permissions: Permission[] = (menu as PermissionMenuItemResponse[]).map((item) => {
+    console.log('🔍 映射权限项:', {
+      原始type: item.type,
+      原始名称: item.permission_name,
+      type类型: typeof item.type
+    });
+    
+    return {
+      id: item.permission_id,
+      name: item.permission_name,
+      code: item.code,
+      type: item.type as 'MENU' | 'BUTTON' | 'API',
+      module: item.module,
+      parentId: item.parent_id,
+      status: (item.status as 'ACTIVE' | 'INACTIVE') || 'ACTIVE',
+      children: []
+    };
+  });
+  
+  console.log('🔍 映射后的权限数据:', permissions);
   
   if (!params) return permissions;
   

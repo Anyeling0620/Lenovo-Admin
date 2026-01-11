@@ -92,6 +92,8 @@ const PermissionManagement: React.FC = () => {
   const loadPermissionList = async (params?: FilterFormValues) => {
     try {
       const data = await getPermissionList(params);
+      console.log('🔍 权限列表原始数据:', data);
+      console.log('🔍 第一条数据类型字段:', data[0]?.type, '类型:', typeof data[0]?.type);
       setListData(data);
       
       // 所有权限都可以作为父级（包括MENU、BUTTON、API）
@@ -299,13 +301,14 @@ const PermissionManagement: React.FC = () => {
       dataIndex: 'type',
       key: 'type',
       width: 100,
-      render: (type) => {
-        const typeMap = {
+      render: (type: string, record) => {
+        console.log('🎨 渲染类型列:', { type, record_name: record.name, record_type: record.type });
+        const typeMap: Record<string, { color: string; text: string }> = {
           MENU: { color: 'green', text: '菜单' },
           BUTTON: { color: 'orange', text: '按钮' },
           API: { color: 'purple', text: '接口' },
         };
-        const config = typeMap[type as keyof typeof typeMap] || typeMap.MENU;
+        const config = typeMap[type] || typeMap['MENU'];
         return <Tag color={config.color}>{config.text}</Tag>;
       },
     },
@@ -376,7 +379,7 @@ const PermissionManagement: React.FC = () => {
     <div style={{ height: 'calc(100vh - 64px)', display: 'flex', flexDirection: 'column', padding: '16px' }}>
       <Row gutter={[16, 16]} style={{ flex: 1, overflow: 'hidden' }}>
         {/* 左侧权限树 */}
-        <Col xs={24} md={12} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <Col xs={24} md={10} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
           <Card 
             title="权限树" 
             extra={
@@ -420,7 +423,7 @@ const PermissionManagement: React.FC = () => {
               </Form>
             </div>
             
-            <div style={{ flex: 1, overflow: 'auto', border: '1px solid #d9d9d9', borderRadius: '4px', padding: '16px' }}>
+            <div style={{ flex: 1, overflow: 'auto', border: '1px solid #d9d9d9', borderRadius: '4px', padding: '16px', maxHeight: 'calc(100vh - 300px)' }}>
               <Tree
                 treeData={treeData}
                 expandedKeys={expandedKeys}
@@ -435,7 +438,7 @@ const PermissionManagement: React.FC = () => {
         </Col>
 
         {/* 右侧权限列表 */}
-        <Col xs={24} md={12} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <Col xs={24} md={14} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
           <Card 
             title="权限列表"
             extra={
@@ -455,8 +458,8 @@ const PermissionManagement: React.FC = () => {
                 </Select>
               </Form.Item>
             }
-            style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
-            bodyStyle={{ flex: 1, overflow: 'hidden', padding: 0 }}
+            style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', marginLeft: '8px' }}
+            bodyStyle={{ flex: 1, overflow: 'hidden', padding: '16px' }}
           >
             <Table
               columns={columns}
@@ -470,7 +473,7 @@ const PermissionManagement: React.FC = () => {
                 showTotal: (total) => `共 ${total} 条`,
               }}
               size="middle"
-              scroll={{ y: 'calc(100vh - 280px)', x: 'max-content' }}
+              scroll={{ y: 'calc(100vh - 320px)', x: 'max-content' }}
             />
           </Card>
         </Col>
