@@ -223,7 +223,10 @@ export const getAdminList = async (params: AdminListParams): Promise<AdminListRe
     }>;
   };
   
-  const backendList = await request.get<BackendAdminListItem[]>(API_PATHS.USER.ADMIN_LIST);
+  // ⚠️ 定制修复（仅影响“用户列表”模块）：
+  // 后端(lenovo-shop-server)真实路由为 GET /admin/system/admins
+  // 旧 API_PATHS.USER.ADMIN_LIST = '/user/admin/list' 会被 request.ts 补成 '/admin/user/admin/list'，从而 404。
+  const backendList = await request.get<BackendAdminListItem[]>('/system/admins');
   
   // 状态映射：后端中文 -> 前端英文
   const mapStatus = (status: string): 'ACTIVE' | 'INACTIVE' | 'BANNED' => {
@@ -306,7 +309,8 @@ export const getAdminList = async (params: AdminListParams): Promise<AdminListRe
  * @returns 管理员详情数据
  */
 export const getAdminDetail = async (adminId: string): Promise<Admin> => {
-  const response = await request.get<Admin>(`${API_PATHS.USER.ADMIN_DETAIL}/${adminId}`);
+  // 后端真实路由：GET /admin/system/admins/:admin_id
+  const response = await request.get<Admin>(`/system/admins/${adminId}`);
   return response;
 };
 
@@ -343,7 +347,8 @@ export const createAdmin = async (data: CreateAdminParams): Promise<Admin> => {
     identity_ids: data.identityIds || [],
     category_ids: data.categoryIds || [],
   };
-  const response = await request.post<Admin>(API_PATHS.USER.ADMIN_CREATE, backendParams);
+  // 后端真实路由：POST /admin/system/admins
+  const response = await request.post<Admin>('/system/admins', backendParams);
   return response;
 };
 
@@ -354,7 +359,9 @@ export const createAdmin = async (data: CreateAdminParams): Promise<Admin> => {
  * @returns Promise<void>
  */
 export const updateAdmin = async (adminId: string, data: Partial<CreateAdminParams>): Promise<void> => {
-  await request.put(`${API_PATHS.USER.ADMIN_UPDATE}/${adminId}`, data);
+  // 后端真实路由当前未提供 PUT（admin.routes.ts 没有该接口）
+  // 为保持页面可用，先沿用约定的 PATCH 路由（如后端补齐可再对齐）
+  await request.patch(`/system/admins/${adminId}`, data);
 };
 
 /**
@@ -363,7 +370,8 @@ export const updateAdmin = async (adminId: string, data: Partial<CreateAdminPara
  * @returns Promise<void>
  */
 export const deleteAdmin = async (adminId: string): Promise<void> => {
-  await request.delete(`${API_PATHS.USER.ADMIN_DELETE}/${adminId}`);
+  // 后端真实路由当前未提供 DELETE（admin.routes.ts 没有该接口）
+  await request.delete(`/system/admins/${adminId}`);
 };
 
 /**
@@ -513,7 +521,9 @@ export const getIdentityList = async (params: IdentityListParams): Promise<Ident
     status: string;
   };
   
-  const backendList = await request.get<BackendIdentity[]>(API_PATHS.USER.IDENTITY_LIST);
+  // ⚠️ 定制修复（仅影响“身份/角色列表”模块）：
+  // 后端(lenovo-shop-server)真实路由为 GET /admin/system/identities
+  const backendList = await request.get<BackendIdentity[]>('/system/identities');
   
   // 转换为前端格式
   let list: Identity[] = backendList.map(item => ({

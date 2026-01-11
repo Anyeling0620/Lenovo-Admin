@@ -62,7 +62,8 @@ import type {
   ProductListItem,
   StockResponse,
   ProductStatsResponse,
-  ShelfStatsResponse
+  ShelfStatsResponse,
+  OrderItemResponse
 } from '../../../services/api-type';
 
 import { globalMessage } from '../../../utils/globalMessage';
@@ -190,7 +191,10 @@ const AnalyticsPage: React.FC = () => {
         }
         
         monthlyData[month].orders++;
-        monthlyData[month].sales += order.actual_pay_amount as number;
+        
+        // 修复：使用订单的实际支付金额
+        const orderAmount = Number(order.actual_pay_amount) || 0;
+        monthlyData[month].sales += orderAmount;
         
         // 统计客户
         if (!customerSet.has(order.user_id)) {
@@ -199,10 +203,10 @@ const AnalyticsPage: React.FC = () => {
         }
         
         // 累加总销售额
-        totalSales += order.actual_pay_amount as number;
+        totalSales += orderAmount;
         
-        // 统计每个商品的销售
-        order.items.forEach(item => {
+        // 统计每个商品的销售 - 修复：使用单价 × 数量
+        order.items.forEach((item: OrderItemResponse) => {
           if (!productSalesMap[item.product_id]) {
             productSalesMap[item.product_id] = {
               name: item.name || '未知商品',
@@ -210,7 +214,13 @@ const AnalyticsPage: React.FC = () => {
               order_count: 0
             };
           }
-          productSalesMap[item.product_id].sales += item.pay_amount_snapshot as number;
+          
+          // 修复：商品销售额 = 单价 × 数量
+          const unitPrice = Number(item.pay_amount_snapshot) || 0;
+          const quantity = item.quantity || 1;
+          const itemTotal = unitPrice * quantity;
+          
+          productSalesMap[item.product_id].sales += itemTotal;
           productSalesMap[item.product_id].order_count++;
         });
       });
@@ -431,7 +441,7 @@ const AnalyticsPage: React.FC = () => {
       width: 100,
       render: (value: number) => (
         <div style={{ fontWeight: 600, color: '#f5222d', fontSize: '12px' }}>
-          ¥{(value / 1000).toFixed(1)}K
+          ¥{value.toLocaleString()} {/* 修复：正确格式化 */}
         </div>
       )
     },
@@ -546,9 +556,6 @@ const AnalyticsPage: React.FC = () => {
       )
     }
   ];
-
-  // 修复工具提示函数 - 处理可能的undefined值
-
 
   // 自定义线图工具提示组件
   const CustomLineTooltip: React.FC<CustomTooltipProps> = ({ active, payload, label }) => {
