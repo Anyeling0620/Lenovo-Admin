@@ -416,6 +416,19 @@ export interface PermissionListParams {
 }
 
 /**
+ * 后端返回的权限菜单项接口
+ */
+interface PermissionMenuItemResponse {
+  permission_id: string;
+  permission_name: string;
+  code?: string;
+  type: string;
+  module: string;
+  parent_id: string | null;
+  status?: string;
+}
+
+/**
  * 获取权限列表
  * @param params 查询参数，包含类型、模块、状态等
  * @returns 权限列表数据
@@ -423,14 +436,59 @@ export interface PermissionListParams {
 export const getPermissionList = async (params?: PermissionListParams): Promise<Permission[]> => {
   // 使用后端真实接口 GET /admin/system/permissions
   const menu = await getPermissionMenu();
-  if (!params) return menu as unknown as Permission[];
-  // 前端做轻量过滤（后端未提供按 type/module/status 的细粒度过滤）
-  return (menu as unknown as Array<Permission & { module?: string; status?: string; type?: string }>).filter(p => {
+  
+  // 转换字段名：permission_id -> id, permission_name -> name, parent_id -> parentId
+  const permissions: Permission[] = (menu as PermissionMenuItemResponse[]).map((item) => ({
+    id: item.permission_id,
+    name: item.permission_name,
+    code: item.code,
+    type: item.type as 'MENU' | 'BUTTON' | 'API',
+    module: item.module,
+    parentId: item.parent_id,
+    status: (item.status as 'ACTIVE' | 'INACTIVE') || 'ACTIVE',
+    children: []
+  }));
+  
+  if (!params) return permissions;
+  
+  // 前端做轻量过滤
+  return permissions.filter(p => {
     if (params.type && p.type !== params.type) return false;
-    if (params.module && (p.module || '') !== params.module) return false;
-    if (params.status && (p.status || '') !== params.status) return false;
+    if (params.module && p.module !== params.module) return false;
+    if (params.status && p.status !== params.status) return false;
     return true;
   });
+};
+
+/**
+ * 构建权限树结构
+ * @param permissions 扁平的权限列表
+ * @returns 树形结构的权限列表
+ */
+const buildPermissionTree = (permissions: Permission[]): Permission[] => {
+  const map = new Map<string, Permission>();
+  const roots: Permission[] = [];
+  
+  // 第一遍：创建映射
+  permissions.forEach(permission => {
+    map.set(permission.id, { ...permission, children: [] });
+  });
+  
+  // 第二遍：建立父子关系
+  permissions.forEach(permission => {
+    const node = map.get(permission.id)!;
+    if (permission.parentId && map.has(permission.parentId)) {
+      const parent = map.get(permission.parentId)!;
+      if (!parent.children) {
+        parent.children = [];
+      }
+      parent.children.push(node);
+    } else {
+      roots.push(node);
+    }
+  });
+  
+  return roots;
 };
 
 /**
@@ -438,8 +496,10 @@ export const getPermissionList = async (params?: PermissionListParams): Promise<
  * @returns 权限树结构数据，包含父子关系
  */
 export const getPermissionTree = async (): Promise<Permission[]> => {
-  // 后端已返回树结构（GET /admin/system/permissions）
-  return (await getPermissionMenu()) as unknown as Permission[];
+  // 获取扁平列表
+  const flatList = await getPermissionList();
+  // 构建树形结构
+  return buildPermissionTree(flatList);
 };
 
 /**
@@ -462,14 +522,17 @@ export interface CreatePermissionParams {
  */
 export const createPermission = async (data: CreatePermissionParams): Promise<Permission> => {
   // 调用后端新增接口：POST /admin/system/permissions
-  const payload = {
+  // 注意：后端Permission模型没有code字段，所以不要发送code
+  const payload: Record<string, unknown> = {
     name: data.name,
-    code: data.code,
     type: data.type,
     module: data.module,
     parentId: data.parentId ?? null,
   };
+  
+  console.log('创建权限请求数据:', payload);
   const res = await request.post<Record<string, unknown>>('/system/permissions', payload);
+  console.log('创建权限响应:', res);
   return res as unknown as Permission;
 };
 
@@ -480,13 +543,16 @@ export const createPermission = async (data: CreatePermissionParams): Promise<Pe
  * @returns Promise<void>
  */
 export const updatePermission = async (permissionId: string, data: Partial<CreatePermissionParams>): Promise<void> => {
+  // 注意：后端Permission模型没有code字段，所以不要发送code
   const payload: Record<string, unknown> = {};
   if (data.name !== undefined) payload.name = data.name;
-  if (data.code !== undefined) payload.code = data.code;
   if (data.type !== undefined) payload.type = data.type;
   if (data.module !== undefined) payload.module = data.module;
   if (data.parentId !== undefined) payload.parentId = data.parentId;
+  
+  console.log('更新权限请求数据:', { permissionId, payload });
   await request.patch(`/system/permissions/${permissionId}`, payload);
+  console.log('更新权限成功');
 };
 
 /**

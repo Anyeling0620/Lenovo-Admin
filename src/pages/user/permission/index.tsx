@@ -15,7 +15,6 @@ import {
   Tooltip,
   Badge,
   Table,
-  message
 } from 'antd';
 import { 
   SearchOutlined, 
@@ -27,13 +26,9 @@ import {
   MenuOutlined,
   ApiOutlined,
   AppstoreOutlined,
-  EyeOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import type { DataNode } from 'antd/es/tree';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
 import { 
   getPermissionTree, 
   getPermissionList,
@@ -41,31 +36,24 @@ import {
   updatePermission,
   deletePermission,
   type Permission,
-  type CreatePermissionParams
 } from '../../../services/user';
 import { globalMessage } from '../../../utils/globalMessage';
 import { globalErrorHandler } from '../../../utils/globalAxiosErrorHandler';
 
 const { Option } = Select;
 
-// 表单验证schema
-const permissionFilterSchema = z.object({
-  type: z.string().optional(),
-  module: z.string().optional(),
-});
+interface FilterFormValues {
+  type?: string;
+  module?: string;
+}
 
-type PermissionFilterForm = z.infer<typeof permissionFilterSchema>;
-
-// 创建/编辑权限表单schema
-const permissionFormSchema = z.object({
-  name: z.string().min(1, '权限名称不能为空'),
-  code: z.string().optional(),
-  type: z.enum(['MENU', 'BUTTON', 'API']),
-  module: z.string().min(1, '模块名称不能为空'),
-  parentId: z.string().optional(),
-});
-
-type PermissionForm = z.infer<typeof permissionFormSchema>;
+interface PermissionFormValues {
+  name: string;
+  code?: string;
+  type: 'MENU' | 'BUTTON' | 'API';
+  module: string;
+  parentId?: string;
+}
 
 const PermissionManagement: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -73,29 +61,14 @@ const PermissionManagement: React.FC = () => {
   const [listData, setListData] = useState<Permission[]>([]);
   const [expandedKeys, setExpandedKeys] = useState<React.Key[]>([]);
   const [selectedKeys, setSelectedKeys] = useState<React.Key[]>([]);
-  const [selectedPermission, setSelectedPermission] = useState<Permission | null>(null);
+  const [editingPermissionId, setEditingPermissionId] = useState<string | null>(null);
   const [formModalVisible, setFormModalVisible] = useState(false);
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
   const [parentPermissions, setParentPermissions] = useState<Permission[]>([]);
-
-  const { control: filterControl, handleSubmit: handleFilterSubmit, reset: resetFilter, watch: filterWatch } = useForm<PermissionFilterForm>({
-    resolver: zodResolver(permissionFilterSchema),
-    defaultValues: {
-      type: '',
-      module: '',
-    }
-  });
-
-  const { control: formControl, handleSubmit: handleFormSubmit, reset: resetForm, setValue } = useForm<PermissionForm>({
-    resolver: zodResolver(permissionFormSchema),
-    defaultValues: {
-      name: '',
-      code: '',
-      type: 'MENU',
-      module: '',
-      parentId: '',
-    }
-  });
+  
+  // 筛选表单和权限表单
+  const [filterForm] = Form.useForm<FilterFormValues>();
+  const [permissionForm] = Form.useForm<PermissionFormValues>();
 
   // 加载权限树
   const loadPermissionTree = async () => {
@@ -116,12 +89,12 @@ const PermissionManagement: React.FC = () => {
   };
 
   // 加载权限列表
-  const loadPermissionList = async (params?: any) => {
+  const loadPermissionList = async (params?: FilterFormValues) => {
     try {
       const data = await getPermissionList(params);
       setListData(data);
       
-      // 加载父权限选项
+      // 加载父权限选项 - 只有菜单类型可以作为父级
       const parentOptions = data.filter(p => p.type === 'MENU');
       setParentPermissions(parentOptions);
     } catch (error) {
@@ -134,19 +107,12 @@ const PermissionManagement: React.FC = () => {
     return permissions.map(permission => ({
       key: permission.id,
       title: (
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between" style={{ width: '100%' }}>
           <div className="flex items-center">
             {permission.type === 'MENU' && <MenuOutlined className="mr-2" />}
             {permission.type === 'BUTTON' && <AppstoreOutlined className="mr-2" />}
             {permission.type === 'API' && <ApiOutlined className="mr-2" />}
-            <span>{permission.name}</span>
-            {permission.code && (
-              <Tag color="blue" className="ml-2">
-                {permission.code}
-              </Tag>
-            )}
-          </div>
-          <div className="flex items-center space-x-1">
+            <span className="mr-2">{permission.name}</span>
             <Tag color={
               permission.type === 'MENU' ? 'green' :
               permission.type === 'BUTTON' ? 'orange' : 'purple'
@@ -154,42 +120,45 @@ const PermissionManagement: React.FC = () => {
               {permission.type === 'MENU' ? '菜单' :
                permission.type === 'BUTTON' ? '按钮' : '接口'}
             </Tag>
-            <Tag color={permission.status === 'ACTIVE' ? 'success' : 'default'}>
-              {permission.status === 'ACTIVE' ? '启用' : '禁用'}
-            </Tag>
-            <Space size={0}>
-              <Tooltip title="编辑">
+          </div>
+          <Space size={4}>
+            <Tooltip title="编辑">
+              <Button 
+                type="text" 
+                size="small" 
+                icon={<EditOutlined />}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleEditPermission(permission);
+                }}
+              />
+            </Tooltip>
+            <Tooltip title="删除">
+              <Popconfirm
+                title="确定要删除这个权限吗？"
+                description="删除后无法恢复，请谨慎操作"
+                onConfirm={(e) => {
+                  e?.stopPropagation();
+                  handleDeletePermission(permission.id);
+                }}
+                okText="确定"
+                cancelText="取消"
+              >
                 <Button 
                   type="text" 
                   size="small" 
-                  icon={<EditOutlined />}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleEditPermission(permission);
-                  }}
+                  danger 
+                  icon={<DeleteOutlined />}
+                  onClick={(e) => e.stopPropagation()}
                 />
-              </Tooltip>
-              <Tooltip title="删除">
-                <Popconfirm
-                  title="确定要删除这个权限吗？"
-                  onConfirm={() => handleDeletePermission(permission.id)}
-                  okText="确定"
-                  cancelText="取消"
-                >
-                  <Button 
-                    type="text" 
-                    size="small" 
-                    danger 
-                    icon={<DeleteOutlined />}
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                </Popconfirm>
-              </Tooltip>
-            </Space>
-          </div>
+              </Popconfirm>
+            </Tooltip>
+          </Space>
         </div>
       ),
-      children: permission.children ? convertPermissionsToTreeNodes(permission.children) : [],
+      children: permission.children && permission.children.length > 0 
+        ? convertPermissionsToTreeNodes(permission.children) 
+        : undefined,
       icon: permission.type === 'MENU' ? <FolderOutlined /> : undefined,
     }));
   };
@@ -207,22 +176,20 @@ const PermissionManagement: React.FC = () => {
   };
 
   // 处理搜索
-  const handleSearch = (values: PermissionFilterForm) => {
+  const handleSearch = () => {
+    const values = filterForm.getFieldsValue();
     loadPermissionList(values);
   };
 
   // 重置筛选
   const handleReset = () => {
-    resetFilter();
+    filterForm.resetFields();
     loadPermissionList();
   };
 
   // 处理树节点选择
-  const handleTreeSelect = (selectedKeys: React.Key[], info: any) => {
+  const handleTreeSelect = (selectedKeys: React.Key[]) => {
     setSelectedKeys(selectedKeys);
-    if (selectedKeys.length > 0) {
-      // 这里可以加载选中权限的详细信息
-    }
   };
 
   // 处理树节点展开
@@ -233,59 +200,81 @@ const PermissionManagement: React.FC = () => {
   // 打开创建权限模态框
   const handleCreatePermission = () => {
     setFormMode('create');
-    resetForm({
-      name: '',
-      code: '',
-      type: 'MENU',
-      module: '',
-      parentId: selectedKeys.length > 0 ? selectedKeys[0] as string : '',
-    });
+    setEditingPermissionId(null);
+    permissionForm.resetFields();
+    
+    // 如果有选中的节点，设置为父级
+    if (selectedKeys.length > 0) {
+      permissionForm.setFieldsValue({ parentId: selectedKeys[0] as string });
+    }
+    
     setFormModalVisible(true);
   };
 
   // 打开编辑权限模态框
   const handleEditPermission = (permission: Permission) => {
+    console.log('编辑权限:', permission);
     setFormMode('edit');
-    setSelectedPermission(permission);
-    resetForm({
+    setEditingPermissionId(permission.id);
+    permissionForm.setFieldsValue({
       name: permission.name,
-      code: permission.code || '',
-      type: permission.type as 'MENU' | 'BUTTON' | 'API',
+      type: permission.type,
       module: permission.module,
-      parentId: permission.parentId || '',
+      parentId: permission.parentId || undefined,
     });
     setFormModalVisible(true);
   };
 
   // 处理表单提交
-  const handleFormSubmitInternal = async (values: PermissionForm) => {
+  const handleFormSubmit = async () => {
     try {
+      const values = await permissionForm.validateFields();
+      
+      console.log('表单提交 - 模式:', formMode);
+      console.log('表单提交 - 编辑ID:', editingPermissionId);
+      console.log('表单提交 - 数据:', values);
+      
       if (formMode === 'create') {
-        await createPermission(values);
+        const result = await createPermission(values);
+        console.log('创建成功:', result);
         globalMessage.success('权限创建成功');
       } else {
-        if (selectedPermission) {
-          await updatePermission(selectedPermission.id, values);
-          globalMessage.success('权限更新成功');
+        // 编辑模式
+        if (!editingPermissionId) {
+          console.error('编辑模式但没有权限ID');
+          globalMessage.error('未找到要编辑的权限ID');
+          return;
         }
+        await updatePermission(editingPermissionId, values);
+        console.log('更新成功');
+        globalMessage.success('权限更新成功');
       }
       
       setFormModalVisible(false);
-      loadPermissionTree();
-      loadPermissionList();
-    } catch (error) {
+      setEditingPermissionId(null);
+      permissionForm.resetFields();
+      await loadPermissionTree();
+      await loadPermissionList();
+    } catch (error: unknown) {
+      console.error('表单提交错误:', error);
+      if (error && typeof error === 'object' && 'errorFields' in error) {
+        // 表单验证错误
+        return;
+      }
       globalErrorHandler.handle(error, globalMessage.error);
     }
   };
 
   // 删除权限
   const handleDeletePermission = async (permissionId: string) => {
+    console.log('删除权限:', permissionId);
     try {
       await deletePermission(permissionId);
       globalMessage.success('权限删除成功');
-      loadPermissionTree();
-      loadPermissionList();
+      await loadPermissionTree();
+      await loadPermissionList();
     } catch (error) {
+      console.error('删除权限错误:', error);
       globalErrorHandler.handle(error, globalMessage.error);
     }
   };
@@ -305,13 +294,6 @@ const PermissionManagement: React.FC = () => {
           <span>{text}</span>
         </div>
       ),
-    },
-    {
-      title: '权限编码',
-      dataIndex: 'code',
-      key: 'code',
-      width: 150,
-      render: (text) => text || '-',
     },
     {
       title: '类型',
@@ -350,11 +332,13 @@ const PermissionManagement: React.FC = () => {
       title: '操作',
       key: 'action',
       width: 120,
+      fixed: 'right',
       render: (_, record) => (
         <Space size="small">
           <Tooltip title="编辑">
             <Button 
-              type="text" 
+              type="link" 
+              size="small"
               icon={<EditOutlined />}
               onClick={() => handleEditPermission(record)}
             />
@@ -362,12 +346,14 @@ const PermissionManagement: React.FC = () => {
           <Tooltip title="删除">
             <Popconfirm
               title="确定要删除这个权限吗？"
+              description="删除后无法恢复"
               onConfirm={() => handleDeletePermission(record.id)}
               okText="确定"
               cancelText="取消"
             >
               <Button 
-                type="text" 
+                type="link" 
+                size="small"
                 danger 
                 icon={<DeleteOutlined />}
               />
@@ -379,8 +365,12 @@ const PermissionManagement: React.FC = () => {
   ];
 
   useEffect(() => {
-    loadPermissionTree();
-    loadPermissionList();
+    const initData = async () => {
+      await loadPermissionTree();
+      await loadPermissionList();
+    };
+    initData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -400,30 +390,32 @@ const PermissionManagement: React.FC = () => {
               </Button>
             }
           >
-            <div className="mb-4">
-              <Space>
+            <Form form={filterForm} layout="inline" className="mb-4">
+              <Form.Item name="module">
                 <Input
                   placeholder="搜索权限名称"
                   style={{ width: 200 }}
-                  value={filterWatch('module')}
-                  onChange={(e) => resetFilter({ ...filterWatch(), module: e.target.value })}
-                  onPressEnter={() => handleFilterSubmit(handleSearch)()}
+                  onPressEnter={handleSearch}
                 />
+              </Form.Item>
+              <Form.Item>
                 <Button
                   icon={<SearchOutlined />}
                   type="primary"
-                  onClick={() => handleFilterSubmit(handleSearch)()}
+                  onClick={handleSearch}
                 >
                   搜索
                 </Button>
+              </Form.Item>
+              <Form.Item>
                 <Button
                   icon={<ReloadOutlined />}
                   onClick={handleReset}
                 >
                   重置
                 </Button>
-              </Space>
-            </div>
+              </Form.Item>
+            </Form>
             
             <Tree
               treeData={treeData}
@@ -443,20 +435,21 @@ const PermissionManagement: React.FC = () => {
           <Card 
             title="权限列表"
             extra={
-              <Select
-                placeholder="按类型筛选"
-                style={{ width: 120 }}
-                value={filterWatch('type')}
-                onChange={(value) => {
-                  resetFilter({ ...filterWatch(), type: value });
-                  handleFilterSubmit(handleSearch)();
-                }}
-                allowClear
-              >
-                <Option value="MENU">菜单</Option>
-                <Option value="BUTTON">按钮</Option>
-                <Option value="API">接口</Option>
-              </Select>
+              <Form.Item name="type" noStyle>
+                <Select
+                  placeholder="按类型筛选"
+                  style={{ width: 120 }}
+                  onChange={(value) => {
+                    filterForm.setFieldsValue({ type: value });
+                    handleSearch();
+                  }}
+                  allowClear
+                >
+                  <Option value="MENU">菜单</Option>
+                  <Option value="BUTTON">按钮</Option>
+                  <Option value="API">接口</Option>
+                </Select>
+              </Form.Item>
             }
           >
             <Table
@@ -481,40 +474,33 @@ const PermissionManagement: React.FC = () => {
       <Modal
         title={formMode === 'create' ? '新增权限' : '编辑权限'}
         open={formModalVisible}
-        onCancel={() => setFormModalVisible(false)}
-        onOk={() => handleFormSubmit(handleFormSubmitInternal)()}
+        onCancel={() => {
+          setFormModalVisible(false);
+          setEditingPermissionId(null);
+          permissionForm.resetFields();
+        }}
+        onOk={handleFormSubmit}
         width={600}
+        okText="确定"
+        cancelText="取消"
       >
-        <Form layout="vertical">
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item label="权限名称" required>
-                <Input
-                  value={formControl._formValues.name}
-                  onChange={(e) => setValue('name', e.target.value)}
-                  placeholder="请输入权限名称"
-                />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item label="权限编码">
-                <Input
-                  value={formControl._formValues.code}
-                  onChange={(e) => setValue('code', e.target.value)}
-                  placeholder="请输入权限编码（英文）"
-                />
-              </Form.Item>
-            </Col>
-          </Row>
+        <Form form={permissionForm} layout="vertical">
+          <Form.Item 
+            label="权限名称" 
+            name="name"
+            rules={[{ required: true, message: '请输入权限名称' }]}
+          >
+            <Input placeholder="请输入权限名称" />
+          </Form.Item>
           
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item label="权限类型" required>
-                <Select
-                  value={formControl._formValues.type}
-                  onChange={(value) => setValue('type', value)}
-                  placeholder="请选择权限类型"
-                >
+              <Form.Item 
+                label="权限类型" 
+                name="type"
+                rules={[{ required: true, message: '请选择权限类型' }]}
+              >
+                <Select placeholder="请选择权限类型">
                   <Option value="MENU">菜单权限</Option>
                   <Option value="BUTTON">按钮权限</Option>
                   <Option value="API">接口权限</Option>
@@ -522,33 +508,32 @@ const PermissionManagement: React.FC = () => {
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item label="所属模块" required>
-                <Input
-                  value={formControl._formValues.module}
-                  onChange={(e) => setValue('module', e.target.value)}
-                  placeholder="请输入模块名称"
-                />
+              <Form.Item 
+                label="所属模块" 
+                name="module"
+                rules={[{ required: true, message: '请输入模块名称' }]}
+              >
+                <Input placeholder="请输入模块名称，如: system" />
               </Form.Item>
             </Col>
           </Row>
           
-          <Form.Item label="父级权限">
+          <Form.Item label="父级权限" name="parentId">
             <Select
-              value={formControl._formValues.parentId}
-              onChange={(value) => setValue('parentId', value)}
-              placeholder="请选择父级权限"
+              placeholder="请选择父级权限（可选）"
               allowClear
             >
               {parentPermissions.map(permission => (
                 <Option key={permission.id} value={permission.id}>
-                  {permission.name} ({permission.code || '无编码'})
+                  {permission.name} ({permission.module})
                 </Option>
               ))}
             </Select>
-            <div className="mt-2 text-sm text-gray-500">
-              提示：选择父级权限可以创建层级结构，留空则为顶级权限
-            </div>
           </Form.Item>
+          
+          <div className="text-sm text-gray-500">
+            提示：选择父级权限可以创建层级结构，留空则为顶级权限
+          </div>
         </Form>
       </Modal>
     </div>
