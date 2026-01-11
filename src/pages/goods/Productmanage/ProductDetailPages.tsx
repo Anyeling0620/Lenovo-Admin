@@ -45,7 +45,12 @@ interface ProductConfig {
   original_price: number | string;
   status: string;
   image?: string | null;
-  stock?: {
+  // 修改：stock 字段应该是一个嵌套对象，而不是 stock 属性
+  stock_num?: number; // 直接库存数量
+  warn_num?: number;  // 预警数量
+  freeze_num?: number; // 冻结数量
+  // 或者API返回的是这样：
+  stock_info?: {
     stock_id: string;
     stock_num: number;
     warn_num: number;
@@ -78,9 +83,6 @@ const ProductDetailPage: React.FC = () => {
   const [productDetail, setProductDetail] = useState<ProductDetailData | null>(null);
   const [activeTab, setActiveTab] = useState('basic');
 
-  // 获取当前页面路径，用于返回
-  const currentPath = window.location.pathname + window.location.search;
-  
   // 获取来源页面，如果没有则使用默认页面
   const fromPath = (location.state as any)?.from || '/goods/manage/list';
 
@@ -112,11 +114,6 @@ const ProductDetailPage: React.FC = () => {
   const handleBack = () => {
     navigate(fromPath);
   };
-
-  // 获取返回状态，确保能返回到当前页面
-  const getBackState = () => ({
-    from: currentPath
-  });
 
   // 处理价格显示
   const formatPrice = (price: number | string) => {
@@ -153,6 +150,16 @@ const ProductDetailPage: React.FC = () => {
     }
   };
 
+  // 获取当前页面路径（包含查询参数）
+  const getCurrentPath = () => {
+    return window.location.pathname + window.location.search;
+  };
+
+  // 获取跳转状态，确保能返回到当前页面
+  const getBackState = () => ({
+    from: getCurrentPath()
+  });
+
   // 处理库存编辑跳转
   const handleStockEdit = (stockId: string | undefined) => {
     if (!stockId) {
@@ -162,6 +169,40 @@ const ProductDetailPage: React.FC = () => {
     navigate(`/goods/stock/edit/${stockId}`, {
       state: getBackState()
     });
+  };
+
+  // 辅助函数：检查是否有库存信息
+  const hasStockInfo = (config: ProductConfig) => {
+    // 检查多种可能的库存字段
+    return (
+      (config.stock_num !== undefined && config.stock_num !== null) ||
+      (config.warn_num !== undefined && config.warn_num !== null) ||
+      (config.freeze_num !== undefined && config.freeze_num !== null) ||
+      (config.stock_info && (
+        config.stock_info.stock_num !== undefined ||
+        config.stock_info.warn_num !== undefined ||
+        config.stock_info.freeze_num !== undefined
+      ))
+    );
+  };
+
+  // 获取库存数值
+  const getStockValue = (config: ProductConfig) => {
+    if (config.stock_info) {
+      return {
+        stock_num: config.stock_info.stock_num || 0,
+        warn_num: config.stock_info.warn_num || 10,
+        freeze_num: config.stock_info.freeze_num || 0,
+        stock_id: config.stock_info.stock_id
+      };
+    }
+    
+    return {
+      stock_num: config.stock_num || 0,
+      warn_num: config.warn_num || 10,
+      freeze_num: config.freeze_num || 0,
+      stock_id: undefined
+    };
   };
 
   useEffect(() => {
@@ -239,6 +280,10 @@ const ProductDetailPage: React.FC = () => {
               )}
             </Space>
           }
+          headStyle={{ 
+            padding: '12px 16px',  // 修复：增加顶部卡片标题区域的内边距
+            borderBottom: '1px solid #f0f0f0'
+          }}
           bordered={false}
           style={{ marginBottom: 16 }}
         >
@@ -418,104 +463,111 @@ const ProductDetailPage: React.FC = () => {
                 <List
                   size="small"
                   dataSource={productDetail.configs}
-                  renderItem={(config) => (
-                    <List.Item>
-                      <Card 
-                        size="small" 
-                        style={{ 
-                          width: '100%',
-                          borderLeft: `4px solid ${config.status === '正常' ? '#52c41a' : '#faad14'}`
-                        }}
-                      >
-                        <Row align="middle" gutter={16}>
-                          <Col span={3}>
-                            {config.image && (
-                              <Image
-                                src={getImageUrl(config.image)}
-                                width={60}
-                                height={60}
-                                style={{ 
-                                  objectFit: 'contain',
-                                  borderRadius: 4
-                                }}
-                              />
-                            )}
-                          </Col>
-                          <Col span={5}>
-                            <div>
-                              <Text strong>配置1: </Text>
-                              {config.config1}
-                            </div>
-                            <div>
-                              <Text strong>配置2: </Text>
-                              {config.config2}
-                            </div>
-                            {config.config3 && (
+                  renderItem={(config) => {
+                    const hasStock = hasStockInfo(config);
+                    const stockData = getStockValue(config);
+                    
+                    return (
+                      <List.Item>
+                        <Card 
+                          size="small" 
+                          style={{ 
+                            width: '100%',
+                            borderLeft: `4px solid ${config.status === '正常' ? '#52c41a' : '#faad14'}`
+                          }}
+                        >
+                          <Row align="middle" gutter={16}>
+                            <Col span={3}>
+                              {config.image && (
+                                <Image
+                                  src={getImageUrl(config.image)}
+                                  width={60}
+                                  height={60}
+                                  style={{ 
+                                    objectFit: 'contain',
+                                    borderRadius: 4
+                                  }}
+                                />
+                              )}
+                            </Col>
+                            <Col span={5}>
                               <div>
-                                <Text strong>配置3: </Text>
-                                {config.config3}
+                                <Text strong>配置1: </Text>
+                                {config.config1}
                               </div>
-                            )}
-                          </Col>
-                          <Col span={4}>
-                            <div style={{ color: '#f5222d', fontWeight: 600, fontSize: 16 }}>
-                              ¥{formatPrice(config.sale_price)}
-                            </div>
-                            <div style={{ 
-                              fontSize: 12, 
-                              color: '#999', 
-                              textDecoration: 'line-through' 
-                            }}>
-                              原价: ¥{formatPrice(config.original_price)}
-                            </div>
-                          </Col>
-                          <Col span={4}>
-                            {config.stock ? (
-                              <>
+                              <div>
+                                <Text strong>配置2: </Text>
+                                {config.config2}
+                              </div>
+                              {config.config3 && (
                                 <div>
-                                  <StockOutlined /> 库存: {config.stock.stock_num}
+                                  <Text strong>配置3: </Text>
+                                  {config.config3}
                                 </div>
-                                <div style={{ fontSize: 12, color: '#faad14' }}>
-                                  预警: {config.stock.warn_num}
-                                </div>
-                                <div style={{ fontSize: 12, color: '#ff4d4f' }}>
-                                  冻结: {config.stock.freeze_num}
-                                </div>
-                              </>
-                            ) : (
-                              <div style={{ color: '#999' }}>
-                                <StockOutlined /> 无库存信息
+                              )}
+                            </Col>
+                            <Col span={4}>
+                              <div style={{ color: '#f5222d', fontWeight: 600, fontSize: 16 }}>
+                                ¥{formatPrice(config.sale_price)}
                               </div>
-                            )}
-                          </Col>
-                          <Col span={3}>
-                            <Tag color={getConfigStatusColor(config.status)}>
-                              {config.status}
-                            </Tag>
-                          </Col>
-                          <Col span={5} style={{ textAlign: 'right' }}>
-                            <Space>
-                              <Button 
-                                size="small"
-                                onClick={() => navigate(`/goods/manage/sku/edit/${config.product_config_id}`, {
-                                  state: getBackState()
-                                })}
-                              >
-                                编辑
-                              </Button>
-                              <Button 
-                                size="small"
-                                onClick={() => handleStockEdit(config.stock?.stock_id)}
-                                disabled={!config.stock}
-                              >
-                                管理库存
-                              </Button>
-                            </Space>
-                          </Col>
-                        </Row>
-                      </Card>
-                    </List.Item>
-                  )}
+                              <div style={{ 
+                                fontSize: 12, 
+                                color: '#999', 
+                                textDecoration: 'line-through' 
+                              }}>
+                                原价: ¥{formatPrice(config.original_price)}
+                              </div>
+                            </Col>
+                            <Col span={4}>
+                              {hasStock ? (
+                                <>
+                                  <div>
+                                    <StockOutlined /> 库存: {stockData.stock_num}
+                                  </div>
+                                  <div style={{ fontSize: 12, color: '#faad14' }}>
+                                    预警: {stockData.warn_num}
+                                  </div>
+                                  {stockData.freeze_num > 0 && (
+                                    <div style={{ fontSize: 12, color: '#ff4d4f' }}>
+                                      冻结: {stockData.freeze_num}
+                                    </div>
+                                  )}
+                                </>
+                              ) : (
+                                <div style={{ color: '#999' }}>
+                                  <StockOutlined /> 无库存信息
+                                </div>
+                              )}
+                            </Col>
+                            <Col span={3}>
+                              <Tag color={getConfigStatusColor(config.status)}>
+                                {config.status}
+                              </Tag>
+                            </Col>
+                            <Col span={5} style={{ textAlign: 'right' }}>
+                              <Space>
+                                <Button 
+                                  size="small"
+                                  onClick={() => navigate(`/goods/manage/sku/edit/${config.product_config_id}`, {
+                                    state: getBackState()
+                                  })}
+                                >
+                                  编辑
+                                </Button>
+                                <Button 
+                                  size="small"
+                                  onClick={() => handleStockEdit(stockData.stock_id)}
+                                  disabled={!hasStock || !stockData.stock_id}
+                                >
+                                  管理库存
+                                </Button>
+                              </Space>
+                            </Col>
+                          </Row>
+                        </Card>
+                      </List.Item>
+                    );
+                  }}
                 />
               ) : (
                 <Empty description="暂无SKU配置" />
@@ -548,14 +600,14 @@ const ProductDetailPage: React.FC = () => {
             >
               管理图库
             </Button>
-            <Button
+            {/* <Button
               type="primary"
               onClick={() => navigate(`/goods/manage/shelf/${productDetail.product_id}`, {
                 state: getBackState()
               })}
             >
               上架商品
-            </Button>
+            </Button> */}
           </Space>
         </div>
       </div>

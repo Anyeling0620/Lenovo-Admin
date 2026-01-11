@@ -525,7 +525,7 @@ const ProductFormPage: React.FC = () => {
                           type="text" 
                           icon={<PlusOutlined />} 
                           block
-                          onClick={() => navigate('/goods/tags', {
+                          onClick={() => navigate('/goods/tag', {
                             state: { from: window.location.pathname + window.location.search }
                           })}
                         >

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useCallback } from 'react';
 import {
@@ -372,11 +373,11 @@ const ProductGalleryPage: React.FC = () => {
                         )
                       }
                       actions={[
-                        <Tooltip title="编辑排序" key="edit">
-                          <EditOutlined 
-                            onClick={() => handleEditBanner(banner)} 
-                          />
-                        </Tooltip>,
+                        // <Tooltip title="编辑排序" key="edit">
+                        //   <EditOutlined 
+                        //     onClick={() => handleEditBanner(banner)} 
+                        //   />
+                        // </Tooltip>,
                         <Tooltip title="替换图片" key="replace">
                           <Upload
                             showUploadList={false}
