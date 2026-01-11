@@ -142,16 +142,23 @@ const OnlineManagement: React.FC = () => {
     {
       title: '设备',
       key: 'device',
-      width: 150,
+      width: 200,
       render: (_, record) => {
-        const isMobile = record.deviceType === 'mobile' || record.deviceType === '手机';
-        const deviceTypeName = isMobile ? '手机' : '电脑';
+        // 更精确的设备类型判断
+        const deviceType = record.deviceType?.toLowerCase() || '';
+        const isMobile = deviceType.includes('mobile') || 
+                        deviceType === '手机' || 
+                        deviceType === 'android' || 
+                        deviceType === 'ios' ||
+                        deviceType === 'phone';
+        const deviceTypeName = isMobile ? '移动设备' : '桌面设备';
+        
         return (
           <div className="flex items-center">
             {isMobile ? <MobileOutlined className="mr-2 text-green-500" /> : <DesktopOutlined className="mr-2 text-blue-500" />}
             <div>
-              <div className="text-sm">{record.deviceName}</div>
-              <div className="text-xs text-gray-500">{deviceTypeName}</div>
+              <div className="text-sm font-medium">{record.deviceName || '未知设备'}</div>
+              <div className="text-xs text-gray-500">{deviceTypeName} ({record.deviceType || '未知'})</div>
             </div>
           </div>
         );
@@ -220,16 +227,23 @@ const OnlineManagement: React.FC = () => {
     {
       title: '设备',
       key: 'device',
-      width: 150,
+      width: 200,
       render: (_, record) => {
-        const isMobile = record.deviceType === 'mobile' || record.deviceType === '手机';
-        const deviceTypeName = isMobile ? '手机' : '电脑';
+        // 更精确的设备类型判断
+        const deviceType = record.deviceType?.toLowerCase() || '';
+        const isMobile = deviceType.includes('mobile') || 
+                        deviceType === '手机' || 
+                        deviceType === 'android' || 
+                        deviceType === 'ios' ||
+                        deviceType === 'phone';
+        const deviceTypeName = isMobile ? '移动设备' : '桌面设备';
+        
         return (
           <div className="flex items-center">
             {isMobile ? <MobileOutlined className="mr-2 text-green-500" /> : <DesktopOutlined className="mr-2 text-blue-500" />}
             <div>
-              <div className="text-sm">{record.deviceName}</div>
-              <div className="text-xs text-gray-500">{deviceTypeName}</div>
+              <div className="text-sm font-medium">{record.deviceName || '未知设备'}</div>
+              <div className="text-xs text-gray-500">{deviceTypeName} ({record.deviceType || '未知'})</div>
             </div>
           </div>
         );
@@ -298,16 +312,27 @@ const OnlineManagement: React.FC = () => {
     {
       title: '设备',
       key: 'device',
-      width: 150,
-      render: (_, record) => (
-        <div className="flex items-center">
-          {record.deviceType === 'pc' ? <DesktopOutlined className="mr-2 text-blue-500" /> : <MobileOutlined className="mr-2 text-green-500" />}
-          <div>
-            <div className="text-sm">{record.deviceName}</div>
-            <div className="text-xs text-gray-500">{record.deviceType === 'pc' ? '电脑' : '手机'}</div>
+      width: 200,
+      render: (_, record) => {
+        // 更精确的设备类型判断
+        const deviceType = record.deviceType?.toLowerCase() || '';
+        const isMobile = deviceType.includes('mobile') || 
+                        deviceType === '手机' || 
+                        deviceType === 'android' || 
+                        deviceType === 'ios' ||
+                        deviceType === 'phone';
+        const deviceTypeName = isMobile ? '移动设备' : '桌面设备';
+        
+        return (
+          <div className="flex items-center">
+            {isMobile ? <MobileOutlined className="mr-2 text-green-500" /> : <DesktopOutlined className="mr-2 text-blue-500" />}
+            <div>
+              <div className="text-sm font-medium">{record.deviceName || '未知设备'}</div>
+              <div className="text-xs text-gray-500">{deviceTypeName} ({record.deviceType || '未知'})</div>
+            </div>
           </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       title: '登录时间',

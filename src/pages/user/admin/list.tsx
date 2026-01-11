@@ -582,7 +582,7 @@ const AdminListPage: React.FC = () => {
                     )}
                   </div>
                   <div className="mt-2 text-sm text-gray-600">
-                    提示：密码应包含大小写字母、数字和特殊字符，长度不少于8位
+                    提示：密码应包含大小写字母、数字和特殊字符，长度不少于6位
                   </div>
                 </div>
               )}
