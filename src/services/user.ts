@@ -946,7 +946,7 @@ export interface OnlineListResponse {
  * @returns 在线用户列表响应数据
  */
 export const getOnlineList = async (): Promise<OnlineListResponse> => {
-  // admin.routes.ts: GET /system/admins/online
+  // 获取在线管理员
   const admins = await getOnlineAdmins();
   
   // 定义后端返回数据的类型
@@ -964,7 +964,7 @@ export const getOnlineList = async (): Promise<OnlineListResponse> => {
     device_type?: string;
   }
   
-  // 转换后端返回的数据格式
+  // 转换管理员数据格式
   const adminList: OnlineAdmin[] = (admins as AdminSessionResponse[]).map((item) => ({
     id: item.admin_session_id || item.id,
     adminId: item.admin_id,
@@ -978,10 +978,44 @@ export const getOnlineList = async (): Promise<OnlineListResponse> => {
     lastActivityTime: item.expire_time ? new Date(item.expire_time).toISOString() : new Date().toISOString(),
   }));
   
+  // 获取在线用户
+  interface UserLoginResponse {
+    user_login_id: string;
+    user_id: string;
+    account: string;
+    name: string;
+    email: string;
+    device_id: string;
+    device_name: string;
+    device_type: string;
+    login_time: string;
+    login_ip?: string;
+    user_agent?: string;
+  }
+  
+  let userList: OnlineUser[] = [];
+  try {
+    const users = await request.get<UserLoginResponse[]>('/system/users/online');
+    userList = users.map((item) => ({
+      id: item.user_login_id,
+      userId: item.user_id,
+      account: item.account,
+      name: item.name,
+      loginTime: item.login_time,
+      deviceType: item.device_type || 'pc',
+      deviceName: item.device_name || '未知设备',
+      ipAddress: item.login_ip || '',
+      sessionId: item.user_login_id, // 使用user_login_id作为sessionId
+      lastActivityTime: item.login_time,
+    }));
+  } catch (error) {
+    console.error('获取在线用户失败:', error);
+  }
+  
   return {
-    users: [],
+    users: userList,
     admins: adminList,
-    totalUsers: 0,
+    totalUsers: userList.length,
     totalAdmins: adminList.length,
   };
 };
@@ -997,8 +1031,8 @@ export const forceLogout = async (sessionId: string, userType: 'USER' | 'ADMIN')
     // admin.routes.ts: POST /system/sessions/:session_id/force-logout
     await request.post(`/system/sessions/${sessionId}/force-logout`);
   } else {
-    // 用户强制下线接口（如果后端有的话）
-    throw new Error('Backend route not implemented: force logout for users');
+    // 用户强制下线接口: POST /system/users/logins/:user_login_id/force-logout
+    await request.post(`/system/users/logins/${sessionId}/force-logout`);
   }
 };
 
@@ -1046,51 +1080,53 @@ export interface LoginRecordResponse {
  * @returns 登录记录响应数据
  */
 export const getLoginRecords = async (params: LoginRecordParams): Promise<LoginRecordResponse> => {
-  if (params.userType === 'ADMIN' || !params.userType) {
-    // 定义后端返回数据的类型
-    interface AdminLoginRecordResponse {
-      id: string;
-      adminId: string;
-      account: string;
-      name: string;
-      deviceType: string;
-      deviceName: string;
-      ipAddress: string;
-      loginTime: string;
-      logoutTime?: string;
-      status: string;
-    }
-    
-    // admin.routes.ts: GET /system/admins/login-records
-    const response = await request.get<{
-      list: AdminLoginRecordResponse[];
-      total: number;
-      page: number;
-      pageSize: number;
-    }>('/system/admins/login-records', { params });
-    
-    return {
-      list: response.list.map((item) => ({
-        id: item.id,
-        userId: item.adminId,
-        account: item.account,
-        name: item.name,
-        deviceType: item.deviceType,
-        deviceName: item.deviceName,
-        ipAddress: item.ipAddress,
-        userAgent: '',
-        loginTime: item.loginTime,
-        logoutTime: item.logoutTime,
-        status: item.status as 'ONLINE' | 'OFFLINE',
-      })),
-      total: response.total,
-      page: response.page,
-      pageSize: response.pageSize,
-    };
-  } else {
-    // 用户登录记录接口（如果后端有的话）
-    throw new Error('Backend route not implemented: login records for users');
+  // 定义后端返回数据的类型
+  interface LoginRecordResponse {
+    id: string;
+    userId?: string;
+    adminId?: string;
+    account: string;
+    name: string;
+    email?: string;
+    deviceType: string;
+    deviceName: string;
+    ipAddress: string;
+    userAgent?: string;
+    loginTime: string;
+    logoutTime?: string;
+    status: string;
   }
+  
+  let apiUrl = '/system/admins/login-records';
+  if (params.userType === 'USER') {
+    apiUrl = '/system/users/login-records';
+  }
+  
+  const response = await request.get<{
+    list: LoginRecordResponse[];
+    total: number;
+    page: number;
+    pageSize: number;
+  }>(apiUrl, { params });
+  
+  return {
+    list: response.list.map((item) => ({
+      id: item.id,
+      userId: item.userId || item.adminId || '',
+      account: item.account,
+      name: item.name,
+      deviceType: item.deviceType,
+      deviceName: item.deviceName,
+      ipAddress: item.ipAddress,
+      userAgent: item.userAgent || '',
+      loginTime: item.loginTime,
+      logoutTime: item.logoutTime,
+      status: item.status as 'ONLINE' | 'OFFLINE',
+    })),
+    total: response.total,
+    page: response.page,
+    pageSize: response.pageSize,
+  };
 };
 
 // ==================== 商品专区 ====================
