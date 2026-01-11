@@ -914,6 +914,10 @@ export const getOnlineList = async (): Promise<OnlineListResponse> => {
     name: string;
     session_id: string;
     expire_time?: string;
+    login_time?: string;
+    login_ip?: string;
+    device_name?: string;
+    device_type?: string;
   }
   
   // 转换后端返回的数据格式
@@ -922,10 +926,10 @@ export const getOnlineList = async (): Promise<OnlineListResponse> => {
     adminId: item.admin_id,
     account: item.account,
     name: item.name,
-    loginTime: item.expire_time ? new Date(item.expire_time).toISOString() : new Date().toISOString(),
-    deviceType: 'pc', // 默认值，后端可能没有该字段
-    deviceName: '电脑', // 默认值
-    ipAddress: '', // 默认值
+    loginTime: item.login_time || new Date().toISOString(),
+    deviceType: item.device_type || 'pc',
+    deviceName: item.device_name || '未知设备',
+    ipAddress: item.login_ip || '',
     sessionId: item.session_id,
     lastActivityTime: item.expire_time ? new Date(item.expire_time).toISOString() : new Date().toISOString(),
   }));

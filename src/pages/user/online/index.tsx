@@ -143,15 +143,19 @@ const OnlineManagement: React.FC = () => {
       title: '设备',
       key: 'device',
       width: 150,
-      render: (_, record) => (
-        <div className="flex items-center">
-          {record.deviceType === 'pc' ? <DesktopOutlined className="mr-2 text-blue-500" /> : <MobileOutlined className="mr-2 text-green-500" />}
-          <div>
-            <div className="text-sm">{record.deviceName}</div>
-            <div className="text-xs text-gray-500">{record.deviceType === 'pc' ? '电脑' : '手机'}</div>
+      render: (_, record) => {
+        const isMobile = record.deviceType === 'mobile' || record.deviceType === '手机';
+        const deviceTypeName = isMobile ? '手机' : '电脑';
+        return (
+          <div className="flex items-center">
+            {isMobile ? <MobileOutlined className="mr-2 text-green-500" /> : <DesktopOutlined className="mr-2 text-blue-500" />}
+            <div>
+              <div className="text-sm">{record.deviceName}</div>
+              <div className="text-xs text-gray-500">{deviceTypeName}</div>
+            </div>
           </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       title: '登录时间',
@@ -217,15 +221,19 @@ const OnlineManagement: React.FC = () => {
       title: '设备',
       key: 'device',
       width: 150,
-      render: (_, record) => (
-        <div className="flex items-center">
-          {record.deviceType === 'pc' ? <DesktopOutlined className="mr-2 text-blue-500" /> : <MobileOutlined className="mr-2 text-green-500" />}
-          <div>
-            <div className="text-sm">{record.deviceName}</div>
-            <div className="text-xs text-gray-500">{record.deviceType === 'pc' ? '电脑' : '手机'}</div>
+      render: (_, record) => {
+        const isMobile = record.deviceType === 'mobile' || record.deviceType === '手机';
+        const deviceTypeName = isMobile ? '手机' : '电脑';
+        return (
+          <div className="flex items-center">
+            {isMobile ? <MobileOutlined className="mr-2 text-green-500" /> : <DesktopOutlined className="mr-2 text-blue-500" />}
+            <div>
+              <div className="text-sm">{record.deviceName}</div>
+              <div className="text-xs text-gray-500">{deviceTypeName}</div>
+            </div>
           </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       title: '登录时间',
