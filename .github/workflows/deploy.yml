@@ -46,7 +46,7 @@ jobs:
       - name: Build Project
         run: |
           rm -rf dist # 强制删除旧构建目录
-          export NODE_OPTIONS="--max-old-space-size=512"
+          export NODE_OPTIONS="--max-old-space-size=1024"
           pnpm vite build
 
       # 部署到 Web 根目录
