@@ -35,21 +35,55 @@ import {
 import { useRequest } from 'ahooks';
 import { z } from 'zod';
 import dayjs from 'dayjs';
-// 售货专区API函数
-import { 
-  getSalesZones, 
-  createSalesZone, 
-  updateSalesZone, 
-  deleteSalesZone 
-} from "../../../services/api";
 import globalErrorHandler from "../../../utils/globalAxiosErrorHandler";
 import { globalMessage } from "../../../utils/globalMessage";
 import { getImageUrl } from "../../../utils/imageUrl";
-import type { 
-  SalesZoneResponse, 
-  SalesZoneCreateRequest, 
-  SalesZoneUpdateRequest 
-} from "../../../services/api-type";
+
+// 售货专区响应类型定义（模拟数据）
+interface SalesZoneResponse {
+  sales_zone_id: string;
+  zone_name: string;
+  description: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// 售货专区创建请求类型
+interface SalesZoneCreateRequest {
+  zone_name: string;
+  description: string;
+  status: string;
+}
+
+// 售货专区更新请求类型
+interface SalesZoneUpdateRequest {
+  zone_name?: string;
+  description?: string;
+  status?: string;
+}
+
+// 模拟API函数
+const getSalesZones = async (): Promise<SalesZoneResponse[]> => {
+  // 模拟API调用延迟
+  await new Promise(resolve => setTimeout(resolve, 500));
+  return []; // 返回空数组，实际使用时可以添加模拟数据
+};
+
+const createSalesZone = async (data: SalesZoneCreateRequest): Promise<{ sales_zone_id: string }> => {
+  await new Promise(resolve => setTimeout(resolve, 500));
+  return { sales_zone_id: Date.now().toString() };
+};
+
+const updateSalesZone = async (salesZoneId: string, data: SalesZoneUpdateRequest): Promise<null> => {
+  await new Promise(resolve => setTimeout(resolve, 500));
+  return null;
+};
+
+const deleteSalesZone = async (salesZoneId: string): Promise<null> => {
+  await new Promise(resolve => setTimeout(resolve, 500));
+  return null;
+};
 
 const { Title } = Typography;
 const { Option } = Select;
@@ -85,9 +119,8 @@ const SalesZoneManagement = () => {
     loading: zonesLoading, 
     run: fetchSalesZones 
   } = useRequest(
-    () => getSalesZones(filters),
+    () => getSalesZones(),
     {
-      refreshDeps: [filters],
       onError: (error) => {
         globalErrorHandler.handle(error, globalMessage.error);
       }

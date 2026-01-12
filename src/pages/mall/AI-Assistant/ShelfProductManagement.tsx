@@ -1,53 +1,41 @@
-import { useState } from "react";
+import React, { useState } from 'react';
 import {
+  Card,
   Table,
   Button,
   Space,
-  Card,
-  Row,
-  Col,
-  Select,
-  Typography,
-  Tag,
   Modal,
   Form,
   Input,
+  Select,
   Switch,
+  Row,
+  Col,
   Divider,
+  Typography,
+  Tag,
   Image,
   Popconfirm,
   Tooltip,
   Upload
-} from "antd";
-import { 
-  PlusOutlined, 
-  SearchOutlined, 
-  EditOutlined, 
+} from 'antd';
+import {
+  PlusOutlined,
+  EditOutlined,
   DeleteOutlined,
-  EyeOutlined,
-  SettingOutlined,
-  UploadOutlined,
+  SearchOutlined,
   DownloadOutlined,
+  UploadOutlined,
+  EyeOutlined,
   InboxOutlined
-} from "@ant-design/icons";
+} from '@ant-design/icons';
 import { useRequest } from 'ahooks';
+import type { ShelfProductResponse, CategoryResponse, ProductListItem, ShelfProductStatus } from '../../../services/api-type';
+import { getShelfProducts, createShelfProduct, updateShelfFlags, updateShelfStatus, deleteShelfItem, getCategories, getProducts } from '../../../services/api';
+import { globalMessage } from '../../../utils/globalMessage';
+import { globalErrorHandler } from '../../../utils/globalAxiosErrorHandler';
+import { getImageUrl } from '../../../utils/imageUrl';
 import { z } from 'zod';
-import { 
-  getShelfProducts, 
-  getCategories, 
-  createShelfProduct, 
-  updateShelfFlags, 
-  updateShelfStatus,
-  deleteShelfItem
-} from "../../../services/api";
-import globalErrorHandler from "../../../utils/globalAxiosErrorHandler";
-import { globalMessage } from "../../../utils/globalMessage";
-import { getImageUrl } from "../../../utils/imageUrl";
-import type { 
-  ShelfProductResponse, 
-  CategoryResponse, 
-  ShelfProductStatus 
-} from "../../../services/api-type";
 
 const { Title } = Typography;
 const { Option } = Select;
@@ -74,6 +62,13 @@ const ShelfProductManagement = () => {
   });
   const [importModalVisible, setImportModalVisible] = useState(false);
   const [form] = Form.useForm();
+  
+  // 商品选择器相关状态
+  const [productModalOpen, setProductModalOpen] = useState(false);
+  const [productFetchLoading, setProductFetchLoading] = useState(false);
+  const [productSearch, setProductSearch] = useState('');
+  const [productList, setProductList] = useState<ProductListItem[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState<ProductListItem | null>(null);
 
   const { 
     data: shelfProducts = [], 
@@ -99,14 +94,24 @@ const ShelfProductManagement = () => {
 
   const handleAdd = () => {
     setEditingProduct(null);
+    setSelectedProduct(null);
     form.resetFields();
     setIsModalVisible(true);
   };
 
   const handleEdit = (product: ShelfProductResponse) => {
     setEditingProduct(product);
+    // 在编辑模式下，设置已选择的商品信息
+    setSelectedProduct({
+      product_id: product.product_id,
+      name: product.product_name,
+      brand_name: product.brand_name,
+      category_name: product.category_name,
+      status: product.status
+    } as ProductListItem);
     form.setFieldsValue({
       product_id: product.product_id,
+      product_name: product.product_name,
       category_id: product.category_id,
       is_self_operated: product.is_self_operated,
       is_customizable: product.is_customizable,
@@ -115,6 +120,41 @@ const ShelfProductManagement = () => {
     });
     setIsModalVisible(true);
   };
+
+  // 商品选择器相关函数
+  const fetchProducts = async () => {
+    setProductFetchLoading(true);
+    try {
+      const res = await getProducts();
+      setProductList(res);
+    } catch (error) {
+      globalErrorHandler.handle(error, globalMessage.error);
+      setProductList([]);
+    } finally {
+      setProductFetchLoading(false);
+    }
+  };
+
+  const openProductPicker = () => {
+    setProductModalOpen(true);
+    if (!productList.length) {
+      fetchProducts();
+    }
+  };
+
+  const confirmProduct = () => {
+    if (!selectedProduct) return;
+    form.setFieldsValue({
+      product_id: selectedProduct.product_id,
+      product_name: selectedProduct.name,
+    });
+    setProductModalOpen(false);
+  };
+
+  const filteredProducts = productList.filter(product => 
+    product.name?.toLowerCase().includes(productSearch.toLowerCase()) ||
+    product.product_id?.toLowerCase().includes(productSearch.toLowerCase())
+  );
 
   const onFinish = async (values: any) => {
     try {
@@ -429,14 +469,21 @@ const ShelfProductManagement = () => {
         >
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item
-                label="商品ID"
-                name="product_id"
-                rules={[{ required: true, message: '请选择商品' }]}
-              >
-                <Input
-                  placeholder="请输入商品ID"
-                />
+              <Form.Item label="选择商品" required style={{ minWidth: 260 }}>
+                <Space>
+                  <Button onClick={openProductPicker}>选择商品</Button>
+                  {selectedProduct && (
+                    <Typography.Text type="secondary">
+                      已选：{selectedProduct.name}（ID: {selectedProduct.product_id}）
+                    </Typography.Text>
+                  )}
+                </Space>
+              </Form.Item>
+              <Form.Item name="product_id" hidden rules={[{ required: true, message: '请选择商品' }]}>
+                <Input />
+              </Form.Item>
+              <Form.Item name="product_name" hidden>
+                <Input />
               </Form.Item>
             </Col>
             <Col span={12}>
@@ -516,6 +563,46 @@ const ShelfProductManagement = () => {
             </Space>
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* 商品选择模态框 */}
+      <Modal
+        open={productModalOpen}
+        title="选择商品"
+        onCancel={() => setProductModalOpen(false)}
+        onOk={confirmProduct}
+        okButtonProps={{ disabled: !selectedProduct, loading: productFetchLoading }}
+        destroyOnClose
+        width={900}
+      >
+        <Space style={{ marginBottom: 12 }}>
+          <Input
+            placeholder="输入关键词搜索（名称或ID）"
+            value={productSearch}
+            onChange={e => setProductSearch(e.target.value)}
+            style={{ width: 260 }}
+            allowClear
+          />
+          <Button onClick={fetchProducts} loading={productFetchLoading}>刷新列表</Button>
+        </Space>
+        <Table
+          rowKey="product_id"
+          dataSource={filteredProducts}
+          loading={productFetchLoading}
+          pagination={{ pageSize: 8 }}
+          rowSelection={{
+            type: 'radio',
+            selectedRowKeys: selectedProduct ? [selectedProduct.product_id] : [],
+            onChange: (_, rows) => setSelectedProduct(rows[0]),
+          }}
+          columns={[
+            { title: '商品ID', dataIndex: 'product_id', width: 140 },
+            { title: '名称', dataIndex: 'name' },
+            { title: '品牌', dataIndex: 'brand_name', width: 140 },
+            { title: '分类', dataIndex: 'category_name', width: 160 },
+            { title: '状态', dataIndex: 'status', width: 100 },
+          ]}
+        />
       </Modal>
 
       {/* 导入商品模态框 */}
