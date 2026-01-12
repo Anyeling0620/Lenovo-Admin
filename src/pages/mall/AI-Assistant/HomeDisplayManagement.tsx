@@ -41,6 +41,19 @@ import { globalMessage } from "../../../utils/globalMessage";
 import { getImageUrl } from "../../../utils/imageUrl";
 import { getHomePush, HomePushResponse } from "../../../services/api";
 
+// 首页展示响应类型定义
+interface HomeDisplayResponse {
+  display_id: string;
+  display_name: string;
+  display_type: string;
+  display_image?: string;
+  target_url?: string;
+  status: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
 const { Title } = Typography;
 const { Option } = Select;
 
@@ -71,11 +84,25 @@ const HomeDisplayManagement = () => {
 
 
   const { 
-    data: homeDisplays, 
+    data: homeDisplays = [], 
     loading: displaysLoading, 
     run: fetchHomeDisplays 
   } = useRequest(
-    () => getHomePush(),
+    async () => {
+      const response = await getHomePush();
+      // 将HomePushResponse转换为HomeDisplayResponse
+      return response.map(item => ({
+        display_id: item.push_id || '',
+        display_name: item.push_name || '',
+        display_type: item.push_type || '',
+        display_image: item.push_image,
+        target_url: item.target_url,
+        status: item.status || '',
+        sort_order: item.sort_order || 0,
+        created_at: item.created_at || '',
+        updated_at: item.updated_at || ''
+      }));
+    },
     {
       refreshDeps: [filters],
       onError: (error) => globalErrorHandler.handle(error, globalMessage.error)

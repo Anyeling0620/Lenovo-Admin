@@ -27,7 +27,6 @@ import {
   EditOutlined, 
   DeleteOutlined,
   EyeOutlined,
-  SettingOutlined,
   UploadOutlined,
   DownloadOutlined,
   InboxOutlined
@@ -44,7 +43,11 @@ interface SalesZoneResponse {
   sales_zone_id: string;
   zone_name: string;
   description: string;
-  status: string;
+  status: 'active' | 'inactive';
+  is_featured: boolean;
+  sort_order: number;
+  start_time?: string;
+  end_time?: string;
   created_at: string;
   updated_at: string;
 }
@@ -56,11 +59,26 @@ interface SalesZoneCreateRequest {
   status: string;
 }
 
+// 售货专区创建请求类型
+interface SalesZoneCreateRequest {
+  zone_name: string;
+  description: string;
+  status: 'active' | 'inactive';
+  is_featured: boolean;
+  sort_order: number;
+  start_time?: string;
+  end_time?: string;
+}
+
 // 售货专区更新请求类型
 interface SalesZoneUpdateRequest {
   zone_name?: string;
   description?: string;
-  status?: string;
+  status?: 'active' | 'inactive';
+  is_featured?: boolean;
+  sort_order?: number;
+  start_time?: string;
+  end_time?: string;
 }
 
 // 模拟API函数
@@ -71,16 +89,19 @@ const getSalesZones = async (): Promise<SalesZoneResponse[]> => {
 };
 
 const createSalesZone = async (data: SalesZoneCreateRequest): Promise<{ sales_zone_id: string }> => {
+  console.log('创建售货专区:', data);
   await new Promise(resolve => setTimeout(resolve, 500));
   return { sales_zone_id: Date.now().toString() };
 };
 
 const updateSalesZone = async (salesZoneId: string, data: SalesZoneUpdateRequest): Promise<null> => {
+  console.log('更新售货专区:', salesZoneId, data);
   await new Promise(resolve => setTimeout(resolve, 500));
   return null;
 };
 
 const deleteSalesZone = async (salesZoneId: string): Promise<null> => {
+  console.log('删除售货专区:', salesZoneId);
   await new Promise(resolve => setTimeout(resolve, 500));
   return null;
 };
@@ -151,17 +172,33 @@ const SalesZoneManagement = () => {
     try {
       const validatedData = salesZoneSchema.parse({
         ...values,
-        start_time: values.start_time ? values.start_time.format('YYYY-MM-DD') : null,
-        end_time: values.end_time ? values.end_time.format('YYYY-MM-DD') : null
+        start_time: values.start_time ? values.start_time.format('YYYY-MM-DD') : undefined,
+        end_time: values.end_time ? values.end_time.format('YYYY-MM-DD') : undefined
       });
 
       if (editingZone) {
         // 更新售货专区
-        await updateSalesZone(editingZone.sales_zone_id, validatedData);
+        await updateSalesZone(editingZone.sales_zone_id, {
+          zone_name: validatedData.zone_name,
+          description: validatedData.description || '',
+          status: validatedData.status,
+          is_featured: validatedData.is_featured,
+          sort_order: validatedData.sort_order,
+          start_time: validatedData.start_time,
+          end_time: validatedData.end_time
+        });
         globalMessage.success('售货专区更新成功');
       } else {
         // 创建售货专区
-        await createSalesZone(validatedData);
+        await createSalesZone({
+          zone_name: validatedData.zone_name,
+          description: validatedData.description || '',
+          status: validatedData.status,
+          is_featured: validatedData.is_featured,
+          sort_order: validatedData.sort_order,
+          start_time: validatedData.start_time,
+          end_time: validatedData.end_time
+        });
         globalMessage.success('售货专区创建成功');
       }
       setIsModalVisible(false);

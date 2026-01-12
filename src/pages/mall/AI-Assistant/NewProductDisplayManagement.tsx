@@ -17,9 +17,7 @@ import {
   Image,
   Popconfirm,
   Tooltip,
-  InputNumber,
-  DatePicker,
-  Upload
+  DatePicker
 } from "antd";
 import { 
   PlusOutlined, 
@@ -27,11 +25,7 @@ import {
   EditOutlined, 
   DeleteOutlined,
   EyeOutlined,
-  ArrowUpOutlined,
-  ArrowDownOutlined,
-  UploadOutlined,
-  DownloadOutlined,
-  InboxOutlined
+  UploadOutlined
 } from "@ant-design/icons";
 import { useRequest } from 'ahooks';
 import { z } from 'zod';
@@ -73,11 +67,9 @@ const NewProductDisplayManagement = () => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingDisplay, setEditingDisplay] = useState<NewProductDisplayResponse | null>(null);
   const [filters, setFilters] = useState({
-    display_position: '',
     status: '',
     keyword: ''
   });
-  const [importModalVisible, setImportModalVisible] = useState(false);
   const [form] = Form.useForm();
 
 
@@ -116,8 +108,8 @@ const NewProductDisplayManagement = () => {
     try {
       const validatedData = newProductDisplaySchema.parse({
         ...values,
-        start_time: values.start_time ? values.start_time.format('YYYY-MM-DD') : null,
-        end_time: values.end_time ? values.end_time.format('YYYY-MM-DD') : null
+        start_time: values.start_time ? dayjs(values.start_time).format('YYYY-MM-DD') : null,
+        end_time: values.end_time ? dayjs(values.end_time).format('YYYY-MM-DD') : null
       });
 
       // 由于API没有提供更新和删除功能，这里使用模拟操作
@@ -141,71 +133,6 @@ const NewProductDisplayManagement = () => {
       fetchNewProductDisplays();
     } catch (error) {
       globalErrorHandler.handle(error, globalMessage.error);
-    }
-  };
-
-
-
-  // 下载模板文件
-  const handleDownloadTemplate = () => {
-    // 创建模板数据
-    const templateData = [
-      {
-        '产品名称': '示例: 新款笔记本电脑',
-        '展示位置': 'homepage/category/promotion', 
-        '展示内容': '示例: 最新款高性能笔记本电脑',
-        '状态': 'active/inactive',
-        '排序值': '示例: 1',
-        '推荐展示': '是/否',
-        '开始时间': '示例: 2024-01-01',
-        '结束时间': '示例: 2024-12-31'
-      }
-    ];
-    
-    // 在实际项目中，这里应该调用后端API下载模板文件
-    globalMessage.info('模板下载功能需要后端API支持');
-  };
-
-  // 文件上传前验证
-  const handleBeforeUpload = (file: File) => {
-    const isExcel = file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
-                   file.type === 'application/vnd.ms-excel';
-    if (!isExcel) {
-      globalMessage.error('只能上传 Excel 文件!');
-      return false;
-    }
-    
-    const isLt10M = file.size / 1024 / 1024 < 10;
-    if (!isLt10M) {
-      globalMessage.error('文件大小不能超过 10MB!');
-      return false;
-    }
-    
-    return true;
-  };
-
-  // 处理文件导入
-  const handleImportFile = async (options: any) => {
-    const { file, onSuccess, onError } = options;
-    
-    try {
-      // 模拟文件上传和数据处理过程
-      globalMessage.loading('正在处理文件...');
-      
-      // 这里应该调用后端API进行文件上传和数据处理
-      // 在实际项目中，这里需要实现Excel文件解析和批量导入逻辑
-      
-      // 模拟处理时间
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      globalMessage.success('文件导入成功！');
-      onSuccess('文件导入成功', file);
-      setImportModalVisible(false);
-      fetchNewProductDisplays(); // 刷新数据
-      
-    } catch (error) {
-      globalMessage.error('文件导入失败，请检查文件格式或联系管理员');
-      onError(error);
     }
   };
 
@@ -331,9 +258,6 @@ const NewProductDisplayManagement = () => {
               >
                 添加展示
               </Button>
-              <Button icon={<UploadOutlined />} onClick={() => setImportModalVisible(true)}>
-                导入展示
-              </Button>
             </Space>
           </Col>
         </Row>
@@ -364,8 +288,8 @@ const NewProductDisplayManagement = () => {
         {/* 新品展示列表 */}
         <Table
           columns={columns}
-          dataSource={newProductDisplays}
-          rowKey="display_id"
+          dataSource={newProductDisplays || []}
+          rowKey="new_product_push_id"
           loading={displaysLoading}
           pagination={{
             showSizeChanger: true,
