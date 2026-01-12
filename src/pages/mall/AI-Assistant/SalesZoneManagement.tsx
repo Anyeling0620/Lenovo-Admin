@@ -56,13 +56,6 @@ interface SalesZoneResponse {
 interface SalesZoneCreateRequest {
   zone_name: string;
   description: string;
-  status: string;
-}
-
-// 售货专区创建请求类型
-interface SalesZoneCreateRequest {
-  zone_name: string;
-  description: string;
   status: 'active' | 'inactive';
   is_featured: boolean;
   sort_order: number;

@@ -15,65 +15,34 @@ import {
   Switch,
   Divider,
   Image,
-  Popconfirm,
-  Tooltip,
-  DatePicker
+  DatePicker,
+  Upload
 } from "antd";
 import { 
   PlusOutlined, 
-  SearchOutlined, 
-  EditOutlined, 
-  DeleteOutlined,
-  EyeOutlined,
-  UploadOutlined
+  SearchOutlined
 } from "@ant-design/icons";
 import { useRequest } from 'ahooks';
-import { z } from 'zod';
 import dayjs from 'dayjs';
 import globalErrorHandler from "../../../utils/globalAxiosErrorHandler";
 import { globalMessage } from "../../../utils/globalMessage";
 import { getImageUrl } from "../../../utils/imageUrl";
-import { getNewPush, setNewPush } from "../../../services/api";
+import { getNewPush, setNewPush, getShelfProducts } from "../../../services/api";
+import type { ShelfProductResponse } from "../../../services/api-type";
 
 const { Title } = Typography;
 const { Option } = Select;
-const { RangePicker } = DatePicker;
-
-// Zod 表单验证
-const newProductDisplaySchema = z.object({
-  product_name: z.string().min(1, '产品名称不能为空'),
-  is_carousel: z.boolean().default(false),
-  status: z.enum(['下架', '在售', '售罄']).default('在售'),
-  start_time: z.string().optional(),
-  end_time: z.string().optional()
-});
-
-type NewProductDisplayFormValues = z.infer<typeof newProductDisplaySchema>;
-
-// 新品展示响应类型定义 - 使用实际的API接口类型
-interface NewProductDisplayResponse {
-  new_product_push_id: string;
-  shelf_product_id: string;
-  product_id: string;
-  product_name: string;
-  is_carousel: boolean;
-  carousel_image: string | null;
-  start_time: string;
-  end_time: string;
-  status: string;
-}
 
 const NewProductDisplayManagement = () => {
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [editingDisplay, setEditingDisplay] = useState<NewProductDisplayResponse | null>(null);
   const [filters, setFilters] = useState({
     status: '',
     keyword: ''
   });
   const [form] = Form.useForm();
+  const [fileList, setFileList] = useState<any[]>([]);
 
-
-
+  // 获取新品展示列表
   const { 
     data: newProductDisplays, 
     loading: displaysLoading, 
@@ -86,50 +55,33 @@ const NewProductDisplayManagement = () => {
     }
   );
 
+  // 获取上架商品列表（用于选择）
+  const { data: shelfProducts } = useRequest(() => getShelfProducts({ status: '在售' }));
+
   const handleAdd = () => {
-    setEditingDisplay(null);
     form.resetFields();
+    setFileList([]);
     setIsModalVisible(true);
   };
 
-  const handleEdit = (display: NewProductDisplayResponse) => {
-    setEditingDisplay(display);
-    form.setFieldsValue({
-      product_name: display.product_name,
-      is_carousel: display.is_carousel,
-      status: display.status,
-      start_time: display.start_time ? dayjs(display.start_time) : null,
-      end_time: display.end_time ? dayjs(display.end_time) : null
-    });
-    setIsModalVisible(true);
-  };
-
-  const onFinish = async (values: NewProductDisplayFormValues) => {
+  const onFinish = async (values: any) => {
     try {
-      const validatedData = newProductDisplaySchema.parse({
-        ...values,
-        start_time: values.start_time ? dayjs(values.start_time).format('YYYY-MM-DD') : null,
-        end_time: values.end_time ? dayjs(values.end_time).format('YYYY-MM-DD') : null
+      const { shelf_product_id, is_carousel, start_time, end_time } = values;
+      const formattedStartTime = start_time ? dayjs(start_time).format('YYYY-MM-DD HH:mm:ss') : '';
+      const formattedEndTime = end_time ? dayjs(end_time).format('YYYY-MM-DD HH:mm:ss') : '';
+      
+      const imageFile = fileList.length > 0 ? fileList[0].originFileObj : undefined;
+
+      await setNewPush({
+        shelf_product_id,
+        start_time: formattedStartTime,
+        end_time: formattedEndTime,
+        is_carousel,
+        imageFile
       });
 
-      // 由于API没有提供更新和删除功能，这里使用模拟操作
-      // 在实际项目中，如果API支持更新和删除，应该调用真实的API
-      if (editingDisplay) {
-        globalMessage.success('新品展示更新成功');
-      } else {
-        globalMessage.success('新品展示创建成功');
-      }
+      globalMessage.success('新品展示创建成功');
       setIsModalVisible(false);
-      fetchNewProductDisplays();
-    } catch (error) {
-      globalErrorHandler.handle(error, globalMessage.error);
-    }
-  };
-
-  const handleDelete = async (displayId: string) => {
-    try {
-      // 模拟删除操作
-      globalMessage.success('新品展示删除成功');
       fetchNewProductDisplays();
     } catch (error) {
       globalErrorHandler.handle(error, globalMessage.error);
@@ -201,46 +153,12 @@ const NewProductDisplayManagement = () => {
       width: 120,
       render: (time: string) => new Date(time).toLocaleString()
     },
-    {
-      title: '操作',
-      key: 'action',
-      width: 180,
-      render: (_: any, record: NewProductDisplayResponse) => (
-        <Space size="small">
-          <Tooltip title="查看详情">
-            <Button 
-              type="link" 
-              icon={<EyeOutlined />} 
-              size="small"
-            />
-          </Tooltip>
-          <Tooltip title="编辑">
-            <Button 
-              type="link" 
-              icon={<EditOutlined />} 
-              size="small"
-              onClick={() => handleEdit(record)}
-            />
-          </Tooltip>
-          <Popconfirm
-            title="确定要删除这个新品展示吗？"
-            onConfirm={() => handleDelete(record.new_product_push_id)}
-            okText="确定"
-            cancelText="取消"
-          >
-            <Tooltip title="删除">
-              <Button 
-                type="link" 
-                danger 
-                icon={<DeleteOutlined />} 
-                size="small"
-              />
-            </Tooltip>
-          </Popconfirm>
-        </Space>
-      )
-    }
+    // API目前没有提供编辑/删除功能，暂时移除操作列
   ];
+
+  const handleUploadChange = ({ fileList: newFileList }: any) => {
+    setFileList(newFileList.slice(-1)); // 只保留最新的一张图片
+  };
 
   return (
     <div style={{ padding: '16px' }}>
@@ -301,9 +219,9 @@ const NewProductDisplayManagement = () => {
         />
       </Card>
 
-      {/* 添加/编辑模态框 */}
+      {/* 添加模态框 */}
       <Modal
-        title={editingDisplay ? '编辑新品展示' : '添加新品展示'}
+        title="添加新品展示"
         open={isModalVisible}
         onCancel={() => setIsModalVisible(false)}
         footer={null}
@@ -315,14 +233,23 @@ const NewProductDisplayManagement = () => {
           onFinish={onFinish}
         >
           <Form.Item
-            label="产品名称"
-            name="product_name"
-            rules={[
-              { required: true, message: '产品名称不能为空' },
-              { min: 1, message: '产品名称不能为空' }
-            ]}
+            label="选择上架商品"
+            name="shelf_product_id"
+            rules={[{ required: true, message: '请选择上架商品' }]}
           >
-            <Input placeholder="请输入产品名称" />
+            <Select 
+              placeholder="请选择商品" 
+              showSearch
+              filterOption={(input, option) =>
+                (option?.children as unknown as string).toLowerCase().includes(input.toLowerCase())
+              }
+            >
+              {shelfProducts?.map((product: ShelfProductResponse) => (
+                <Option key={product.shelf_product_id} value={product.shelf_product_id}>
+                  {product.product_name} (ID: {product.shelf_product_id})
+                </Option>
+              ))}
+            </Select>
           </Form.Item>
 
           <Row gutter={16}>
@@ -331,30 +258,40 @@ const NewProductDisplayManagement = () => {
                 label="轮播展示"
                 name="is_carousel"
                 valuePropName="checked"
+                initialValue={false}
               >
                 <Switch />
               </Form.Item>
             </Col>
-            <Col span={12}>
-              <Form.Item
-                label="状态"
-                name="status"
-                rules={[{ required: true, message: '请选择状态' }]}
-              >
-                <Select placeholder="请选择状态">
-                  <Option value="下架">下架</Option>
-                  <Option value="在售">在售</Option>
-                  <Option value="售罄">售罄</Option>
-                </Select>
-              </Form.Item>
-            </Col>
           </Row>
+          
+          <Form.Item 
+            label="轮播图片" 
+            name="image"
+            extra="如果不上传，将使用商品主图"
+          >
+             <Upload
+                listType="picture-card"
+                fileList={fileList}
+                onChange={handleUploadChange}
+                beforeUpload={() => false} // 阻止自动上传
+                maxCount={1}
+              >
+                {fileList.length < 1 && (
+                  <div>
+                    <PlusOutlined />
+                    <div style={{ marginTop: 8 }}>上传图片</div>
+                  </div>
+                )}
+              </Upload>
+          </Form.Item>
 
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item
                 label="开始时间"
                 name="start_time"
+                rules={[{ required: true, message: '请选择开始时间' }]}
               >
                 <DatePicker
                   style={{ width: '100%' }}
@@ -368,6 +305,7 @@ const NewProductDisplayManagement = () => {
               <Form.Item
                 label="结束时间"
                 name="end_time"
+                rules={[{ required: true, message: '请选择结束时间' }]}
               >
                 <DatePicker
                   style={{ width: '100%' }}
@@ -387,7 +325,7 @@ const NewProductDisplayManagement = () => {
                 取消
               </Button>
               <Button type="primary" htmlType="submit">
-                {editingDisplay ? '更新' : '添加'}
+                添加
               </Button>
             </Space>
           </Form.Item>
