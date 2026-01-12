@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Table, 
   Card, 
@@ -8,15 +8,13 @@ import {
   Input, 
   Select, 
   Space, 
-  Tag, 
   Statistic,
   Modal,
   Popconfirm,
   Tooltip,
   Badge,
   Descriptions,
-  Tabs,
-  message
+  Tabs
 } from 'antd';
 import { 
   SearchOutlined, 
@@ -55,7 +53,6 @@ const OnlineManagement: React.FC = () => {
   const [activeTab, setActiveTab] = useState('online');
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedSession, setSelectedSession] = useState<OnlineUser | OnlineAdmin | null>(null);
-  const [sessionType, setSessionType] = useState<'USER' | 'ADMIN'>('USER');
   const [keyword, setKeyword] = useState('');
   const [deviceType, setDeviceType] = useState('');
 
@@ -73,20 +70,21 @@ const OnlineManagement: React.FC = () => {
   };
 
   // 加载登录记录
-  const loadLoginRecords = async () => {
+  const loadLoginRecords = useCallback(async () => {
     try {
       const response = await getLoginRecords({
         page: recordsPage,
         pageSize: recordsPageSize,
         account: keyword,
         deviceType: deviceType,
+        userType: 'ADMIN', // 指定为管理员类型
       });
       setLoginRecords(response.list);
       setRecordsTotal(response.total);
     } catch (error) {
       globalErrorHandler.handle(error, globalMessage.error);
     }
-  };
+  }, [recordsPage, recordsPageSize, keyword, deviceType]);
 
   useEffect(() => {
     if (activeTab === 'online') {
@@ -96,7 +94,7 @@ const OnlineManagement: React.FC = () => {
     } else {
       loadLoginRecords();
     }
-  }, [activeTab, recordsPage, recordsPageSize, keyword, deviceType]);
+  }, [activeTab, loadLoginRecords]);
 
   // 强制下线
   const handleForceLogout = async (sessionId: string, userType: 'USER' | 'ADMIN') => {
@@ -110,9 +108,8 @@ const OnlineManagement: React.FC = () => {
   };
 
   // 查看会话详情
-  const handleViewDetail = (session: OnlineUser | OnlineAdmin, type: 'USER' | 'ADMIN') => {
+  const handleViewDetail = (session: OnlineUser | OnlineAdmin) => {
     setSelectedSession(session);
-    setSessionType(type);
     setDetailModalVisible(true);
   };
 
@@ -126,6 +123,42 @@ const OnlineManagement: React.FC = () => {
     if (duration < 3600) return `${Math.floor(duration / 60)}分钟`;
     if (duration < 86400) return `${Math.floor(duration / 3600)}小时${Math.floor((duration % 3600) / 60)}分钟`;
     return `${Math.floor(duration / 86400)}天${Math.floor((duration % 86400) / 3600)}小时`;
+  };
+
+  // 解析User-Agent字符串为友好的设备名称
+  const parseDeviceName = (deviceName: string): string => {
+    if (!deviceName || deviceName === '未知设备') return '未知设备';
+    
+    // 如果不是User-Agent字符串，直接返回
+    if (!deviceName.startsWith('Mozilla/') && deviceName.length < 50) {
+      return deviceName;
+    }
+    
+    const ua = deviceName;
+    let browser = '未知浏览器';
+    let os = '未知系统';
+    
+    // 解析浏览器（顺序很重要）
+    if (ua.includes('Edg/') || ua.includes('Edge/')) browser = 'Edge';
+    else if (ua.includes('Chrome/')) browser = 'Chrome';
+    else if (ua.includes('Firefox/')) browser = 'Firefox';
+    else if (ua.includes('Safari/') && !ua.includes('Chrome')) browser = 'Safari';
+    else if (ua.includes('OPR/') || ua.includes('Opera/')) browser = 'Opera';
+    
+    // 解析操作系统
+    if (ua.includes('Windows NT 10.0')) os = 'Windows 10/11';
+    else if (ua.includes('Windows NT 6.3')) os = 'Windows 8.1';
+    else if (ua.includes('Windows NT 6.2')) os = 'Windows 8';
+    else if (ua.includes('Windows NT 6.1')) os = 'Windows 7';
+    else if (ua.includes('Windows NT')) os = 'Windows';
+    else if (ua.includes('Mac OS X')) os = 'macOS';
+    else if (ua.includes('Android')) os = 'Android';
+    else if (ua.includes('iPhone')) os = 'iPhone';
+    else if (ua.includes('iPad')) os = 'iPad';
+    else if (ua.includes('Linux') && ua.includes('X11')) os = 'Linux';
+    else if (ua.includes('Linux')) os = 'Linux';
+    
+    return `${browser} (${os})`;
   };
 
   // 用户表格列定义
@@ -145,16 +178,30 @@ const OnlineManagement: React.FC = () => {
     {
       title: '设备',
       key: 'device',
-      width: 150,
-      render: (_, record) => (
-        <div className="flex items-center">
-          {record.deviceType === 'pc' ? <DesktopOutlined className="mr-2 text-blue-500" /> : <MobileOutlined className="mr-2 text-green-500" />}
-          <div>
-            <div className="text-sm">{record.deviceName}</div>
-            <div className="text-xs text-gray-500">{record.deviceType === 'pc' ? '电脑' : '手机'}</div>
+      width: 250,
+      render: (_, record) => {
+        // 更精确的设备类型判断
+        const deviceType = record.deviceType?.toLowerCase() || '';
+        const isMobile = deviceType.includes('mobile') || 
+                        deviceType === '手机' || 
+                        deviceType === 'android' || 
+                        deviceType === 'ios' ||
+                        deviceType === 'phone';
+        const deviceTypeName = isMobile ? '手机' : '电脑';
+        
+        // 使用解析函数获取友好的设备名称
+        const displayName = parseDeviceName(record.deviceName);
+        
+        return (
+          <div className="flex items-center">
+            {isMobile ? <MobileOutlined className="mr-2 text-green-500" /> : <DesktopOutlined className="mr-2 text-blue-500" />}
+            <div>
+              <div className="text-sm font-medium">{displayName}</div>
+              <div className="text-xs text-gray-500">{deviceTypeName}</div>
+            </div>
           </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       title: '登录时间',
@@ -190,7 +237,7 @@ const OnlineManagement: React.FC = () => {
       render: (_, record) => (
         <Space size="small">
           <Tooltip title="查看详情">
-            <Button type="text" icon={<EyeOutlined />} onClick={() => handleViewDetail(record, 'USER')} />
+            <Button type="text" icon={<EyeOutlined />} onClick={() => handleViewDetail(record)} />
           </Tooltip>
           <Tooltip title="强制下线">
             <Popconfirm title="确定要强制下线这个用户吗？" onConfirm={() => handleForceLogout(record.sessionId, 'USER')}>
@@ -219,16 +266,30 @@ const OnlineManagement: React.FC = () => {
     {
       title: '设备',
       key: 'device',
-      width: 150,
-      render: (_, record) => (
-        <div className="flex items-center">
-          {record.deviceType === 'pc' ? <DesktopOutlined className="mr-2 text-blue-500" /> : <MobileOutlined className="mr-2 text-green-500" />}
-          <div>
-            <div className="text-sm">{record.deviceName}</div>
-            <div className="text-xs text-gray-500">{record.deviceType === 'pc' ? '电脑' : '手机'}</div>
+      width: 250,
+      render: (_, record) => {
+        // 更精确的设备类型判断
+        const deviceType = record.deviceType?.toLowerCase() || '';
+        const isMobile = deviceType.includes('mobile') || 
+                        deviceType === '手机' || 
+                        deviceType === 'android' || 
+                        deviceType === 'ios' ||
+                        deviceType === 'phone';
+        const deviceTypeName = isMobile ? '手机' : '电脑';
+        
+        // 使用解析函数获取友好的设备名称
+        const displayName = parseDeviceName(record.deviceName);
+        
+        return (
+          <div className="flex items-center">
+            {isMobile ? <MobileOutlined className="mr-2 text-green-500" /> : <DesktopOutlined className="mr-2 text-blue-500" />}
+            <div>
+              <div className="text-sm font-medium">{displayName}</div>
+              <div className="text-xs text-gray-500">{deviceTypeName}</div>
+            </div>
           </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       title: '登录时间',
@@ -264,7 +325,7 @@ const OnlineManagement: React.FC = () => {
       render: (_, record) => (
         <Space size="small">
           <Tooltip title="查看详情">
-            <Button type="text" icon={<EyeOutlined />} onClick={() => handleViewDetail(record, 'ADMIN')} />
+            <Button type="text" icon={<EyeOutlined />} onClick={() => handleViewDetail(record)} />
           </Tooltip>
           <Tooltip title="强制下线">
             <Popconfirm title="确定要强制下线这个管理员吗？" onConfirm={() => handleForceLogout(record.sessionId, 'ADMIN')}>
@@ -293,16 +354,30 @@ const OnlineManagement: React.FC = () => {
     {
       title: '设备',
       key: 'device',
-      width: 150,
-      render: (_, record) => (
-        <div className="flex items-center">
-          {record.deviceType === 'pc' ? <DesktopOutlined className="mr-2 text-blue-500" /> : <MobileOutlined className="mr-2 text-green-500" />}
-          <div>
-            <div className="text-sm">{record.deviceName}</div>
-            <div className="text-xs text-gray-500">{record.deviceType === 'pc' ? '电脑' : '手机'}</div>
+      width: 250,
+      render: (_, record) => {
+        // 更精确的设备类型判断
+        const deviceType = record.deviceType?.toLowerCase() || '';
+        const isMobile = deviceType.includes('mobile') || 
+                        deviceType === '手机' || 
+                        deviceType === 'android' || 
+                        deviceType === 'ios' ||
+                        deviceType === 'phone';
+        const deviceTypeName = isMobile ? '手机' : '电脑';
+        
+        // 使用解析函数获取友好的设备名称
+        const displayName = parseDeviceName(record.deviceName);
+        
+        return (
+          <div className="flex items-center">
+            {isMobile ? <MobileOutlined className="mr-2 text-green-500" /> : <DesktopOutlined className="mr-2 text-blue-500" />}
+            <div>
+              <div className="text-sm font-medium">{displayName}</div>
+              <div className="text-xs text-gray-500">{deviceTypeName}</div>
+            </div>
           </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       title: '登录时间',

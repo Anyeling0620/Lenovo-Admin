@@ -10,12 +10,6 @@ jobs:
     runs-on: self-hosted # 指向你刚刚在服务器启动的 runner
 
     steps:
-      - name: Fix SSL certificate issues
-        run: |
-          # 更新证书
-          yum update ca-certificates -y || true
-          update-ca-trust || true
-
       - name: Setup SSH known_hosts
         run: |
           mkdir -p ~/.ssh
@@ -26,6 +20,16 @@ jobs:
         uses: actions/checkout@v4
         with:
           ssh-key: ${{ secrets.DEPLOY_KEY_LENOVO_ADMIN }}
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.pnpm-store
+            node_modules
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
 
       - name: Install Dependencies
         run: pnpm install
@@ -38,7 +42,7 @@ jobs:
           echo "VITE_PUBLIC_PRODUCT_IMAGE_PATH=static/images/products/" >> .env.production
           echo "VITE_USE_MOCK_DATA=false" >> .env.production
 
-      # 限制打包内存，防止卡死服务器
+      # 限制打包内存，防止卡死服务器（如服务器有更多可用内存可提高到 2048/3072）
       - name: Build Project
         run: |
           rm -rf dist # 强制删除旧构建目录
@@ -53,8 +57,13 @@ jobs:
             chattr -i /www/wwwroot/admin.jxutcm.top/.user.ini
           fi
           
-          # 同步产物
-          rsync -av --delete --exclude='.user.ini' dist/ /www/wwwroot/admin.jxutcm.top/
+          # 同步产物（去掉 -v 减少日志输出，加快传输）
+          rsync -a --delete --exclude='.user.ini' --exclude='*.map' dist/ /www/wwwroot/admin.jxutcm.top/
           
           # 修正权限
           chown -R www:www /www/wwwroot/admin.jxutcm.top/
+          
+          # 重新锁定 .user.ini
+          if [ -f /www/wwwroot/admin.jxutcm.top/.user.ini ]; then
+            chattr +i /www/wwwroot/admin.jxutcm.top/.user.ini
+          fi

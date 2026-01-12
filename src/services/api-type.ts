@@ -232,8 +232,8 @@ export interface UpdateBrandRequest {
 }
 
 export interface CategoryResponse {
-  updated_at: boolean | CategoryResponse | null
-  created_at: string
+  updated_at: string;
+  created_at: string;
   category_id: string;
   name: string;
   code: string;
