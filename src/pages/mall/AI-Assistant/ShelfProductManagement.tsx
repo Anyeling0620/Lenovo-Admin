@@ -17,7 +17,8 @@ import {
   Image,
   Popconfirm,
   Tooltip,
-  Upload
+  Upload,
+  InputNumber
 } from 'antd';
 import {
   PlusOutlined,
@@ -26,18 +27,36 @@ import {
   SearchOutlined,
   DownloadOutlined,
   UploadOutlined,
-  EyeOutlined,
-  InboxOutlined
+  InboxOutlined,
+  SettingOutlined
 } from '@ant-design/icons';
 import { useRequest } from 'ahooks';
-import type { ShelfProductResponse, CategoryResponse, ProductListItem, ShelfProductStatus } from '../../../services/api-type';
-import { getShelfProducts, createShelfProduct, updateShelfFlags, updateShelfStatus, deleteShelfItem, getCategories, getProducts } from '../../../services/api';
+import type { 
+  ShelfProductResponse, 
+  CategoryResponse, 
+  ProductListItem, 
+  ShelfProductStatus,
+  ProductConfigResponse,
+  ShelfProductItemResponse
+} from '../../../services/api-type';
+import { 
+  getShelfProducts, 
+  createShelfProduct, 
+  updateShelfFlags, 
+  updateShelfStatus, 
+  deleteShelfItem, 
+  getCategories, 
+  getProducts,
+  getProductConfigs,
+  addShelfItem,
+  updateShelfItemQuantity
+} from '../../../services/api';
 import { globalMessage } from '../../../utils/globalMessage';
 import { globalErrorHandler } from '../../../utils/globalAxiosErrorHandler';
 import { getImageUrl } from '../../../utils/imageUrl';
 import { z } from 'zod';
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 const { Option } = Select;
 
 // Zod 表单验证
@@ -49,8 +68,6 @@ const shelfProductSchema = z.object({
   installment: z.boolean().default(false),
   status: z.enum(['下架', '在售', '售罄']).default('在售')
 });
-
-
 
 const ShelfProductManagement = () => {
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -69,6 +86,13 @@ const ShelfProductManagement = () => {
   const [productSearch, setProductSearch] = useState('');
   const [productList, setProductList] = useState<ProductListItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<ProductListItem | null>(null);
+
+  // 规格管理相关状态
+  const [itemModalVisible, setItemModalVisible] = useState(false);
+  const [currentShelfProduct, setCurrentShelfProduct] = useState<ShelfProductResponse | null>(null);
+  const [productConfigs, setProductConfigs] = useState<ProductConfigResponse[]>([]);
+  const [configLoading, setConfigLoading] = useState(false);
+  const [itemForm] = Form.useForm();
 
   const { 
     data: shelfProducts = [], 
@@ -191,9 +215,86 @@ const ShelfProductManagement = () => {
 
   const handleDelete = async (shelfProductId: string) => {
     try {
-      await deleteShelfItem(shelfProductId);
-      globalMessage.success('商品删除成功');
+      // API 目前的 deleteShelfItem 可能是删除 Item 而不是 Product？
+      // 假设我们要下架整个商品，可能需要调用 updateShelfStatus('下架')
+      // 如果要物理删除，看API定义。这里假设 deleteShelfItem 是删除 item。
+      // 如果要删除 shelfProduct，可能需要先下架。
+      // 检查 api.ts，deleteShelfItem 是 `/shelf/items/${itemId}`
+      // 没有 deleteShelfProduct API。只能下架。
+       await updateShelfStatus(shelfProductId, { status: '下架' });
+       globalMessage.success('商品已下架');
+       fetchShelfProducts();
+    } catch (error) {
+      globalErrorHandler.handle(error, globalMessage.error);
+    }
+  };
+
+  // 规格管理相关逻辑
+  const handleManageItems = async (product: ShelfProductResponse) => {
+    setCurrentShelfProduct(product);
+    setItemModalVisible(true);
+    setConfigLoading(true);
+    try {
+      const res = await getProductConfigs(product.product_id);
+      setProductConfigs(res);
+    } catch (error) {
+      globalErrorHandler.handle(error, globalMessage.error);
+    } finally {
+      setConfigLoading(false);
+    }
+  };
+
+  const handleAddItem = async (values: any) => {
+    if (!currentShelfProduct) return;
+    try {
+      await addShelfItem({
+        shelf_product_id: currentShelfProduct.shelf_product_id,
+        config_id: values.config_id,
+        shelf_num: values.shelf_num
+      });
+      globalMessage.success('规格添加成功');
+      itemForm.resetFields();
+      fetchShelfProducts(); // 刷新列表以更新 items
+      // 更新当前选中的 shelfProduct (因为 items 变了，需要重新获取或者手动更新状态，简单起见重新 fetch)
+      // 注意：这里 fetchShelfProducts 是异步的，可能 currentShelfProduct 不会马上更新。
+      // 更好的做法是重新获取单个 shelfProduct 详情，或者重新 fetch 列表后在列表里找到它。
+      // 这里的列表刷新会更新表格，但 Modal 里的 currentShelfProduct 需要手动同步。
+      // 由于没有 getShelfProductDetail API，只能依赖列表刷新。
+      // 我们可以先关闭 Modal 或者手动把新 item 加进去 (如果后端返回了完整 item)。
+      // addShelfItem 返回 { shelf_product_item_id }。
+      setIsModalVisible(false); // 简单处理：添加完关闭，让用户重开或刷新
+      // 实际上不需要关闭，只要能刷新 items 列表即可。
+      // 由于我们依赖 fetchShelfProducts 更新数据，而 currentShelfProduct 是个 state，不会自动变。
+      // 我们需要在 fetchShelfProducts 完成后更新 currentShelfProduct。
+      // 暂时方案：重新 fetch 并关闭 Modal 提示用户。
+      setItemModalVisible(false);
+    } catch (error) {
+      globalErrorHandler.handle(error, globalMessage.error);
+    }
+  };
+
+  const handleUpdateItemQuantity = async (itemId: string, num: number) => {
+    try {
+      await updateShelfItemQuantity(itemId, { shelf_num: num });
+      globalMessage.success('数量更新成功');
       fetchShelfProducts();
+    } catch (error) {
+      globalErrorHandler.handle(error, globalMessage.error);
+    }
+  };
+
+  const handleDeleteItem = async (itemId: string) => {
+    try {
+      await deleteShelfItem(itemId);
+      globalMessage.success('规格删除成功');
+      fetchShelfProducts();
+      // 手动移除 currentShelfProduct.items 中的对应项，以更新 UI
+      if (currentShelfProduct) {
+        setCurrentShelfProduct({
+          ...currentShelfProduct,
+          items: currentShelfProduct.items.filter(i => i.shelf_product_item_id !== itemId)
+        });
+      }
     } catch (error) {
       globalErrorHandler.handle(error, globalMessage.error);
     }
@@ -339,14 +440,15 @@ const ShelfProductManagement = () => {
     {
       title: '操作',
       key: 'action',
-      width: 200,
+      width: 280,
       render: (_: any, record: ShelfProductResponse) => (
         <Space size="small">
-          <Tooltip title="查看详情">
-            <Button 
+          <Tooltip title="管理规格">
+             <Button 
               type="link" 
-              icon={<EyeOutlined />} 
+              icon={<SettingOutlined />} 
               size="small"
+              onClick={() => handleManageItems(record)}
             />
           </Tooltip>
           <Tooltip title="编辑">
@@ -358,12 +460,12 @@ const ShelfProductManagement = () => {
             />
           </Tooltip>
           <Popconfirm
-            title="确定要删除这个商品吗？"
+            title="确定要下架这个商品吗？"
             onConfirm={() => handleDelete(record.shelf_product_id)}
             okText="确定"
             cancelText="取消"
           >
-            <Tooltip title="删除">
+            <Tooltip title="下架">
               <Button 
                 type="link" 
                 danger 
@@ -563,6 +665,106 @@ const ShelfProductManagement = () => {
             </Space>
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* 规格管理模态框 */}
+      <Modal
+        title={`管理规格 - ${currentShelfProduct?.product_name || ''}`}
+        open={itemModalVisible}
+        onCancel={() => setItemModalVisible(false)}
+        footer={null}
+        width={800}
+      >
+        <Space direction="vertical" style={{ width: '100%' }}>
+          {/* 添加规格表单 */}
+          <Card size="small" title="添加上架规格">
+             <Form
+              form={itemForm}
+              layout="inline"
+              onFinish={handleAddItem}
+             >
+                <Form.Item 
+                  name="config_id" 
+                  rules={[{ required: true, message: '请选择配置' }]} 
+                  style={{ width: 300 }}
+                >
+                  <Select
+                    placeholder="选择商品配置"
+                    loading={configLoading}
+                    options={productConfigs.map(cfg => ({
+                      label: `${cfg.config1} / ${cfg.config2}${cfg.config3 ? ' / ' + cfg.config3 : ''}（原价¥${cfg.original_price}）`,
+                      value: cfg.product_config_id,
+                    }))}
+                  />
+                </Form.Item>
+                <Form.Item 
+                  name="shelf_num" 
+                  rules={[{ required: true, message: '请输入上架数量' }]}
+                >
+                   <InputNumber min={0} placeholder="上架数量" />
+                </Form.Item>
+                <Form.Item>
+                   <Button type="primary" htmlType="submit" icon={<PlusOutlined />}>
+                      添加
+                   </Button>
+                </Form.Item>
+             </Form>
+          </Card>
+          
+          <Divider>已上架规格列表</Divider>
+          
+          {/* 已上架规格列表 */}
+          <Table
+            dataSource={currentShelfProduct?.items || []}
+            rowKey="shelf_product_item_id"
+            pagination={false}
+            columns={[
+               { 
+                 title: '配置', 
+                 key: 'config',
+                 render: (_, record: ShelfProductItemResponse) => (
+                   <Space direction="vertical" size={0}>
+                     <Text>{record.config1} / {record.config2}</Text>
+                     {record.config3 && <Text type="secondary">{record.config3}</Text>}
+                   </Space>
+                 )
+               },
+               {
+                 title: '上架数量',
+                 dataIndex: 'shelf_num',
+                 key: 'shelf_num',
+                 render: (num, record) => (
+                    <InputNumber 
+                      defaultValue={num} 
+                      onBlur={(e) => {
+                         const val = parseInt(e.target.value);
+                         if (!isNaN(val) && val !== num) {
+                           handleUpdateItemQuantity(record.shelf_product_item_id, val);
+                         }
+                      }}
+                    />
+                 )
+               },
+               {
+                 title: '锁定数量',
+                 dataIndex: 'lock_num',
+                 key: 'lock_num',
+               },
+               {
+                 title: '操作',
+                 key: 'action',
+                 render: (_, record) => (
+                   <Popconfirm
+                      title="确定要删除该规格吗？"
+                      onConfirm={() => handleDeleteItem(record.shelf_product_item_id)}
+                   >
+                     <Button type="link" danger size="small" icon={<DeleteOutlined />}>删除</Button>
+                   </Popconfirm>
+                 )
+               }
+            ]}
+          />
+        </Space>
       </Modal>
 
       {/* 商品选择模态框 */}
