@@ -39,20 +39,7 @@ import { z } from 'zod';
 import globalErrorHandler from "../../../utils/globalAxiosErrorHandler";
 import { globalMessage } from "../../../utils/globalMessage";
 import { getImageUrl } from "../../../utils/imageUrl";
-import { getHomePush } from "../../../services/api";
-
-// 首页展示响应类型定义 - 使用实际的API接口类型
-interface HomeDisplayResponse {
-  home_push_id: string;
-  shelf_product_id: string;
-  product_id: string;
-  product_name: string;
-  is_carousel: boolean;
-  carousel_image: string | null;
-  start_time: string;
-  end_time: string;
-  status: string;
-}
+import { getHomePush, HomePushResponse } from "../../../services/api";
 
 const { Title } = Typography;
 const { Option } = Select;
@@ -88,7 +75,7 @@ const HomeDisplayManagement = () => {
     loading: displaysLoading, 
     run: fetchHomeDisplays 
   } = useRequest(
-    () => getHomeDisplays(),
+    () => getHomePush(),
     {
       refreshDeps: [filters],
       onError: (error) => globalErrorHandler.handle(error, globalMessage.error)

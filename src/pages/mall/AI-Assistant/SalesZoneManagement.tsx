@@ -35,25 +35,21 @@ import {
 import { useRequest } from 'ahooks';
 import { z } from 'zod';
 import dayjs from 'dayjs';
-// 售货专区相关API函数暂时未实现
-// 根据组长要求，使用服务器数据而非模拟数据
+// 售货专区API函数
+import { 
+  getSalesZones, 
+  createSalesZone, 
+  updateSalesZone, 
+  deleteSalesZone 
+} from "../../../services/api";
 import globalErrorHandler from "../../../utils/globalAxiosErrorHandler";
 import { globalMessage } from "../../../utils/globalMessage";
 import { getImageUrl } from "../../../utils/imageUrl";
-// 售货专区响应类型定义
-interface SalesZoneResponse {
-  sales_zone_id: string;
-  zone_name: string;
-  description?: string;
-  zone_image?: string;
-  status: string;
-  is_featured: boolean;
-  sort_order: number;
-  start_time?: string;
-  end_time?: string;
-  created_at: string;
-  updated_at: string;
-}
+import type { 
+  SalesZoneResponse, 
+  SalesZoneCreateRequest, 
+  SalesZoneUpdateRequest 
+} from "../../../services/api-type";
 
 const { Title } = Typography;
 const { Option } = Select;
@@ -83,13 +79,13 @@ const SalesZoneManagement = () => {
   const [importModalVisible, setImportModalVisible] = useState(false);
   const [form] = Form.useForm();
 
-  // 售货专区API暂时未实现，使用空数据
+  // 售货专区数据获取
   const { 
     data: salesZones = [], 
     loading: zonesLoading, 
     run: fetchSalesZones 
   } = useRequest(
-    () => Promise.resolve([]),
+    () => getSalesZones(filters),
     {
       refreshDeps: [filters],
       onError: (error) => {
@@ -120,18 +116,19 @@ const SalesZoneManagement = () => {
 
   const onFinish = async (values: any) => {
     try {
-      salesZoneSchema.parse({
+      const validatedData = salesZoneSchema.parse({
         ...values,
         start_time: values.start_time ? values.start_time.format('YYYY-MM-DD') : null,
         end_time: values.end_time ? values.end_time.format('YYYY-MM-DD') : null
       });
 
-      // 模拟API调用，实际项目中应该调用真实的API
       if (editingZone) {
-        // await updateSalesZone(editingZone.sales_zone_id, data);
+        // 更新售货专区
+        await updateSalesZone(editingZone.sales_zone_id, validatedData);
         globalMessage.success('售货专区更新成功');
       } else {
-        // await createSalesZone(data);
+        // 创建售货专区
+        await createSalesZone(validatedData);
         globalMessage.success('售货专区创建成功');
       }
       setIsModalVisible(false);
@@ -141,11 +138,12 @@ const SalesZoneManagement = () => {
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = async (salesZoneId: string) => {
     try {
-      // 使用通用的删除函数，因为 deleteSalesZone 不存在
-      // 在实际项目中，需要根据后端 API 进行调整
-      globalMessage.warning('删除功能需要根据后端 API 实现');
+      // 删除售货专区
+      await deleteSalesZone(salesZoneId);
+      globalMessage.success('售货专区删除成功');
+      fetchSalesZones();
     } catch (error) {
       globalErrorHandler.handle(error, globalMessage.error);
     }

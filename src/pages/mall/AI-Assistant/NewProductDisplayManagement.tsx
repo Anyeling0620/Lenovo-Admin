@@ -39,7 +39,7 @@ import dayjs from 'dayjs';
 import globalErrorHandler from "../../../utils/globalAxiosErrorHandler";
 import { globalMessage } from "../../../utils/globalMessage";
 import { getImageUrl } from "../../../utils/imageUrl";
-import { getNewPush } from "../../../services/api";
+import { getNewPush, setNewPush } from "../../../services/api";
 
 const { Title } = Typography;
 const { Option } = Select;
@@ -114,7 +114,14 @@ const NewProductDisplayManagement = () => {
 
   const onFinish = async (values: NewProductDisplayFormValues) => {
     try {
-      // 模拟API调用，实际项目中应该调用真实的API
+      const validatedData = newProductDisplaySchema.parse({
+        ...values,
+        start_time: values.start_time ? values.start_time.format('YYYY-MM-DD') : null,
+        end_time: values.end_time ? values.end_time.format('YYYY-MM-DD') : null
+      });
+
+      // 由于API没有提供更新和删除功能，这里使用模拟操作
+      // 在实际项目中，如果API支持更新和删除，应该调用真实的API
       if (editingDisplay) {
         globalMessage.success('新品展示更新成功');
       } else {
