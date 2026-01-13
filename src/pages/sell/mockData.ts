@@ -7,10 +7,12 @@ export const mockOrders: OrderListItem[] = Array.from({ length: 20 }, (_, i) => 
   order_no: `ORD${String(i + 1).padStart(8, '0')}`,
   user_id: `user_${(i % 10) + 1}`,
   user_account: `user${(i % 10) + 1}`,
-  status: ['待付款', '待发货', '待收货', '已完成', '已取消'][i % 5],
+  status: ['已取消', '待支付', '已支付', '待发货', '已发货', '待收货', '已收货', '已完成'][i % 8],
   pay_amount: (Math.random() * 10000 + 100).toFixed(2),
   actual_pay_amount: (Math.random() * 10000 + 100).toFixed(2),
-  pay_time: i % 3 === 0 ? dayjs().subtract(i, 'day').format('YYYY-MM-DD HH:mm:ss') : null,
+  pay_time: ['已支付', '待发货', '已发货', '待收货', '已收货', '已完成'].includes(['已取消', '待支付', '已支付', '待发货', '已发货', '待收货', '已收货', '已完成'][i % 8]) 
+    ? dayjs().subtract(i, 'day').format('YYYY-MM-DD HH:mm:ss') 
+    : null,
   created_at: dayjs().subtract(i + 1, 'day').format('YYYY-MM-DD HH:mm:ss'),
   items: [
     {

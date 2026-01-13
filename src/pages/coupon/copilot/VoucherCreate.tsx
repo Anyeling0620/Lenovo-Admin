@@ -9,7 +9,6 @@ import { createVoucherApi } from '../../../services/api';
 import type { VoucherCreateRequest } from '../../../services/api-type';
 import { globalErrorHandler } from '../../../utils/globalAxiosErrorHandler';
 import { globalMessage } from '../../../utils/globalMessage';
-import { marketingMock } from '../../../services/marketing-mock';
 
 const { Title, Text } = Typography;
 
@@ -54,9 +53,6 @@ const VoucherCreate: React.FC = () => {
       globalMessage.success('创建成功');
     } catch (error) {
       globalErrorHandler.handle(error, globalMessage.error);
-      const res = await marketingMock.createVoucher(payload);
-      setCreatedId(res.voucher_id);
-      globalMessage.success('已在模拟环境创建');
     } finally {
       setLoading(false);
     }

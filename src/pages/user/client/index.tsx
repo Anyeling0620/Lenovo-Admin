@@ -10,26 +10,23 @@ import {
   DatePicker, 
   Space, 
   Tag, 
-  Statistic,
   Modal,
   Form,
-  message,
-  Popconfirm,
   Tooltip,
-  Badge,
-  Descriptions
+  Descriptions,
+  Statistic
 } from 'antd';
 import { 
   SearchOutlined, 
   ReloadOutlined, 
-  UserOutlined, 
   EditOutlined, 
-  DeleteOutlined,
   EyeOutlined,
-  PlusOutlined,
   FilterOutlined,
   ShoppingOutlined,
-  DollarOutlined
+  DollarOutlined,
+  UserOutlined,
+  UserAddOutlined,
+  CrownOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useForm } from 'react-hook-form';
@@ -38,11 +35,11 @@ import * as z from 'zod';
 import dayjs from 'dayjs';
 import { 
   getClientUsers, 
-  getClientUserStatistics, 
-  deleteClientUser,
+  updateClientUser,
+  getClientUserStatistics,
   type User,
   type UserListParams,
-  type UserStatistics
+  type ClientUserStatistics
 } from '../../../services/user';
 import { globalMessage } from '../../../utils/globalMessage';
 import { globalErrorHandler } from '../../../utils/globalAxiosErrorHandler';
@@ -54,7 +51,6 @@ const { Option } = Select;
 const userFilterSchema = z.object({
   keyword: z.string().optional(),
   memberType: z.string().optional(),
-  status: z.string().optional(),
   dateRange: z.array(z.string()).optional(),
 });
 
@@ -66,20 +62,39 @@ const ClientUserManagement: React.FC = () => {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [statistics, setStatistics] = useState<UserStatistics | null>(null);
   const [filterVisible, setFilterVisible] = useState(false);
-  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
-  const { control, handleSubmit, reset, watch } = useForm<UserFilterForm>({
+  // 统计数据
+  const [statistics, setStatistics] = useState<ClientUserStatistics | null>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+
+  // 编辑弹窗
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [form] = Form.useForm();
+
+  const { handleSubmit, reset, watch } = useForm<UserFilterForm>({
     resolver: zodResolver(userFilterSchema),
     defaultValues: {
       keyword: '',
       memberType: '',
-      status: '',
     }
   });
+
+  // 加载统计数据
+  const loadStatistics = async () => {
+    setStatsLoading(true);
+    try {
+      const stats = await getClientUserStatistics();
+      setStatistics(stats);
+    } catch (error) {
+      console.error('Failed to load statistics:', error);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
 
   // 加载用户列表
   const loadUserList = async (params: UserListParams = {}) => {
@@ -99,19 +114,13 @@ const ClientUserManagement: React.FC = () => {
     }
   };
 
-  // 加载统计数据
-  const loadStatistics = async () => {
-    try {
-      const stats = await getClientUserStatistics();
-      setStatistics(stats);
-    } catch (error) {
-      globalErrorHandler.handle(error, globalMessage.error);
-    }
-  };
+  useEffect(() => {
+    loadStatistics();
+  }, []);
 
   useEffect(() => {
     loadUserList();
-    loadStatistics();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, pageSize]);
 
   // 处理搜索
@@ -119,7 +128,6 @@ const ClientUserManagement: React.FC = () => {
     const params: UserListParams = {
       keyword: values.keyword,
       memberType: values.memberType,
-      status: values.status,
     };
     
     if (values.dateRange && values.dateRange.length === 2) {
@@ -137,47 +145,43 @@ const ClientUserManagement: React.FC = () => {
     loadUserList();
   };
 
-  // 删除用户
-  const handleDelete = async (userId: string) => {
-    try {
-      await deleteClientUser(userId);
-      globalMessage.success('用户删除成功');
-      loadUserList();
-    } catch (error) {
-      globalErrorHandler.handle(error, globalMessage.error);
-    }
-  };
-
-  // 批量删除
-  const handleBatchDelete = async () => {
-    if (selectedRowKeys.length === 0) {
-      globalMessage.warning('请选择要删除的用户');
-      return;
-    }
-
-    Modal.confirm({
-      title: '确认删除',
-      content: `确定要删除选中的 ${selectedRowKeys.length} 个用户吗？`,
-      onOk: async () => {
-        try {
-          // 这里应该调用批量删除接口，暂时循环删除
-          for (const userId of selectedRowKeys) {
-            await deleteClientUser(userId as string);
-          }
-          globalMessage.success('批量删除成功');
-          setSelectedRowKeys([]);
-          loadUserList();
-        } catch (error) {
-          globalErrorHandler.handle(error, globalMessage.error);
-        }
-      }
-    });
-  };
-
   // 查看用户详情
   const handleViewDetail = (user: User) => {
     setSelectedUser(user);
     setDetailModalVisible(true);
+  };
+
+  const openEditModal = (user: User) => {
+    setEditingUser(user);
+    form.setFieldsValue({
+      account: user.account,
+      nickname: user.nickname,
+      email: user.email,
+      memberType: user.memberType,
+    });
+    setEditModalVisible(true);
+  };
+
+  const handleSaveUser = async () => {
+    try {
+      const values = await form.validateFields();
+
+      if (editingUser) {
+        await updateClientUser(editingUser.id, {
+          nickname: values.nickname,
+          memberType: values.memberType,
+        });
+        globalMessage.success('用户更新成功');
+      }
+
+      // 刷新列表
+      loadUserList();
+
+      setEditModalVisible(false);
+    } catch (error) {
+      // 表单校验失败会抛出
+      globalErrorHandler.handle(error, globalMessage.error);
+    }
   };
 
   // 表格列定义
@@ -224,21 +228,6 @@ const ClientUserManagement: React.FC = () => {
       },
     },
     {
-      title: '状态',
-      dataIndex: 'status',
-      key: 'status',
-      width: 100,
-      render: (status) => {
-        const statusMap = {
-          ACTIVE: { color: 'success', text: '活跃' },
-          INACTIVE: { color: 'default', text: '未激活' },
-          BANNED: { color: 'error', text: '已封禁' },
-        };
-        const config = statusMap[status as keyof typeof statusMap] || statusMap.INACTIVE;
-        return <Badge status={config.color as any} text={config.text} />;
-      },
-    },
-    {
       title: '注册时间',
       dataIndex: 'createdAt',
       key: 'createdAt',
@@ -276,7 +265,7 @@ const ClientUserManagement: React.FC = () => {
     {
       title: '操作',
       key: 'action',
-      width: 180,
+      width: 100,
       fixed: 'right',
       render: (_, record) => (
         <Space size="small">
@@ -291,79 +280,54 @@ const ClientUserManagement: React.FC = () => {
             <Button 
               type="text" 
               icon={<EditOutlined />}
-              disabled={record.status === 'BANNED'}
+              onClick={() => openEditModal(record)}
             />
-          </Tooltip>
-          <Tooltip title="删除">
-            <Popconfirm
-              title="确定要删除这个用户吗？"
-              onConfirm={() => handleDelete(record.id)}
-              okText="确定"
-              cancelText="取消"
-            >
-              <Button 
-                type="text" 
-                danger 
-                icon={<DeleteOutlined />}
-                disabled={record.status === 'BANNED'}
-              />
-            </Popconfirm>
           </Tooltip>
         </Space>
       ),
     },
   ];
 
-  // 行选择配置
-  const rowSelection = {
-    selectedRowKeys,
-    onChange: (keys: React.Key[]) => setSelectedRowKeys(keys),
-    getCheckboxProps: (record: User) => ({
-      disabled: record.status === 'BANNED',
-    }),
-  };
-
   return (
     <div className="p-4">
       {/* 统计卡片 */}
-      <Row gutter={[16, 16]} className="mb-6">
-        <Col xs={24} sm={12} md={6}>
-          <Card>
+      <Row gutter={16} className="mb-6">
+        <Col span={6}>
+          <Card loading={statsLoading}>
             <Statistic
-              title="总用户数"
-              value={statistics?.totalUsers || 0}
+              title="用户总数"
+              value={statistics?.totalUsers ?? 0}
               prefix={<UserOutlined />}
+            />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card loading={statsLoading}>
+            <Statistic
+              title="今日新增"
+              value={statistics?.newUsersToday ?? 0}
+              prefix={<UserAddOutlined />}
+              valueStyle={{ color: '#3f8600' }}
+            />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card loading={statsLoading}>
+            <Statistic
+              title="VIP会员"
+              value={statistics?.vipUsers ?? 0}
+              prefix={<CrownOutlined />}
               valueStyle={{ color: '#1890ff' }}
             />
           </Card>
         </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card>
+        <Col span={6}>
+          <Card loading={statsLoading}>
             <Statistic
-              title="活跃用户"
-              value={statistics?.activeUsers || 0}
-              prefix={<UserOutlined />}
-              valueStyle={{ color: '#52c41a' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card>
-            <Statistic
-              title="今日新增"
-              value={statistics?.newUsersToday || 0}
-              prefix={<UserOutlined />}
+              title="SVIP会员"
+              value={statistics?.svipUsers ?? 0}
+              prefix={<CrownOutlined />}
               valueStyle={{ color: '#faad14' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card>
-            <Statistic
-              title="VIP用户"
-              value={(statistics?.vipUsers || 0) + (statistics?.svipUsers || 0)}
-              prefix={<UserOutlined />}
-              valueStyle={{ color: '#722ed1' }}
             />
           </Card>
         </Col>
@@ -371,26 +335,7 @@ const ClientUserManagement: React.FC = () => {
 
       {/* 搜索和操作栏 */}
       <Card className="mb-6">
-        <Row justify="space-between" align="middle" gutter={[16, 16]}>
-          <Col>
-            <Space>
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                // onClick={() => setCreateModalVisible(true)}
-              >
-                新增用户
-              </Button>
-              <Button
-                danger
-                icon={<DeleteOutlined />}
-                onClick={handleBatchDelete}
-                disabled={selectedRowKeys.length === 0}
-              >
-                批量删除
-              </Button>
-            </Space>
-          </Col>
+        <Row justify="end" align="middle" gutter={[16, 16]}>
           <Col>
             <Space>
               <Input
@@ -443,8 +388,7 @@ const ClientUserManagement: React.FC = () => {
               setPageSize(newPageSize);
             },
           }}
-          rowSelection={rowSelection}
-          scroll={{ x: 1500 }}
+          scroll={{ x: 1200 }}
           size="middle"
         />
       </Card>
@@ -459,7 +403,7 @@ const ClientUserManagement: React.FC = () => {
       >
         <Form layout="vertical">
           <Row gutter={16}>
-            <Col span={12}>
+            <Col span={24}>
               <Form.Item label="会员类型">
                 <Select
                   placeholder="请选择会员类型"
@@ -470,20 +414,6 @@ const ClientUserManagement: React.FC = () => {
                   <Option value="NORMAL">普通会员</Option>
                   <Option value="VIP">VIP会员</Option>
                   <Option value="SVIP">SVIP会员</Option>
-                </Select>
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item label="用户状态">
-                <Select
-                  placeholder="请选择用户状态"
-                  value={watch('status')}
-                  onChange={(value) => reset({ ...watch(), status: value })}
-                  allowClear
-                >
-                  <Option value="ACTIVE">活跃</Option>
-                  <Option value="INACTIVE">未激活</Option>
-                  <Option value="BANNED">已封禁</Option>
                 </Select>
               </Form.Item>
             </Col>
@@ -548,18 +478,6 @@ const ClientUserManagement: React.FC = () => {
                   <Descriptions.Item label="生日">
                     {selectedUser.birthday ? dayjs(selectedUser.birthday).format('YYYY-MM-DD') : '未设置'}
                   </Descriptions.Item>
-                  <Descriptions.Item label="状态">
-                    <Badge 
-                      status={
-                        selectedUser.status === 'ACTIVE' ? 'success' :
-                        selectedUser.status === 'INACTIVE' ? 'default' : 'error'
-                      } 
-                      text={
-                        selectedUser.status === 'ACTIVE' ? '活跃' :
-                        selectedUser.status === 'INACTIVE' ? '未激活' : '已封禁'
-                      }
-                    />
-                  </Descriptions.Item>
                   <Descriptions.Item label="注册时间">
                     {dayjs(selectedUser.createdAt).format('YYYY-MM-DD HH:mm:ss')}
                   </Descriptions.Item>
@@ -578,8 +496,60 @@ const ClientUserManagement: React.FC = () => {
           </div>
         )}
       </Modal>
+
+      {/* 编辑用户模态框 */}
+      <Modal
+        title="编辑用户"
+        open={editModalVisible}
+        onCancel={() => setEditModalVisible(false)}
+        onOk={handleSaveUser}
+        okText="保存"
+        cancelText="取消"
+        width={640}
+      >
+        <Form form={form} layout="vertical">
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                label="账号"
+                name="account"
+              >
+                <Input placeholder="账号" disabled />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                label="邮箱"
+                name="email"
+              >
+                <Input placeholder="邮箱" disabled />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                label="昵称"
+                name="nickname"
+              >
+                <Input placeholder="请输入昵称" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="会员类型" name="memberType">
+                <Select placeholder="请选择会员类型">
+                  <Option value="NORMAL">普通会员</Option>
+                  <Option value="VIP">VIP会员</Option>
+                  <Option value="SVIP">SVIP会员</Option>
+                </Select>
+              </Form.Item>
+            </Col>
+          </Row>
+        </Form>
+      </Modal>
     </div>
   );
 };
 
-export default ClientUserManagement
+export default ClientUserManagement;

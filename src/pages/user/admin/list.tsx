@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Table, 
   Card, 
@@ -11,37 +11,42 @@ import {
   Tag, 
   Modal,
   Form,
-  Popconfirm,
   Tooltip,
-  Badge,
-  Avatar,
-  message
+  Badge
 } from 'antd';
+import type { BadgeProps } from 'antd';
+
+type IdName = { id: string; name: string };
+type CategoryApiItem = { category_id: string; name: string };
 import { 
   SearchOutlined, 
   ReloadOutlined, 
-  UserOutlined, 
-  EditOutlined, 
-  DeleteOutlined,
   EyeOutlined,
   PlusOutlined,
   KeyOutlined,
-  LockOutlined
+  LockOutlined,
+  EditOutlined,
+  DeleteOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import dayjs from 'dayjs';
-import { 
-  getAdminList, 
-  deleteAdmin, 
+import {
+  getAdminList,
+  createAdmin,
   resetAdminPassword,
+  getIdentityList,
+  updateAdmin,
+  deleteAdmin,
   type Admin,
-  type AdminListParams
+  type AdminListParams,
+  type CreateAdminParams
 } from '../../../services/user';
+import { disableAdmin, getCategories } from '../../../services/api';
 import { globalMessage } from '../../../utils/globalMessage';
 import { globalErrorHandler } from '../../../utils/globalAxiosErrorHandler';
+import useAdminProfileStore from '../../../store/adminInfo';
 
 const { Option } = Select;
 
@@ -60,12 +65,29 @@ const AdminListPage: React.FC = () => {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   const [resetPasswordModalVisible, setResetPasswordModalVisible] = useState(false);
   const [selectedAdmin, setSelectedAdmin] = useState<Admin | null>(null);
   const [newPassword, setNewPassword] = useState('');
+  
+  // 新增管理员相关状态
+  const [createModalVisible, setCreateModalVisible] = useState(false);
+  const [createForm] = Form.useForm();
+  const [identities, setIdentities] = useState<Array<{ id: string; name: string }>>([]);
+  const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
 
-  const { control, handleSubmit, reset, watch } = useForm<AdminFilterForm>({
+  // 编辑管理员相关状态
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editForm] = Form.useForm();
+  const [editingAdmin, setEditingAdmin] = useState<Admin | null>(null);
+
+  // 获取当前登录管理员的身份信息
+  const getIdentityCodes = useAdminProfileStore((state) => state.getIdentityCodes);
+  const identityCodes = getIdentityCodes();
+  
+  // 检查是否是超级管理员或系统管理员
+  const isSuperOrSystemAdmin = identityCodes.includes('SUPER_ADMIN') || identityCodes.includes('SYSTEM_ADMIN');
+
+  const { handleSubmit, reset, watch } = useForm<AdminFilterForm>({
     resolver: zodResolver(adminFilterSchema),
     defaultValues: {
       keyword: '',
@@ -75,7 +97,7 @@ const AdminListPage: React.FC = () => {
   });
 
   // 加载管理员列表
-  const loadAdminList = async (params: AdminListParams = {}) => {
+  const loadAdminList = useCallback(async (params: AdminListParams = {}) => {
     setLoading(true);
     try {
       const response = await getAdminList({
@@ -90,11 +112,35 @@ const AdminListPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, pageSize]);
 
   useEffect(() => {
     loadAdminList();
-  }, [page, pageSize]);
+    loadIdentities();
+    loadCategories();
+  }, [loadAdminList]);
+
+  // 加载身份列表
+  const loadIdentities = async () => {
+    try {
+      const response = await getIdentityList({ page: 1, pageSize: 100 });
+      setIdentities(response.list.map(item => ({ id: item.id, name: item.name })));
+    } catch (error) {
+      console.error('Failed to load identities:', error);
+    }
+  };
+
+  // 加载分类列表
+  const loadCategories = async () => {
+    try {
+      const response = await getCategories();
+      setCategories(
+        (response as CategoryApiItem[]).map((item) => ({ id: item.category_id, name: item.name }))
+      );
+    } catch (error) {
+      console.error('Failed to load categories:', error);
+    }
+  };
 
   // 处理搜索
   const handleSearch = (values: AdminFilterForm) => {
@@ -104,50 +150,16 @@ const AdminListPage: React.FC = () => {
       identityId: values.identityId,
     };
     
+    // 搜索时重置到第一页
+    setPage(1);
     loadAdminList(params);
   };
 
   // 重置筛选
   const handleReset = () => {
     reset();
+    setPage(1);
     loadAdminList();
-  };
-
-  // 删除管理员
-  const handleDelete = async (adminId: string) => {
-    try {
-      await deleteAdmin(adminId);
-      globalMessage.success('管理员删除成功');
-      loadAdminList();
-    } catch (error) {
-      globalErrorHandler.handle(error, globalMessage.error);
-    }
-  };
-
-  // 批量删除
-  const handleBatchDelete = async () => {
-    if (selectedRowKeys.length === 0) {
-      globalMessage.warning('请选择要删除的管理员');
-      return;
-    }
-
-    Modal.confirm({
-      title: '确认删除',
-      content: `确定要删除选中的 ${selectedRowKeys.length} 个管理员吗？`,
-      onOk: async () => {
-        try {
-          // 这里应该调用批量删除接口，暂时循环删除
-          for (const adminId of selectedRowKeys) {
-            await deleteAdmin(adminId as string);
-          }
-          globalMessage.success('批量删除成功');
-          setSelectedRowKeys([]);
-          loadAdminList();
-        } catch (error) {
-          globalErrorHandler.handle(error, globalMessage.error);
-        }
-      }
-    });
   };
 
   // 重置密码
@@ -177,6 +189,29 @@ const AdminListPage: React.FC = () => {
     }
   };
 
+  // 禁用管理员（按需求：禁用后不允许再启用）
+  // API（见 src/services/api.ts 与 src/services/API文档.md）：
+  // - POST /system/admins/{adminId}/disable
+  const handleDisableAdmin = async (admin: Admin) => {
+    // 已禁用/封禁：按钮会置灰，不允许再次操作
+    if (admin.status === 'INACTIVE' || admin.status === 'BANNED') return;
+    Modal.confirm({
+      title: '确定禁用该管理员？',
+      content: '禁用后，该管理员将无法继续登录后台，且当前系统不支持再次启用。',
+      okText: '禁用',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await disableAdmin(admin.id);
+          globalMessage.success('已禁用');
+          loadAdminList();
+        } catch (error) {
+          globalErrorHandler.handle(error, globalMessage.error);
+        }
+      },
+    });
+  };
+
   // 生成随机密码
   const generateRandomPassword = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
@@ -187,6 +222,96 @@ const AdminListPage: React.FC = () => {
     setNewPassword(password);
   };
 
+  // 打开创建管理员弹窗
+  const handleOpenCreateModal = () => {
+    createForm.resetFields();
+    setCreateModalVisible(true);
+  };
+
+  // 创建管理员
+  const handleCreateAdmin = async () => {
+    try {
+      const values = await createForm.validateFields();
+      
+      const params: CreateAdminParams = {
+        account: values.account,
+        password: values.password,
+        name: values.name,
+        email: values.email,
+        nickname: values.nickname,
+        identityIds: values.identityIds || [],
+        categoryIds: values.categoryIds || [], // 添加负责专区
+      };
+      
+      await createAdmin(params);
+      globalMessage.success('管理员创建成功');
+      setCreateModalVisible(false);
+      createForm.resetFields();
+      loadAdminList();
+    } catch (error) {
+      globalErrorHandler.handle(error, globalMessage.error);
+    }
+  };
+
+  // 打开编辑管理员弹窗
+  const handleOpenEditModal = (admin: Admin) => {
+    setEditingAdmin(admin);
+    editForm.setFieldsValue({
+      name: admin.name,
+      nickname: admin.nickname,
+      email: admin.email,
+      identityIds: admin.identities?.map((i: IdName) => i.id) || [],
+      categoryIds: admin.productCategories?.map((c: IdName) => c.id) || [],
+    });
+    setEditModalVisible(true);
+  };
+
+  // 编辑管理员
+  const handleEditAdmin = async () => {
+    if (!editingAdmin) return;
+    
+    try {
+      const values = await editForm.validateFields();
+      
+      const params: Partial<CreateAdminParams> = {
+        name: values.name,
+        email: values.email,
+        nickname: values.nickname,
+        identityIds: values.identityIds || [],
+        categoryIds: values.categoryIds || [],
+      };
+      
+      await updateAdmin(editingAdmin.id, params);
+      globalMessage.success('管理员信息更新成功');
+      setEditModalVisible(false);
+      editForm.resetFields();
+      setEditingAdmin(null);
+      loadAdminList();
+    } catch (error) {
+      globalErrorHandler.handle(error, globalMessage.error);
+    }
+  };
+
+  // 删除管理员
+  const handleDeleteAdmin = async (admin: Admin) => {
+    Modal.confirm({
+      title: '确定删除该管理员？',
+      content: `确定要删除管理员 "${admin.name}" (${admin.account}) 吗？此操作不可恢复。`,
+      okText: '删除',
+      okButtonProps: { danger: true },
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          await deleteAdmin(admin.id);
+          globalMessage.success('管理员删除成功');
+          loadAdminList();
+        } catch (error) {
+          globalErrorHandler.handle(error, globalMessage.error);
+        }
+      },
+    });
+  };
+
   // 表格列定义
   const columns: ColumnsType<Admin> = [
     {
@@ -195,19 +320,6 @@ const AdminListPage: React.FC = () => {
       key: 'id',
       width: 200,
       ellipsis: true,
-    },
-    {
-      title: '头像',
-      dataIndex: 'avatar',
-      key: 'avatar',
-      width: 80,
-      render: (avatar) => (
-        <Avatar 
-          src={avatar} 
-          icon={!avatar && <UserOutlined />}
-          size="large"
-        />
-      ),
     },
     {
       title: '账号',
@@ -235,14 +347,18 @@ const AdminListPage: React.FC = () => {
       width: 200,
       render: (identities) => (
         <Space size={[0, 4]} wrap>
-          {identities?.slice(0, 2).map((identity: any) => (
+          {(
+            identities as IdName[] | undefined
+          )?.slice(0, 2).map((identity) => (
             <Tag key={identity.id} color="blue">
               {identity.name}
             </Tag>
           ))}
-          {identities?.length > 2 && (
-            <Tooltip title={identities.slice(2).map((i: any) => i.name).join(', ')}>
-              <Tag>+{identities.length - 2}</Tag>
+          {(((identities as IdName[] | undefined)?.length ?? 0) > 2) && (
+            <Tooltip
+              title={(identities as IdName[]).slice(2).map(i => i.name).join(', ')}
+            >
+              <Tag>+{(identities as IdName[]).length - 2}</Tag>
             </Tooltip>
           )}
         </Space>
@@ -255,14 +371,18 @@ const AdminListPage: React.FC = () => {
       width: 200,
       render: (categories) => (
         <Space size={[0, 4]} wrap>
-          {categories?.slice(0, 2).map((category: any) => (
+          {(
+            categories as IdName[] | undefined
+          )?.slice(0, 2).map((category) => (
             <Tag key={category.id} color="green">
               {category.name}
             </Tag>
           ))}
-          {categories?.length > 2 && (
-            <Tooltip title={categories.slice(2).map((c: any) => c.name).join(', ')}>
-              <Tag>+{categories.length - 2}</Tag>
+          {(((categories as IdName[] | undefined)?.length ?? 0) > 2) && (
+            <Tooltip
+              title={(categories as IdName[]).slice(2).map(c => c.name).join(', ')}
+            >
+              <Tag>+{(categories as IdName[]).length - 2}</Tag>
             </Tooltip>
           )}
         </Space>
@@ -280,22 +400,8 @@ const AdminListPage: React.FC = () => {
           BANNED: { color: 'error', text: '封禁' },
         };
         const config = statusMap[status as keyof typeof statusMap] || statusMap.INACTIVE;
-        return <Badge status={config.color as any} text={config.text} />;
+  return <Badge status={config.color as BadgeProps['status']} text={config.text} />;
       },
-    },
-    {
-      title: '创建时间',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      width: 180,
-      render: (date) => dayjs(date).format('YYYY-MM-DD HH:mm'),
-    },
-    {
-      title: '最后登录',
-      dataIndex: 'lastLoginTime',
-      key: 'lastLoginTime',
-      width: 180,
-      render: (date) => date ? dayjs(date).format('YYYY-MM-DD HH:mm') : '从未登录',
     },
     {
       title: '操作',
@@ -310,13 +416,15 @@ const AdminListPage: React.FC = () => {
               icon={<EyeOutlined />}
             />
           </Tooltip>
-          <Tooltip title="编辑">
-            <Button 
-              type="text" 
-              icon={<EditOutlined />}
-              disabled={record.status === 'BANNED'}
-            />
-          </Tooltip>
+          {isSuperOrSystemAdmin && (
+            <Tooltip title="编辑信息">
+              <Button 
+                type="text" 
+                icon={<EditOutlined />}
+                onClick={() => handleOpenEditModal(record)}
+              />
+            </Tooltip>
+          )}
           <Tooltip title="重置密码">
             <Button 
               type="text" 
@@ -325,34 +433,29 @@ const AdminListPage: React.FC = () => {
               disabled={record.status === 'BANNED'}
             />
           </Tooltip>
-          <Tooltip title="删除">
-            <Popconfirm
-              title="确定要删除这个管理员吗？"
-              onConfirm={() => handleDelete(record.id)}
-              okText="确定"
-              cancelText="取消"
-            >
-              <Button 
-                type="text" 
-                danger 
+      <Tooltip title={record.status === 'INACTIVE' ? '已禁用（不可操作）' : record.status === 'BANNED' ? '封禁（不可操作）' : '禁用'}>
+            <Button
+              type="text"
+              icon={<LockOutlined />}
+        onClick={() => handleDisableAdmin(record)}
+        disabled={record.status === 'INACTIVE' || record.status === 'BANNED'}
+            />
+          </Tooltip>
+          {isSuperOrSystemAdmin && (
+            <Tooltip title="删除管理员">
+              <Button
+                type="text"
+                danger
                 icon={<DeleteOutlined />}
+                onClick={() => handleDeleteAdmin(record)}
                 disabled={record.status === 'BANNED'}
               />
-            </Popconfirm>
-          </Tooltip>
+            </Tooltip>
+          )}
         </Space>
       ),
     },
   ];
-
-  // 行选择配置
-  const rowSelection = {
-    selectedRowKeys,
-    onChange: (keys: React.Key[]) => setSelectedRowKeys(keys),
-    getCheckboxProps: (record: Admin) => ({
-      disabled: record.status === 'BANNED',
-    }),
-  };
 
   return (
     <div className="p-4">
@@ -360,23 +463,13 @@ const AdminListPage: React.FC = () => {
       <Card className="mb-6">
         <Row justify="space-between" align="middle" gutter={[16, 16]}>
           <Col>
-            <Space>
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                // onClick={() => setCreateModalVisible(true)}
-              >
-                新增管理员
-              </Button>
-              <Button
-                danger
-                icon={<DeleteOutlined />}
-                onClick={handleBatchDelete}
-                disabled={selectedRowKeys.length === 0}
-              >
-                批量删除
-              </Button>
-            </Space>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={handleOpenCreateModal}
+            >
+              新增管理员
+            </Button>
           </Col>
           <Col>
             <Space>
@@ -435,7 +528,6 @@ const AdminListPage: React.FC = () => {
               setPageSize(newPageSize);
             },
           }}
-          rowSelection={rowSelection}
           scroll={{ x: 1800 }}
           size="middle"
         />
@@ -456,21 +548,8 @@ const AdminListPage: React.FC = () => {
         {selectedAdmin && (
           <div>
             <div className="mb-6 p-4 bg-gray-50 rounded">
-              <Row align="middle" gutter={16}>
-                <Col>
-                  <Avatar 
-                    src={selectedAdmin.avatar} 
-                    icon={!selectedAdmin.avatar && <UserOutlined />}
-                    size="large"
-                  />
-                </Col>
-                <Col>
-                  <div>
-                    <div className="font-medium">{selectedAdmin.name}</div>
-                    <div className="text-gray-500">{selectedAdmin.account}</div>
-                  </div>
-                </Col>
-              </Row>
+              <div className="font-medium">{selectedAdmin.name}</div>
+              <div className="text-gray-500">{selectedAdmin.account}</div>
             </div>
 
             <Form layout="vertical">
@@ -503,13 +582,219 @@ const AdminListPage: React.FC = () => {
                     )}
                   </div>
                   <div className="mt-2 text-sm text-gray-600">
-                    提示：密码应包含大小写字母、数字和特殊字符，长度不少于8位
+                    提示：密码应包含大小写字母、数字和特殊字符，长度不少于6位
                   </div>
                 </div>
               )}
             </Form>
           </div>
         )}
+      </Modal>
+
+      {/* 创建管理员模态框 */}
+      <Modal
+        title="新增管理员"
+        open={createModalVisible}
+        onCancel={() => {
+          setCreateModalVisible(false);
+          createForm.resetFields();
+        }}
+        onOk={handleCreateAdmin}
+        width={640}
+        okText="创建"
+        cancelText="取消"
+      >
+        <Form form={createForm} layout="vertical">
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                label="账号"
+                name="account"
+                rules={[
+                  { required: true, message: '请输入账号' },
+                  { min: 3, message: '账号长度不能少于3位' }
+                ]}
+              >
+                <Input placeholder="请输入账号" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                label="密码"
+                name="password"
+                rules={[
+                  { required: true, message: '请输入密码' },
+                  { min: 6, message: '密码长度不能少于6位' }
+                ]}
+              >
+                <Input.Password placeholder="请输入密码" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                label="姓名"
+                name="name"
+                rules={[{ required: true, message: '请输入姓名' }]}
+              >
+                <Input placeholder="请输入姓名" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                label="昵称"
+                name="nickname"
+              >
+                <Input placeholder="请输入昵称（可选）" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col span={24}>
+              <Form.Item
+                label="邮箱"
+                name="email"
+                rules={[
+                  { type: 'email', message: '请输入有效的邮箱地址' }
+                ]}
+              >
+                <Input placeholder="请输入邮箱（可选）" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col span={24}>
+              <Form.Item
+                label="身份/角色"
+                name="identityIds"
+              >
+                <Select
+                  mode="multiple"
+                  placeholder="请选择身份/角色（可选）"
+                  options={identities.map(item => ({
+                    label: item.name,
+                    value: item.id
+                  }))}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col span={24}>
+              <Form.Item
+                label="负责专区"
+                name="categoryIds"
+              >
+                <Select
+                  mode="multiple"
+                  placeholder="请选择负责的商品专区（可选）"
+                  options={categories.map(item => ({
+                    label: item.name,
+                    value: item.id
+                  }))}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+        </Form>
+      </Modal>
+
+      {/* 编辑管理员模态框 */}
+      <Modal
+        title="编辑管理员信息"
+        open={editModalVisible}
+        onCancel={() => {
+          setEditModalVisible(false);
+          editForm.resetFields();
+          setEditingAdmin(null);
+        }}
+        onOk={handleEditAdmin}
+        width={640}
+        okText="保存"
+        cancelText="取消"
+      >
+        {editingAdmin && (
+          <div className="mb-4 p-4 bg-gray-50 rounded">
+            <div className="font-medium">{editingAdmin.name}</div>
+            <div className="text-gray-500">账号：{editingAdmin.account}</div>
+          </div>
+        )}
+        <Form form={editForm} layout="vertical">
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                label="姓名"
+                name="name"
+                rules={[{ required: true, message: '请输入姓名' }]}
+              >
+                <Input placeholder="请输入姓名" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                label="昵称"
+                name="nickname"
+              >
+                <Input placeholder="请输入昵称（可选）" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col span={24}>
+              <Form.Item
+                label="邮箱"
+                name="email"
+                rules={[
+                  { type: 'email', message: '请输入有效的邮箱地址' }
+                ]}
+              >
+                <Input placeholder="请输入邮箱（可选）" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col span={24}>
+              <Form.Item
+                label="身份/角色"
+                name="identityIds"
+              >
+                <Select
+                  mode="multiple"
+                  placeholder="请选择身份/角色（可选）"
+                  options={identities.map(item => ({
+                    label: item.name,
+                    value: item.id
+                  }))}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col span={24}>
+              <Form.Item
+                label="负责专区"
+                name="categoryIds"
+              >
+                <Select
+                  mode="multiple"
+                  placeholder="请选择负责的商品专区（可选）"
+                  options={categories.map(item => ({
+                    label: item.name,
+                    value: item.id
+                  }))}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+        </Form>
       </Modal>
     </div>
   );

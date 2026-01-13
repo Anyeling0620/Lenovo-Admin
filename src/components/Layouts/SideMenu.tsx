@@ -41,12 +41,12 @@ const _menuItems: MenuItem[] = [
         icon: <DesktopOutlined />,
         path: '/workbench',
     },
-        {
-        key: '3',
-        label: '广播通知',
-        icon: <BellOutlined />,
-        path: '/broadcast',
-    },
+    //     {
+    //     key: '3',
+    //     label: '广播通知',
+    //     icon: <BellOutlined />,
+    //     path: '/broadcast',
+    // },
     {
         key: '4',
         label: '商品管理',
@@ -55,7 +55,7 @@ const _menuItems: MenuItem[] = [
             { key: '4-1', label: '商品总览', path: '/goods/overview' },
             { key: '4-2', label: '品牌·专区', path: '/goods/brand-zone' },
             { key: '4-3', label: '商品管理', path: '/goods/manage' },
-            { key: '4-4', label: '库存管理', path: '/goods/category' }
+            { key: '4-4', label: '库存管理', path: '/goods/stock' }
         ],
     },
     {
@@ -63,10 +63,10 @@ const _menuItems: MenuItem[] = [
         label: '商城管理',
         icon: <ShoppingOutlined />,
         children: [
-            { key: '5-1', label: '上架商品管理', path: '/mall/goods' },
-            { key: '5-2', label: '售货专区管理', path: '/mall/zone' },
-            { key: '5-3', label: '首页展示管理', path: '/mall/home' },
-            { key: '5-4', label: '新品展示管理', path: '/mall/new' },
+            { key: '5-1', label: '上架商品管理', path: '/mall/ai/shelf-product' },
+            { key: '5-2', label: '售货专区管理', path: '/mall/ai/sales-zone' },
+            { key: '5-3', label: '首页展示管理', path: '/mall/ai/home-display' },
+            { key: '5-4', label: '新品展示管理', path: '/mall/ai/new-product-display' },
         ]
     },
     {
@@ -112,16 +112,16 @@ const _menuItems: MenuItem[] = [
             },
         ],
     },
-    {
-        key: '9',
-        label: '客服中心',
-        icon: <PhoneOutlined />,
-        children: [
-            { key: '9-1', label: '服务总览', path: '/customer-service/overview' },
-            { key: '9-2', label: '会话中心', path: '/customer-service/session' },
-            { key: '9-3', label: '评价管理', path: '/customer-service/evaluation' },
-        ],
-    },
+    // {
+    //     key: '9',
+    //     label: '客服中心',
+    //     icon: <PhoneOutlined />,
+    //     children: [
+    //         { key: '9-1', label: '服务总览', path: '/customer-service/overview' },
+    //         { key: '9-2', label: '会话中心', path: '/customer-service/session' },
+    //         { key: '9-3', label: '评价管理', path: '/customer-service/evaluation' },
+    //     ],
+    // },
     {
         key: '10',
         label: '账号管理',
