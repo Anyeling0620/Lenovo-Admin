@@ -616,7 +616,8 @@ const ShelfProductManagement = () => {
 
   // 处理搜索
   const handleSearch = (value: string) => {
-    setFilters({...filters, keyword: value});
+    const keyword = value.trim();
+    setFilters((prev) => ({ ...prev, keyword }));
   };
 
   return (
@@ -687,13 +688,10 @@ const ShelfProductManagement = () => {
               placeholder="搜索商品名称"
               prefix={<SearchOutlined />}
               allowClear
-              onPressEnter={(e) => handleSearch((e.target as HTMLInputElement).value)}
-              onChange={(e) => {
-                if (e.target.value === '') {
-                  handleSearch('');
-                }
-              }}
-              onBlur={(e) => handleSearch(e.target.value)}
+              value={filters.keyword}
+              onChange={(e) => setFilters((prev) => ({ ...prev, keyword: e.target.value }))}
+              onPressEnter={() => handleSearch(filters.keyword)}
+              onBlur={() => handleSearch(filters.keyword)}
             />
           </Col>
         </Row>
