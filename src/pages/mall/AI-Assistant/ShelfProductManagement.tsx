@@ -413,20 +413,29 @@ const ShelfProductManagement = () => {
       title: '商品名称',
       dataIndex: 'product_name',
       key: 'product_name',
-      width: 200,
+      width: 150,
       ellipsis: true
     },
     {
       title: '商品ID',
       dataIndex: 'product_id',
       key: 'product_id',
-      width: 120
+      width: 100
+    },
+    {
+      title: '品牌',
+      dataIndex: 'brand_name',
+      key: 'brand_name',
+      width: 100,
+      render: (brand: string) => (
+        <Tag color="cyan">{brand || '未设置'}</Tag>
+      )
     },
     {
       title: '分类',
       dataIndex: 'category_name',
       key: 'category_name',
-      width: 120,
+      width: 100,
       render: (name: string) => (
         <Tag color="blue">{name}</Tag>
       )
@@ -435,14 +444,14 @@ const ShelfProductManagement = () => {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
-      width: 100,
+      width: 80,
       render: (status: ShelfProductStatus) => getStatusTag(status)
     },
     {
       title: '自营',
       dataIndex: 'is_self_operated',
       key: 'is_self_operated',
-      width: 80,
+      width: 70,
       render: (isSelfOperated: boolean) => (
         <Tag color={isSelfOperated ? 'blue' : 'default'}>
           {isSelfOperated ? '是' : '否'}
@@ -453,7 +462,7 @@ const ShelfProductManagement = () => {
       title: '可定制',
       dataIndex: 'is_customizable',
       key: 'is_customizable',
-      width: 80,
+      width: 70,
       render: (isCustomizable: boolean) => (
         <Tag color={isCustomizable ? 'green' : 'default'}>
           {isCustomizable ? '是' : '否'}
@@ -474,7 +483,8 @@ const ShelfProductManagement = () => {
     {
       title: '操作',
       key: 'action',
-      width: 280,
+      width: 200,
+      fixed: 'right' as const,
       render: (_: any, record: ShelfProductResponse) => (
         <Space size="small">
           <Tooltip title="管理规格">
@@ -541,7 +551,7 @@ const ShelfProductManagement = () => {
           </Col>
         </Row>
 
-        {/* 筛选条件 */}
+        {/* 筛选条件 - 调整为文档一的样式 */}
         <Row gutter={16} style={{ marginBottom: 16 }}>
           <Col span={6}>
             <Select
@@ -571,7 +581,7 @@ const ShelfProductManagement = () => {
               <Option value="">全部状态</Option>
               <Option value="下架">下架</Option>
               <Option value="在售">上架中</Option>
-              <Option value="售罄">已售罄</Option>
+              <Option value="售罄">售罄</Option>
             </Select>
           </Col>
           <Col span={12}>
