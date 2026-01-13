@@ -882,7 +882,7 @@ const ShelfProductManagement = () => {
             style={{ width: 260 }}
             allowClear
           />
-          <Button onClick={fetchProducts} loading={productFetchLoading}>刷新列表</Button>
+          <Button onClick={fetchAvailableProducts} loading={productFetchLoading}>刷新列表</Button>
         </Space>
         <Table
           rowKey="product_id"
