@@ -174,11 +174,24 @@ const ShelfProductManagement = () => {
   };
 
   // 商品选择器相关函数
-  const fetchProducts = async () => {
+  const fetchAvailableProducts = async () => {
     setProductFetchLoading(true);
     try {
-      const res = await getProducts();
-      setProductList(res);
+      // 同时调用两个API
+      const [allProducts, shelfProducts] = await Promise.all([
+        getProducts(),
+        getShelfProducts()
+      ]);
+      
+      // 获取已上架商品的product_id集合
+      const shelfProductIds = new Set(shelfProducts.map(sp => sp.product_id));
+      
+      // 筛选出未上架的商品
+      const availableProducts = allProducts.filter(product => 
+        !shelfProductIds.has(product.product_id)
+      );
+      
+      setProductList(availableProducts);
     } catch (error) {
       globalErrorHandler.handle(error, globalMessage.error);
       setProductList([]);
@@ -189,9 +202,7 @@ const ShelfProductManagement = () => {
 
   const openProductPicker = () => {
     setProductModalOpen(true);
-    if (!productList.length) {
-      fetchProducts();
-    }
+    fetchAvailableProducts();
   };
 
   const confirmProduct = () => {
