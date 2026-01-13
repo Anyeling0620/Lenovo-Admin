@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react'; // 删除了 useMemo 和 message
 import {
   Card,
   Table,
@@ -21,8 +21,7 @@ import {
   Tooltip,
   Upload,
   InputNumber,
-  Spin,
-  message
+  Spin
 } from 'antd';
 import {
   PlusOutlined,
@@ -496,20 +495,7 @@ const ShelfProductManagement = () => {
               borderRadius: '4px',
               border: '1px solid #f0f0f0'
             }}
-            fallback={
-              <div style={{
-                width: '60px',
-                height: '60px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: '#f5f5f5',
-                borderRadius: '4px',
-                border: '1px solid #d9d9d9'
-              }}>
-                <PictureOutlined style={{ fontSize: '20px', color: '#bfbfbf' }} />
-              </div>
-            }
+            fallback="/placeholder-image.png" // 修复：改为字符串URL
           />
         );
       }
@@ -758,6 +744,7 @@ const ShelfProductManagement = () => {
                           src={getImageUrl(selectedProduct.main_image)} 
                           alt={selectedProduct.name}
                           style={{ objectFit: 'cover', borderRadius: '4px' }}
+                          fallback="/placeholder-image.png" // 修复：添加fallback属性
                         />
                       )}
                       <Typography.Text type="secondary">
@@ -1045,6 +1032,7 @@ const ShelfProductManagement = () => {
                     src={image ? getImageUrl(image) : '/placeholder-image.png'} 
                     alt="商品图片"
                     style={{ objectFit: 'cover', borderRadius: '4px' }}
+                    fallback="/placeholder-image.png" // 修复：添加fallback属性
                   />
                 )
               },
