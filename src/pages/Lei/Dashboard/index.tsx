@@ -3,7 +3,6 @@ import { Card, Col, Row, Segmented, Space, Statistic, Tag, Typography, Divider, 
 import { AdminRole } from "../../../utils/permission";
 import dayjs from "dayjs";
 import {
-  getProductStats,
   getShelfStats,
   getStocks,
   getOrders,
@@ -25,11 +24,10 @@ type DashboardSection = {
   key: string;
   title: string;
   allowed: AdminRole[];
-  apiNote: string;
   stats: { label: string; value: number | string; trend?: string; highlight?: boolean }[];
 };
 
-const { Title, Paragraph, Text } = Typography;
+const { Title, Paragraph } = Typography;
 
 type TrendPeriod = "daily" | "monthly" | "quarterly";
 
@@ -49,7 +47,6 @@ const mockSections: DashboardSection[] = [
     key: "order",
     title: "订单与售后",
     allowed: [AdminRole.SUPER_ADMIN, AdminRole.SYSTEM_ADMIN, AdminRole.ORDER_MANAGER, AdminRole.AFTER_SALES],
-    apiNote: "接口：GET /admin/orders；GET /admin/after-sales；GET /admin/complaints",
     stats: [
       { label: "今日订单数", value: 362, trend: "较昨日 +6%" },
       { label: "待发货", value: 58, highlight: true },
@@ -62,7 +59,6 @@ const mockSections: DashboardSection[] = [
     key: "product",
     title: "商品与货架",
     allowed: [AdminRole.SUPER_ADMIN, AdminRole.PRODUCT_MANAGER, AdminRole.WAREHOUSE_MANAGER],
-    apiNote: "接口：GET /admin/products/stats；GET /admin/shelf/stats；GET /admin/stocks",
     stats: [
       { label: "商品总数", value: 1280 },
       { label: "在售", value: 940, trend: "环比 +3%" },
@@ -75,7 +71,6 @@ const mockSections: DashboardSection[] = [
     key: "marketing",
     title: "营销概览",
     allowed: [AdminRole.SUPER_ADMIN, AdminRole.SYSTEM_ADMIN, AdminRole.MARKETING],
-    apiNote: "接口：GET /admin/marketing/coupons；GET /admin/marketing/vouchers；GET /admin/marketing/coupons/:id/stats",
     stats: [
       { label: "有效优惠券", value: 12 },
       { label: "核销率", value: "42%" },
@@ -87,7 +82,6 @@ const mockSections: DashboardSection[] = [
     key: "system",
     title: "系统与权限",
     allowed: [AdminRole.SUPER_ADMIN, AdminRole.SYSTEM_ADMIN],
-    apiNote: "接口：GET /admin/system/admins；/system/identities；/system/permissions；/system/admins/online",
     stats: [
       { label: "管理员数", value: 48 },
       { label: "在线管理员", value: 9, trend: "实时" },
@@ -99,7 +93,6 @@ const mockSections: DashboardSection[] = [
     key: "service",
     title: "客服概览",
     allowed: [AdminRole.SUPER_ADMIN, AdminRole.SYSTEM_ADMIN, AdminRole.CUSTOMER_SERVICE],
-    apiNote: "接口：GET /admin/service/sessions；GET /admin/service/sessions/:room_id/messages",
     stats: [
       { label: "活跃会话", value: 34 },
       { label: "未读消息", value: 128, highlight: true },
@@ -202,7 +195,6 @@ const DashboardPage = () => {
     setLoading(true);
     try {
       const settled = await Promise.allSettled([
-        getProductStats(),
         getShelfStats(),
         getStocks(),
         getOrders(),
@@ -224,20 +216,19 @@ const DashboardPage = () => {
         return null;
       };
 
-      const productStatsRes = pick(settled[0]) || { total: 0, normal: 0, off: 0, deleted: 0 };
-      const shelfStatsRes = pick(settled[1]) || [];
-      const stocksRes = pick(settled[2]) || [];
-      const ordersRes = pick(settled[3]) || [];
-      const afterSalesRes = pick(settled[4]) || [];
-      const complaintsRes = pick(settled[5]) || [];
-      const couponsRes = pick(settled[6]) || [];
-      const vouchersRes = pick(settled[7]) || [];
-      const seckillRoundsRes = pick(settled[8]) || [];
-      const adminsRes = pick(settled[9]) || [];
-      const onlineAdminsRes = pick(settled[10]) || [];
-      const identitiesRes = pick(settled[11]) || [];
-      const permissionsRes = pick(settled[12]) || [];
-      const serviceSessionsRes = pick(settled[13]) || [];
+      const shelfStatsRes = pick(settled[0]) || [];
+      const stocksRes = pick(settled[1]) || [];
+      const ordersRes = pick(settled[2]) || [];
+      const afterSalesRes = pick(settled[3]) || [];
+      const complaintsRes = pick(settled[4]) || [];
+      const couponsRes = pick(settled[5]) || [];
+      const vouchersRes = pick(settled[6]) || [];
+      const seckillRoundsRes = pick(settled[7]) || [];
+      const adminsRes = pick(settled[8]) || [];
+      const onlineAdminsRes = pick(settled[9]) || [];
+      const identitiesRes = pick(settled[10]) || [];
+      const permissionsRes = pick(settled[11]) || [];
+      const serviceSessionsRes = pick(settled[12]) || [];
 
       const lowStockCount = stocksRes.filter(
         (s: any) => typeof s.warn_num === "number" && typeof s.stock_num === "number" && s.stock_num <= s.warn_num
@@ -274,14 +265,27 @@ const DashboardPage = () => {
         quarterlySeries.push({ label: `${dt.year()}-Q${q}`, value: count });
       }
 
+      const uniqueProductIds = new Set<string>();
+      const onSaleProductIds = new Set<string>();
+      stocksRes.forEach((s: any) => {
+        if (s.product_id) uniqueProductIds.add(s.product_id);
+        if (typeof s.stock_num === "number" && s.stock_num > 0 && s.product_id) {
+          onSaleProductIds.add(s.product_id);
+        }
+      });
+      const shelfTotal = (shelfStatsRes as any[]).reduce(
+        (sum, r) => sum + (typeof r.shelf_product_count === "number" ? r.shelf_product_count : 0),
+        0
+      );
+
       setData({
         productStats: {
-          total: productStatsRes.total,
-          normal: productStatsRes.normal,
-          off: productStatsRes.off,
-          deleted: productStatsRes.deleted,
+          total: uniqueProductIds.size,
+          normal: onSaleProductIds.size,
+          off: 0,
+          deleted: 0,
         },
-        shelfCount: shelfStatsRes.length,
+        shelfCount: shelfTotal,
         lowStock: lowStockCount,
         orders: ordersRes.length,
         pendingShip: pendingShipCount,
@@ -310,7 +314,10 @@ const DashboardPage = () => {
   };
 
   useEffect(() => {
+    const roleLabel = identityOptions.find((opt) => opt.value === activeRole)?.label || activeRole;
+    globalMessage.info(`当前身份：${roleLabel}`);
     fetchDashboardData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const dynamicSections = useMemo<DashboardSection[]>(
@@ -319,7 +326,6 @@ const DashboardPage = () => {
         key: "order",
         title: "订单与售后",
         allowed: [AdminRole.SUPER_ADMIN, AdminRole.SYSTEM_ADMIN, AdminRole.ORDER_MANAGER, AdminRole.AFTER_SALES],
-        apiNote: "接口：GET /admin/orders；GET /admin/after-sales；GET /admin/complaints",
         stats: [
           { label: "订单总数", value: data.orders, trend: "" },
           { label: "待发货", value: data.pendingShip, highlight: true },
@@ -331,7 +337,6 @@ const DashboardPage = () => {
         key: "product",
         title: "商品与货架",
         allowed: [AdminRole.SUPER_ADMIN, AdminRole.PRODUCT_MANAGER, AdminRole.WAREHOUSE_MANAGER],
-        apiNote: "接口：GET /admin/products/stats；GET /admin/shelf/stats；GET /admin/stocks",
         stats: [
           { label: "商品总数", value: data.productStats.total },
           { label: "在售", value: data.productStats.normal },
@@ -344,7 +349,6 @@ const DashboardPage = () => {
         key: "marketing",
         title: "营销概览",
         allowed: [AdminRole.SUPER_ADMIN, AdminRole.SYSTEM_ADMIN, AdminRole.MARKETING],
-        apiNote: "接口：GET /admin/marketing/coupons；/vouchers；/seckill-rounds；/coupons/:id/stats",
         stats: [
           { label: "有效优惠券", value: data.coupons },
           { label: "代金券数", value: data.vouchers },
@@ -355,7 +359,6 @@ const DashboardPage = () => {
         key: "system",
         title: "系统与权限",
         allowed: [AdminRole.SUPER_ADMIN, AdminRole.SYSTEM_ADMIN],
-        apiNote: "接口：GET /admin/system/admins；/system/identities；/system/permissions；/system/admins/online",
         stats: [
           { label: "管理员数", value: data.admins },
           { label: "在线管理员", value: data.onlineAdmins },
@@ -367,7 +370,6 @@ const DashboardPage = () => {
         key: "service",
         title: "客服概览",
         allowed: [AdminRole.SUPER_ADMIN, AdminRole.SYSTEM_ADMIN, AdminRole.CUSTOMER_SERVICE],
-        apiNote: "接口：GET /admin/service/sessions；GET /admin/service/sessions/:room_id/messages",
         stats: [
           { label: "会话数", value: data.serviceSessions },
         ],
@@ -452,9 +454,6 @@ const DashboardPage = () => {
                 </Col>
               ))}
             </Row>
-            <Paragraph type="secondary" className="mt-3 mb-0 text-xs">
-              {section.apiNote}
-            </Paragraph>
           </Card>
         ))}
       </Space>
