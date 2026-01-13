@@ -378,14 +378,14 @@ const ShelfProductManagement = () => {
   const columns = [
     {
       title: '商品图片',
-      dataIndex: 'main_image',
-      key: 'main_image',
+      dataIndex: 'carousel_image',
+      key: 'carousel_image',
       width: 80,
       render: (image: string | null, record: ShelfProductResponse) => (
         <Image 
           width={60} 
           height={60} 
-          src={image ? getImageUrl(image) : record.product_image || '/placeholder-image.png'} 
+          src={image ? getImageUrl(image) : '/placeholder-image.png'} 
           alt={record.product_name}
           style={{ 
             objectFit: 'cover',
