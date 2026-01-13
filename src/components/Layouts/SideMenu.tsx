@@ -64,7 +64,7 @@ const _menuItems: MenuItem[] = [
         icon: <ShoppingOutlined />,
         children: [
             { key: '5-1', label: '上架商品管理', path: '/mall/ai/shelf-product' },
-            { key: '5-2', label: '售货专区管理', path: '/mall/ai/sales-zone' },
+            // { key: '5-2', label: '售货专区管理', path: '/mall/ai/sales-zone' },
             { key: '5-3', label: '首页展示管理', path: '/mall/ai/home-display' },
             { key: '5-4', label: '新品展示管理', path: '/mall/ai/new-product-display' },
         ]
