@@ -378,36 +378,41 @@ const ShelfProductManagement = () => {
   const columns = [
     {
       title: '商品图片',
-      dataIndex: 'carousel_image',
-      key: 'carousel_image',
+      key: 'product_image',
       width: 80,
-      render: (image: string | null, record: ShelfProductResponse) => (
-        <Image 
-          width={60} 
-          height={60} 
-          src={image ? getImageUrl(image) : '/placeholder-image.png'} 
-          alt={record.product_name}
-          style={{ 
-            objectFit: 'cover',
-            borderRadius: '4px',
-            border: '1px solid #f0f0f0'
-          }}
-          fallback={
-            <div style={{
-              width: '60px',
-              height: '60px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: '#f5f5f5',
+      render: (_: any, record: ShelfProductResponse) => {
+        // 优先使用轮播图，如果没有则使用商品主图
+        const imageUrl = record.carousel_image || 
+                        (record as any).main_image || 
+                        (record as any).product_image;
+        return (
+          <Image 
+            width={60} 
+            height={60} 
+            src={imageUrl ? getImageUrl(imageUrl) : '/placeholder-image.png'} 
+            alt={record.product_name}
+            style={{ 
+              objectFit: 'cover',
               borderRadius: '4px',
-              border: '1px solid #d9d9d9'
-            }}>
-              <PictureOutlined style={{ fontSize: '20px', color: '#bfbfbf' }} />
-            </div>
-          }
-        />
-      )
+              border: '1px solid #f0f0f0'
+            }}
+            fallback={
+              <div style={{
+                width: '60px',
+                height: '60px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: '#f5f5f5',
+                borderRadius: '4px',
+                border: '1px solid #d9d9d9'
+              }}>
+                <PictureOutlined style={{ fontSize: '20px', color: '#bfbfbf' }} />
+              </div>
+            }
+          />
+        );
+      }
     },
     {
       title: '商品名称',
