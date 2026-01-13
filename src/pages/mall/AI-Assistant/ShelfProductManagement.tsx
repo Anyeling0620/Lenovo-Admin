@@ -28,7 +28,8 @@ import {
   DownloadOutlined,
   UploadOutlined,
   InboxOutlined,
-  SettingOutlined
+  SettingOutlined,
+  PictureOutlined
 } from '@ant-design/icons';
 import { useRequest } from 'ahooks';
 import type { 
@@ -78,7 +79,8 @@ const ShelfProductManagement = () => {
   const [editingProduct, setEditingProduct] = useState<ShelfProductResponse | null>(null);
   const [filters, setFilters] = useState({
     category_id: '',
-    status: ''
+    status: '',
+    keyword: ''
   });
   const [importModalVisible, setImportModalVisible] = useState(false);
   const [form] = Form.useForm();
@@ -104,9 +106,10 @@ const ShelfProductManagement = () => {
     run: fetchShelfProducts 
   } = useRequest(
     () => {
-      const params: { category_id?: string; status?: string } = {};
+      const params: { category_id?: string; status?: string; keyword?: string } = {};
       if (filters.category_id) params.category_id = filters.category_id;
       if (filters.status) params.status = filters.status;
+      if (filters.keyword) params.keyword = filters.keyword;
       return getShelfProducts(params);
     },
     {
@@ -151,7 +154,7 @@ const ShelfProductManagement = () => {
       category_id: product.category_id,
       category_name: product.category_name,
       status: '正常' as ProductStatus,
-      main_image: null,
+      main_image: product.main_image || null,
       created_at: '',
       sub_title: '',
       updated_at: (): unknown => undefined
@@ -374,6 +377,39 @@ const ShelfProductManagement = () => {
 
   const columns = [
     {
+      title: '商品图片',
+      dataIndex: 'main_image',
+      key: 'main_image',
+      width: 80,
+      render: (image: string | null, record: ShelfProductResponse) => (
+        <Image 
+          width={60} 
+          height={60} 
+          src={image ? getImageUrl(image) : record.product_image || '/placeholder-image.png'} 
+          alt={record.product_name}
+          style={{ 
+            objectFit: 'cover',
+            borderRadius: '4px',
+            border: '1px solid #f0f0f0'
+          }}
+          fallback={
+            <div style={{
+              width: '60px',
+              height: '60px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: '#f5f5f5',
+              borderRadius: '4px',
+              border: '1px solid #d9d9d9'
+            }}>
+              <PictureOutlined style={{ fontSize: '20px', color: '#bfbfbf' }} />
+            </div>
+          }
+        />
+      )
+    },
+    {
       title: '商品名称',
       dataIndex: 'product_name',
       key: 'product_name',
@@ -385,15 +421,6 @@ const ShelfProductManagement = () => {
       dataIndex: 'product_id',
       key: 'product_id',
       width: 120
-    },
-    {
-      title: '品牌',
-      dataIndex: 'brand_name',
-      key: 'brand_name',
-      width: 100,
-      render: (brand: string) => (
-        <Tag color="cyan">{brand || '未设置'}</Tag>
-      )
     },
     {
       title: '分类',
@@ -486,6 +513,11 @@ const ShelfProductManagement = () => {
     }
   ];
 
+  // 处理搜索
+  const handleSearch = (value: string) => {
+    setFilters({...filters, keyword: value});
+  };
+
   return (
     <div style={{ padding: '16px' }}>
       <Card>
@@ -511,9 +543,9 @@ const ShelfProductManagement = () => {
 
         {/* 筛选条件 */}
         <Row gutter={16} style={{ marginBottom: 16 }}>
-          <Col span={12}>
+          <Col span={6}>
             <Select
-              placeholder="选择分类"
+              placeholder="全部分类"
               allowClear
               value={filters.category_id}
               onChange={(value) => setFilters({...filters, category_id: value || ''})}
@@ -528,7 +560,7 @@ const ShelfProductManagement = () => {
               ))}
             </Select>
           </Col>
-          <Col span={12}>
+          <Col span={6}>
             <Select
               placeholder="选择状态"
               allowClear
@@ -538,9 +570,23 @@ const ShelfProductManagement = () => {
             >
               <Option value="">全部状态</Option>
               <Option value="下架">下架</Option>
-              <Option value="在售">在售</Option>
-              <Option value="售罄">售罄</Option>
+              <Option value="在售">上架中</Option>
+              <Option value="售罄">已售罄</Option>
             </Select>
+          </Col>
+          <Col span={12}>
+            <Input
+              placeholder="搜索商品名称"
+              prefix={<SearchOutlined />}
+              allowClear
+              onPressEnter={(e) => handleSearch((e.target as HTMLInputElement).value)}
+              onChange={(e) => {
+                if (e.target.value === '') {
+                  handleSearch('');
+                }
+              }}
+              onBlur={(e) => handleSearch(e.target.value)}
+            />
           </Col>
         </Row>
 
@@ -582,9 +628,20 @@ const ShelfProductManagement = () => {
                     <Button onClick={openProductPicker}>选择商品</Button>
                   )}
                   {(selectedProduct || editingProduct) && (
-                    <Typography.Text type="secondary">
-                      已选：{editingProduct?.product_name || selectedProduct?.name}（ID: {editingProduct?.product_id || selectedProduct?.product_id}）
-                    </Typography.Text>
+                    <Space>
+                      {selectedProduct?.main_image && (
+                        <Image 
+                          width={40} 
+                          height={40} 
+                          src={getImageUrl(selectedProduct.main_image)} 
+                          alt={selectedProduct.name}
+                          style={{ objectFit: 'cover', borderRadius: '4px' }}
+                        />
+                      )}
+                      <Typography.Text type="secondary">
+                        {editingProduct?.product_name || selectedProduct?.name}（ID: {editingProduct?.product_id || selectedProduct?.product_id}）
+                      </Typography.Text>
+                    </Space>
                   )}
                 </Space>
               </Form.Item>
@@ -751,7 +808,7 @@ const ShelfProductManagement = () => {
                     defaultValue={num} 
                     min={0}
                     onBlur={(e) => {
-                      const val = parseInt(e.target.value);
+                      const val = parseInt((e.target as HTMLInputElement).value);
                       if (!isNaN(val) && val !== num) {
                         handleUpdateItemQuantity(record.shelf_product_item_id, val);
                       }
@@ -812,6 +869,20 @@ const ShelfProductManagement = () => {
             onChange: (_, rows) => setSelectedProduct(rows[0]),
           }}
           columns={[
+            { 
+              title: '商品图片', 
+              dataIndex: 'main_image', 
+              width: 80,
+              render: (image: string | null) => (
+                <Image 
+                  width={40} 
+                  height={40} 
+                  src={image ? getImageUrl(image) : '/placeholder-image.png'} 
+                  alt="商品图片"
+                  style={{ objectFit: 'cover', borderRadius: '4px' }}
+                />
+              )
+            },
             { title: '商品ID', dataIndex: 'product_id', width: 140 },
             { title: '名称', dataIndex: 'name' },
             { title: '品牌', dataIndex: 'brand_name', width: 140 },
