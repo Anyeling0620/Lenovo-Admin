@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Button, Card, Form, Input, Typography } from 'antd';
 import globalErrorHandler from '../utils/globalAxiosErrorHandler';
 import { globalMessage } from '../utils/globalMessage';
 import { adminLogin } from '../services/api';
 import loginBg from './login.png';
+import useAuthStore from '../store/auth';
 const PUZZLE_IMG = loginBg
-// 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=900&q=80';
 
 const DEFAULT_FORM = { account: '114514', password: '123456' };
 
@@ -21,6 +21,12 @@ const Login = () => {
   const [dragging, setDragging] = useState(false);
   const [dragStartX, setDragStartX] = useState(0);
   const [dragStartPos, setDragStartPos] = useState(0);
+  const isLogin = useAuthStore(state => state.isAuthenticated)
+
+
+  if (isLogin) {
+    return <Navigate to="/index" state={{ from: location.pathname }} replace />;
+  }
 
   const sliderWidth = 320;
   const handleWidth = 44;
@@ -106,7 +112,7 @@ const Login = () => {
           boxShadow: '0 15px 40px rgba(15,23,42,0.25)',
         }}
       >
-        <Typography.Title level={3} style={{ textAlign: 'center', marginBottom: 24, color:"white" }}>
+        <Typography.Title level={3} style={{ textAlign: 'center', marginBottom: 24, color: "white" }}>
           管理后台登录
         </Typography.Title>
         <Form initialValues={DEFAULT_FORM} layout="vertical" onFinish={onFinish}>
