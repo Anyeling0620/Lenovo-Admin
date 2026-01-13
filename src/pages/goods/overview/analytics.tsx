@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
+ 
 /* eslint-disable prefer-const */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useCallback } from 'react';
@@ -849,7 +849,7 @@ const AnalyticsPage: React.FC = () => {
                 <Button 
                   type="link" 
                   size="small" 
-                  onClick={() => navigate('/orders', { state: { from: window.location.pathname } })}
+                  onClick={() => navigate('/order/manage', { state: { from: window.location.pathname } })}
                 >
                   查看更多
                 </Button>
