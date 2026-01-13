@@ -74,8 +74,7 @@ const ShelfProductManagement = () => {
   const [editingProduct, setEditingProduct] = useState<ShelfProductResponse | null>(null);
   const [filters, setFilters] = useState({
     category_id: '',
-    status: '',
-    keyword: ''
+    status: ''
   });
   const [importModalVisible, setImportModalVisible] = useState(false);
   const [form] = Form.useForm();
@@ -504,39 +503,36 @@ const ShelfProductManagement = () => {
 
         {/* 筛选条件 */}
         <Row gutter={16} style={{ marginBottom: 16 }}>
-          <Col span={6}>
+          <Col span={12}>
             <Select
               placeholder="选择分类"
-              style={{ width: '100%' }}
               allowClear
-              loading={categoriesLoading}
+              value={filters.category_id}
               onChange={(value) => setFilters({...filters, category_id: value})}
+              loading={categoriesLoading}
+              style={{ width: '100%' }}
             >
-              {categories.map((category: CategoryResponse) => (
-                <Option key={category.category_id} value={category.category_id}>
-                  {category.name}
+              <Option value="">全部分类</Option>
+              {categories.map(cat => (
+                <Option key={cat.category_id} value={cat.category_id}>
+                  {cat.name}
                 </Option>
               ))}
             </Select>
           </Col>
-          <Col span={6}>
+          <Col span={12}>
             <Select
               placeholder="选择状态"
-              style={{ width: '100%' }}
               allowClear
+              value={filters.status}
               onChange={(value) => setFilters({...filters, status: value})}
+              style={{ width: '100%' }}
             >
-              <Option value="在售">上架中</Option>
-              <Option value="下架">已下架</Option>
-              <Option value="售罄">已售罄</Option>
+              <Option value="">全部状态</Option>
+              <Option value="下架">下架</Option>
+              <Option value="在售">在售</Option>
+              <Option value="售罄">售罄</Option>
             </Select>
-          </Col>
-          <Col span={6}>
-            <Input
-              placeholder="搜索商品名称或ID"
-              prefix={<SearchOutlined />}
-              onChange={(e) => setFilters({...filters, keyword: e.target.value})}
-            />
           </Col>
         </Row>
 
