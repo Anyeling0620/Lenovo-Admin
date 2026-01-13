@@ -54,7 +54,6 @@ const Login = () => {
         localStorage.setItem('admin_sessionId', response.sessionId);
       }
       window.dispatchEvent(new Event('login'));
-      globalMessage.success('登录成功');
       navigate(fromPath, { replace: true });
     } catch (error) {
       globalErrorHandler.handle(error, globalMessage.error);
