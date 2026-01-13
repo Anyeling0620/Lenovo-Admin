@@ -214,13 +214,18 @@ const GoodsOverview: React.FC = () => {
             };
           }
           
-          productSalesMap[item.product_id].sales_count += item.quantity;
+          // 确保价格是数字类型
+          const unitPrice = Number(item.pay_amount_snapshot) || 0;
+          const quantity = item.quantity || 0;
+          const itemTotal = unitPrice * quantity; // ✅ 正确：单价 × 数量
+          
+          productSalesMap[item.product_id].sales_count += quantity;
           productSalesMap[item.product_id].order_count += 1;
-          productSalesMap[item.product_id].revenue += item.pay_amount_snapshot as number;
+          productSalesMap[item.product_id].revenue += itemTotal; // ✅ 正确
           
           if (isToday) {
-            todaySalesCount += item.quantity;
-            todayRevenue += item.pay_amount_snapshot as number;
+            todaySalesCount += quantity;
+            todayRevenue += itemTotal; // ✅ 正确
           }
         });
       });
@@ -569,7 +574,7 @@ const GoodsOverview: React.FC = () => {
               type="text" 
               size="small" 
               icon={<EyeOutlined />}
-              onClick={() => navigate(`/goods/manage/detail/${record.product_id}`, { state: buildRouteState() })}
+              onClick={() => navigate(`/goods/detail/${record.product_id}`, { state: buildRouteState() })}
             />
           </Tooltip>
           <Tooltip title="编辑">
@@ -714,7 +719,7 @@ const GoodsOverview: React.FC = () => {
       label: '上架管理', 
       icon: <ShopOutlined />, 
       color: '#f5222d',
-      onClick: () => navigate('/goods/shelf', { state: buildRouteState() })
+      onClick: () => navigate('/mall/ai/shelf-product', { state: buildRouteState() })
     },
     { 
       label: '数据分析', 
@@ -861,7 +866,7 @@ const GoodsOverview: React.FC = () => {
                 bordered={false}
                 style={{ borderRadius: '6px', width: '100%' }}
                 extra={
-                  <Link to="/orders" state={buildRouteState()}>
+                  <Link to="/order/manage" state={buildRouteState()}>
                     <Button type="link" size="small" style={{ fontSize: '12px' }}>
                       查看订单
                     </Button>

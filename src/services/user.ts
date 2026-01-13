@@ -1,5 +1,11 @@
 import request from "../utils/request";
-import { API_PATHS } from "./api-paths";
+import {
+  bindAdminIdentity,
+  getIdentitiesWithPermissions,
+  getOnlineAdmins,
+  getPermissionMenu,
+  unbindAdminIdentity,
+} from "./api";
 
 // 后端(lenovo-shop-server)管理端用户列表返回结构
 // 对应：GET /admin/clients
@@ -223,7 +229,10 @@ export const getAdminList = async (params: AdminListParams): Promise<AdminListRe
     }>;
   };
   
-  const backendList = await request.get<BackendAdminListItem[]>(API_PATHS.USER.ADMIN_LIST);
+  // ⚠️ 定制修复（仅影响“用户列表”模块）：
+  // 后端(lenovo-shop-server)真实路由为 GET /admin/system/admins
+  // 旧 API_PATHS.USER.ADMIN_LIST = '/user/admin/list' 会被 request.ts 补成 '/admin/user/admin/list'，从而 404。
+  const backendList = await request.get<BackendAdminListItem[]>('/system/admins');
   
   // 状态映射：后端中文 -> 前端英文
   const mapStatus = (status: string): 'ACTIVE' | 'INACTIVE' | 'BANNED' => {
@@ -306,7 +315,8 @@ export const getAdminList = async (params: AdminListParams): Promise<AdminListRe
  * @returns 管理员详情数据
  */
 export const getAdminDetail = async (adminId: string): Promise<Admin> => {
-  const response = await request.get<Admin>(`${API_PATHS.USER.ADMIN_DETAIL}/${adminId}`);
+  // 后端真实路由：GET /admin/system/admins/:admin_id
+  const response = await request.get<Admin>(`/system/admins/${adminId}`);
   return response;
 };
 
@@ -343,7 +353,8 @@ export const createAdmin = async (data: CreateAdminParams): Promise<Admin> => {
     identity_ids: data.identityIds || [],
     category_ids: data.categoryIds || [],
   };
-  const response = await request.post<Admin>(API_PATHS.USER.ADMIN_CREATE, backendParams);
+  // 后端真实路由：POST /admin/system/admins
+  const response = await request.post<Admin>('/system/admins', backendParams);
   return response;
 };
 
@@ -354,7 +365,14 @@ export const createAdmin = async (data: CreateAdminParams): Promise<Admin> => {
  * @returns Promise<void>
  */
 export const updateAdmin = async (adminId: string, data: Partial<CreateAdminParams>): Promise<void> => {
-  await request.put(`${API_PATHS.USER.ADMIN_UPDATE}/${adminId}`, data);
+  // 将前端的驼峰命名转换为后端的蛇形命名
+  await request.patch(`/system/admins/${adminId}`, {
+    name: data.name,
+    nickname: data.nickname,
+    email: data.email,
+    identity_ids: data.identityIds,
+    category_ids: data.categoryIds,
+  });
 };
 
 /**
@@ -363,7 +381,7 @@ export const updateAdmin = async (adminId: string, data: Partial<CreateAdminPara
  * @returns Promise<void>
  */
 export const deleteAdmin = async (adminId: string): Promise<void> => {
-  await request.delete(`${API_PATHS.USER.ADMIN_DELETE}/${adminId}`);
+  await request.delete(`/system/admins/${adminId}`);
 };
 
 /**
@@ -374,7 +392,7 @@ export const deleteAdmin = async (adminId: string): Promise<void> => {
  */
 export const resetAdminPassword = async (adminId: string, newPassword: string): Promise<void> => {
   // 后端期望的字段名是 new_password (蛇形命名)
-  await request.post(`${API_PATHS.USER.ADMIN_DETAIL}/${adminId}/reset-password`, { new_password: newPassword });
+  await request.post(`/system/admins/${adminId}/reset-password`, { new_password: newPassword });
 };
 
 // ==================== 权限管理 ====================
@@ -388,11 +406,37 @@ export interface Permission {
   id: string;
   name: string;
   code?: string;
-  type: 'MENU' | 'BUTTON' | 'API';
+  type: 'MENU' | 'BUTTON' | 'API' | 'MODULE';
   module: string;
   parentId: string | null;
   children?: Permission[];
   status: 'ACTIVE' | 'INACTIVE';
+}
+
+/**
+ * 权限类型映射函数（后端小写 -> 前端大写）
+ */
+function mapPermissionType(backendType: string): 'MENU' | 'BUTTON' | 'API' | 'MODULE' {
+  const typeMap: Record<string, 'MENU' | 'BUTTON' | 'API' | 'MODULE'> = {
+    'menu': 'MENU',
+    'button': 'BUTTON',
+    'api': 'API',
+    'module': 'MODULE'
+  };
+  return typeMap[backendType.toLowerCase()] || 'MENU';
+}
+
+/**
+ * 权限类型映射（前端大写 -> 后端小写）
+ */
+function mapPermissionTypeToBackend(frontendType: 'MENU' | 'BUTTON' | 'API' | 'MODULE'): string {
+  const typeMap: Record<string, string> = {
+    'MENU': 'menu',
+    'BUTTON': 'button',
+    'API': 'api',
+    'MODULE': 'module'
+  };
+  return typeMap[frontendType] || 'menu';
 }
 
 export interface PermissionListParams {
@@ -402,13 +446,139 @@ export interface PermissionListParams {
 }
 
 /**
+ * 后端返回的权限菜单项接口
+ */
+interface PermissionMenuItemResponse {
+  permission_id: string;
+  permission_name: string;
+  code?: string;
+  type: string;
+  module: string;
+  parent_id: string | null;
+  status?: string;
+}
+
+/**
  * 获取权限列表
  * @param params 查询参数，包含类型、模块、状态等
  * @returns 权限列表数据
  */
 export const getPermissionList = async (params?: PermissionListParams): Promise<Permission[]> => {
-  const response = await request.get<Permission[]>(API_PATHS.USER.PERMISSION_LIST, { params });
-  return response;
+  // 使用后端真实接口 GET /admin/system/permissions
+  const menu = await getPermissionMenu();
+  
+  console.log('🔍 后端返回的原始权限数据:', menu);
+  
+  // 转换字段名：permission_id -> id, permission_name -> name, parent_id -> parentId
+  const permissions: Permission[] = (menu as PermissionMenuItemResponse[]).map((item) => {
+    const mappedType = mapPermissionType(item.type);
+    console.log('🔍 映射权限项:', {
+      原始type: item.type,
+      映射后type: mappedType,
+      原始名称: item.permission_name,
+      type类型: typeof item.type
+    });
+    
+    return {
+      id: item.permission_id,
+      name: item.permission_name,
+      code: item.code,
+      type: mappedType,
+      module: item.module,
+      parentId: item.parent_id,
+      status: (item.status as 'ACTIVE' | 'INACTIVE') || 'ACTIVE',
+      children: []
+    };
+  });
+  
+  console.log('🔍 映射后的权限数据:', permissions);
+  
+  if (!params) return permissions;
+  
+  // 前端做轻量过滤
+  return permissions.filter(p => {
+    if (params.type && p.type !== params.type) return false;
+    if (params.module && p.module !== params.module) return false;
+    if (params.status && p.status !== params.status) return false;
+    return true;
+  });
+};
+
+/**
+ * 构建权限树结构
+ * @param permissions 扁平的权限列表
+ * @returns 树形结构的权限列表
+ */
+const buildPermissionTree = (permissions: Permission[]): Permission[] => {
+  if (!permissions || permissions.length === 0) {
+    return [];
+  }
+  
+  const map = new Map<string, Permission>();
+  const roots: Permission[] = [];
+  
+  // 第一遍：创建映射，确保每个权限都有独立的children数组
+  permissions.forEach(permission => {
+    map.set(permission.id, { 
+      ...permission, 
+      children: [] 
+    });
+  });
+  
+  // 第二遍：建立父子关系
+  permissions.forEach(permission => {
+    const node = map.get(permission.id);
+    if (!node) return;
+    
+    // 如果有父级ID且父级存在
+    if (permission.parentId && permission.parentId.trim() !== '') {
+      const parent = map.get(permission.parentId);
+      if (parent) {
+        // 确保父级有children数组
+        if (!parent.children) {
+          parent.children = [];
+        }
+        // 添加到父级的children中
+        parent.children.push(node);
+      } else {
+        // 父级不存在，作为根节点
+        console.warn(`权限 "${permission.name}" (${permission.id}) 的父级 ${permission.parentId} 不存在，将作为根节点`);
+        roots.push(node);
+      }
+    } else {
+      // 没有父级，是根节点
+      roots.push(node);
+    }
+  });
+  
+  // 按模块和名称排序根节点
+  roots.sort((a, b) => {
+    if (a.module !== b.module) {
+      return a.module.localeCompare(b.module);
+    }
+    return a.name.localeCompare(b.name);
+  });
+  
+  // 递归排序子节点
+  const sortChildren = (node: Permission) => {
+    if (node.children && node.children.length > 0) {
+      node.children.sort((a, b) => {
+        // 按类型排序：MODULE > MENU > BUTTON > API
+        const typeOrder: Record<string, number> = { MODULE: 0, MENU: 1, BUTTON: 2, API: 3 };
+        const aOrder = typeOrder[a.type] ?? 4;
+        const bOrder = typeOrder[b.type] ?? 4;
+        if (aOrder !== bOrder) {
+          return aOrder - bOrder;
+        }
+        return a.name.localeCompare(b.name);
+      });
+      node.children.forEach(child => sortChildren(child));
+    }
+  };
+  
+  roots.forEach(root => sortChildren(root));
+  
+  return roots;
 };
 
 /**
@@ -416,8 +586,10 @@ export const getPermissionList = async (params?: PermissionListParams): Promise<
  * @returns 权限树结构数据，包含父子关系
  */
 export const getPermissionTree = async (): Promise<Permission[]> => {
-  const response = await request.get<Permission[]>(API_PATHS.USER.PERMISSION_TREE);
-  return response;
+  // 获取扁平列表
+  const flatList = await getPermissionList();
+  // 构建树形结构
+  return buildPermissionTree(flatList);
 };
 
 /**
@@ -428,7 +600,7 @@ export const getPermissionTree = async (): Promise<Permission[]> => {
 export interface CreatePermissionParams {
   name: string;
   code?: string;
-  type: 'MENU' | 'BUTTON' | 'API';
+  type: 'MENU' | 'BUTTON' | 'API' | 'MODULE';
   module: string;
   parentId?: string;
 }
@@ -439,8 +611,19 @@ export interface CreatePermissionParams {
  * @returns 新创建的权限数据
  */
 export const createPermission = async (data: CreatePermissionParams): Promise<Permission> => {
-  const response = await request.post<Permission>(API_PATHS.USER.PERMISSION_CREATE, data);
-  return response;
+  // 调用后端新增接口：POST /admin/system/permissions
+  // 注意：后端Permission模型没有code字段，所以不要发送code
+  const payload: Record<string, unknown> = {
+    name: data.name,
+    type: mapPermissionTypeToBackend(data.type), // 转换为后端小写格式
+    module: data.module,
+    parentId: data.parentId ?? null,
+  };
+  
+  console.log('📝 创建权限请求数据 (转换后):', payload);
+  const res = await request.post<Record<string, unknown>>('/system/permissions', payload);
+  console.log('✅ 创建权限响应:', res);
+  return res as unknown as Permission;
 };
 
 /**
@@ -450,7 +633,16 @@ export const createPermission = async (data: CreatePermissionParams): Promise<Pe
  * @returns Promise<void>
  */
 export const updatePermission = async (permissionId: string, data: Partial<CreatePermissionParams>): Promise<void> => {
-  await request.put(`${API_PATHS.USER.PERMISSION_UPDATE}/${permissionId}`, data);
+  // 注意：后端Permission模型没有code字段，所以不要发送code
+  const payload: Record<string, unknown> = {};
+  if (data.name !== undefined) payload.name = data.name;
+  if (data.type !== undefined) payload.type = mapPermissionTypeToBackend(data.type); // 转换为后端小写格式
+  if (data.module !== undefined) payload.module = data.module;
+  if (data.parentId !== undefined) payload.parentId = data.parentId;
+  
+  console.log('📝 更新权限请求数据:', { permissionId, payload });
+  await request.patch(`/system/permissions/${permissionId}`, payload);
+  console.log('✅ 更新权限成功');
 };
 
 /**
@@ -459,7 +651,7 @@ export const updatePermission = async (permissionId: string, data: Partial<Creat
  * @returns Promise<void>
  */
 export const deletePermission = async (permissionId: string): Promise<void> => {
-  await request.delete(`${API_PATHS.USER.PERMISSION_DELETE}/${permissionId}`);
+  await request.delete(`/system/permissions/${permissionId}`);
 };
 
 // ==================== 身份（角色）管理 ====================
@@ -513,7 +705,10 @@ export const getIdentityList = async (params: IdentityListParams): Promise<Ident
     status: string;
   };
   
-  const backendList = await request.get<BackendIdentity[]>(API_PATHS.USER.IDENTITY_LIST);
+  // ⚠️ 定制修复（仅影响“身份/角色列表”模块）：
+  // 后端(lenovo-shop-server)真实路由为 GET /admin/system/identities
+  // 使用后端真实接口 GET /admin/system/identities
+  const backendList = await request.get<BackendIdentity[]>('/system/identities');
   
   // 转换为前端格式
   let list: Identity[] = backendList.map(item => ({
@@ -521,7 +716,9 @@ export const getIdentityList = async (params: IdentityListParams): Promise<Ident
     name: item.identity_name,
     code: item.identity_code,
     description: item.description || undefined,
-    isSystem: item.is_system,
+  // 后端 IdentityWithPermissions 当前不返回 is_system 字段（见 lenovo-shop-server/src/types/admin/api.type.ts）
+  // 这里先按非系统角色处理（不影响管理员列表/绑定身份等核心功能）
+  isSystem: false,
     status: item.status === '启用' ? 'ACTIVE' : 'INACTIVE',
     createdAt: '', // 后端未返回创建时间
     permissions: []
@@ -566,8 +763,22 @@ export const getIdentityList = async (params: IdentityListParams): Promise<Ident
  * @returns 身份详情数据
  */
 export const getIdentityDetail = async (identityId: string): Promise<Identity> => {
-  const response = await request.get<Identity>(`${API_PATHS.USER.IDENTITY_DETAIL}/${identityId}`);
-  return response;
+  // 使用后端 GET /admin/system/identities 并从中查找详情
+  const list = await getIdentitiesWithPermissions();
+  const hit = list.find(i => i.identity_id === identityId);
+  if (!hit) throw new Error(`Identity not found: ${identityId}`);
+
+  return {
+    id: hit.identity_id,
+    name: hit.identity_name,
+    code: hit.identity_code,
+    description: hit.description || undefined,
+  // getIdentitiesWithPermissions() 的返回结构中该字段为 snake_case
+  isSystem: (hit as unknown as { is_system: boolean }).is_system,
+    status: hit.status === '启用' ? 'ACTIVE' : 'INACTIVE',
+    createdAt: '',
+    permissions: [],
+  };
 };
 
 /**
@@ -588,8 +799,37 @@ export interface CreateIdentityParams {
  * @returns 新创建的身份数据
  */
 export const createIdentity = async (data: CreateIdentityParams): Promise<Identity> => {
-  const response = await request.post<Identity>(API_PATHS.USER.IDENTITY_CREATE, data);
-  return response;
+  const payload = {
+    name: data.name,
+    code: data.code,
+    description: data.description,
+    permission_ids: data.permissionIds || [],
+  };
+  type TemporaryIdentityResponse = Partial<{
+    id: string;
+    identity_id: string;
+    name: string;
+    identity_name: string;
+    code: string;
+    identity_code: string;
+    description: string;
+    is_system: boolean;
+    status: string;
+    createdAt: string;
+  }>;
+  const resRaw = await request.post<Record<string, unknown>>('/system/identities', payload);
+  const res = resRaw as unknown as TemporaryIdentityResponse;
+  // 返回最小可用 Identity 结构（后端可能只返回基础字段）
+  return {
+    id: (res.id || res.identity_id) as string,
+    name: (res.name || res.identity_name) as string,
+    code: (res.code || res.identity_code) as string,
+    description: (res.description as string) || undefined,
+    isSystem: !!res.is_system,
+    status: res.status === '启用' ? 'ACTIVE' : 'INACTIVE',
+    createdAt: (res.createdAt as string) || '',
+    permissions: [],
+  };
 };
 
 /**
@@ -599,7 +839,12 @@ export const createIdentity = async (data: CreateIdentityParams): Promise<Identi
  * @returns Promise<void>
  */
 export const updateIdentity = async (identityId: string, data: Partial<CreateIdentityParams>): Promise<void> => {
-  await request.put(`${API_PATHS.USER.IDENTITY_UPDATE}/${identityId}`, data);
+  const payload: Record<string, unknown> = {};
+  if (data.name !== undefined) payload.name = data.name;
+  if (data.code !== undefined) payload.code = data.code;
+  if (data.description !== undefined) payload.description = data.description;
+  if (data.permissionIds !== undefined) payload.permission_ids = data.permissionIds;
+  await request.patch(`/system/identities/${identityId}`, payload);
 };
 
 /**
@@ -608,7 +853,7 @@ export const updateIdentity = async (identityId: string, data: Partial<CreateIde
  * @returns Promise<void>
  */
 export const deleteIdentity = async (identityId: string): Promise<void> => {
-  await request.delete(`${API_PATHS.USER.IDENTITY_DELETE}/${identityId}`);
+  await request.delete(`/system/identities/${identityId}`);
 };
 
 /**
@@ -618,7 +863,7 @@ export const deleteIdentity = async (identityId: string): Promise<void> => {
  * @returns Promise<void>
  */
 export const assignPermissionsToIdentity = async (identityId: string, permissionIds: string[]): Promise<void> => {
-  await request.post(API_PATHS.USER.IDENTITY_PERMISSION_ASSIGN, { identityId, permissionIds });
+  await request.post(`/system/identities/${identityId}/permissions`, { permissionIds });
 };
 
 /**
@@ -628,7 +873,8 @@ export const assignPermissionsToIdentity = async (identityId: string, permission
  * @returns Promise<void>
  */
 export const revokePermissionsFromIdentity = async (identityId: string, permissionIds: string[]): Promise<void> => {
-  await request.post(API_PATHS.USER.IDENTITY_PERMISSION_REVOKE, { identityId, permissionIds });
+  // axios delete with body: pass in config.data
+  await request.delete(`/system/identities/${identityId}/permissions`, { data: { permissionIds } });
 };
 
 // ==================== 管理员-身份关联 ====================
@@ -640,7 +886,8 @@ export const revokePermissionsFromIdentity = async (identityId: string, permissi
  * @returns Promise<void>
  */
 export const assignIdentityToAdmin = async (adminId: string, identityId: string): Promise<void> => {
-  await request.post(API_PATHS.USER.ADMIN_IDENTITY_ASSIGN, { adminId, identityId });
+  // admin.routes.ts: POST /system/admins/:admin_id/identities
+  await bindAdminIdentity(adminId, { identity_id: identityId });
 };
 
 /**
@@ -650,7 +897,8 @@ export const assignIdentityToAdmin = async (adminId: string, identityId: string)
  * @returns Promise<void>
  */
 export const revokeIdentityFromAdmin = async (adminId: string, identityId: string): Promise<void> => {
-  await request.post(API_PATHS.USER.ADMIN_IDENTITY_REVOKE, { adminId, identityId });
+  // admin.routes.ts: DELETE /system/admins/:admin_id/identities/:identity_id
+  await unbindAdminIdentity(adminId, identityId);
 };
 
 // ==================== 在线管理 ====================
@@ -698,8 +946,78 @@ export interface OnlineListResponse {
  * @returns 在线用户列表响应数据
  */
 export const getOnlineList = async (): Promise<OnlineListResponse> => {
-  const response = await request.get<OnlineListResponse>(API_PATHS.USER.ONLINE_LIST);
-  return response;
+  // 获取在线管理员
+  const admins = await getOnlineAdmins();
+  
+  // 定义后端返回数据的类型
+  interface AdminSessionResponse {
+    admin_session_id?: string;
+    id: string;
+    admin_id: string;
+    account: string;
+    name: string;
+    session_id: string;
+    expire_time?: string;
+    login_time?: string;
+    login_ip?: string;
+    device_name?: string;
+    device_type?: string;
+  }
+  
+  // 转换管理员数据格式
+  const adminList: OnlineAdmin[] = (admins as AdminSessionResponse[]).map((item) => ({
+    id: item.admin_session_id || item.id,
+    adminId: item.admin_id,
+    account: item.account,
+    name: item.name,
+    loginTime: item.login_time || new Date().toISOString(),
+    deviceType: item.device_type || 'pc',
+    deviceName: item.device_name || '未知设备',
+    ipAddress: item.login_ip || '',
+    sessionId: item.session_id,
+    lastActivityTime: item.expire_time ? new Date(item.expire_time).toISOString() : new Date().toISOString(),
+  }));
+  
+  // 获取在线用户
+  interface UserLoginResponse {
+    user_login_id: string;
+    user_id: string;
+    account: string;
+    name: string;
+    email: string;
+    device_id: string;
+    device_name: string;
+    device_type: string;
+    login_time: string;
+    login_ip?: string;
+    user_agent?: string;
+  }
+  
+  let userList: OnlineUser[] = [];
+  try {
+    const users = await request.get<UserLoginResponse[]>('/system/users/online');
+    userList = users.map((item) => ({
+      id: item.user_login_id,
+      userId: item.user_id,
+      account: item.account,
+      name: item.name,
+      loginTime: item.login_time,
+      deviceType: item.device_type || 'pc',
+      deviceName: item.device_name || '未知设备',
+      ipAddress: item.login_ip || '',
+      sessionId: item.user_login_id, // 使用user_login_id作为sessionId
+      lastActivityTime: item.login_time,
+    }));
+  } catch (error) {
+    console.error('获取在线用户失败:', error);
+  }
+  
+  return {
+    users: userList,
+    admins: adminList,
+    totalUsers: userList.length,
+    totalAdmins: adminList.length,
+  };
 };
 
 /**
@@ -709,7 +1027,13 @@ export const getOnlineList = async (): Promise<OnlineListResponse> => {
  * @returns Promise<void>
  */
 export const forceLogout = async (sessionId: string, userType: 'USER' | 'ADMIN'): Promise<void> => {
-  await request.post(API_PATHS.USER.ONLINE_FORCE_LOGOUT, { sessionId, userType });
+  if (userType === 'ADMIN') {
+    // admin.routes.ts: POST /system/sessions/:session_id/force-logout
+    await request.post(`/system/sessions/${sessionId}/force-logout`);
+  } else {
+    // 用户强制下线接口: POST /system/users/logins/:user_login_id/force-logout
+    await request.post(`/system/users/logins/${sessionId}/force-logout`);
+  }
 };
 
 // ==================== 登录记录 ====================
@@ -756,8 +1080,53 @@ export interface LoginRecordResponse {
  * @returns 登录记录响应数据
  */
 export const getLoginRecords = async (params: LoginRecordParams): Promise<LoginRecordResponse> => {
-  const response = await request.get<LoginRecordResponse>(API_PATHS.USER.LOGIN_RECORDS, { params });
-  return response;
+  // 定义后端返回数据的类型
+  interface LoginRecordResponse {
+    id: string;
+    userId?: string;
+    adminId?: string;
+    account: string;
+    name: string;
+    email?: string;
+    deviceType: string;
+    deviceName: string;
+    ipAddress: string;
+    userAgent?: string;
+    loginTime: string;
+    logoutTime?: string;
+    status: string;
+  }
+  
+  let apiUrl = '/system/admins/login-records';
+  if (params.userType === 'USER') {
+    apiUrl = '/system/users/login-records';
+  }
+  
+  const response = await request.get<{
+    list: LoginRecordResponse[];
+    total: number;
+    page: number;
+    pageSize: number;
+  }>(apiUrl, { params });
+  
+  return {
+    list: response.list.map((item) => ({
+      id: item.id,
+      userId: item.userId || item.adminId || '',
+      account: item.account,
+      name: item.name,
+      deviceType: item.deviceType,
+      deviceName: item.deviceName,
+      ipAddress: item.ipAddress,
+      userAgent: item.userAgent || '',
+      loginTime: item.loginTime,
+      logoutTime: item.logoutTime,
+      status: item.status as 'ONLINE' | 'OFFLINE',
+    })),
+    total: response.total,
+    page: response.page,
+    pageSize: response.pageSize,
+  };
 };
 
 // ==================== 商品专区 ====================

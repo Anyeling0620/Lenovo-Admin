@@ -232,8 +232,8 @@ export interface UpdateBrandRequest {
 }
 
 export interface CategoryResponse {
-  updated_at: boolean | CategoryResponse | null
-  created_at: string
+  updated_at: string;
+  created_at: string;
   category_id: string;
   name: string;
   code: string;
@@ -430,6 +430,12 @@ export interface ShelfProductResponse {
   installment: number;
   status: ShelfProductStatus;
   items: ShelfProductItemResponse[];
+  // 添加前端需要的字段
+  main_image?: string | null;
+  product_image?: string | null;
+  brand_id?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface ShelfProductCreateRequest {

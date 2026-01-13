@@ -136,14 +136,14 @@ const OrderManagement: React.FC = () => {
       ),
     },
     {
-      title: '待支付金额',
+      title: '应支付金额',
       dataIndex: 'pay_amount',
       key: 'pay_amount',
       width: 100,
       render: (amount: number | string) => `¥${Number(amount).toFixed(2)}`,
     },
     {
-      title: '实付金额',
+      title: '待支付金额',
       dataIndex: 'actual_pay_amount',
       key: 'actual_pay_amount',
       width: 100,

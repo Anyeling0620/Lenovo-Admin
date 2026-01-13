@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
@@ -44,7 +45,8 @@ const ProductListPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<ProductListItem[]>([]);
+  const [allData, setAllData] = useState<ProductListItem[]>([]); // 存储所有数据用于统计
+  const [data, setData] = useState<ProductListItem[]>([]); // 存储分页数据
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -57,6 +59,23 @@ const ProductListPage: React.FC = () => {
   const { control: filterControl, handleSubmit: handleFilterSubmit, reset: resetFilter, getValues } = useForm({
     defaultValues: { keyword: '', status: '', brand_id: '', category_id: '' }
   });
+
+  // 计算统计数据
+  const calculateStats = useCallback((data: ProductListItem[]) => {
+    const total = data.length;
+    const normal = data.filter(item => item.status === '正常').length;
+    const off = data.filter(item => item.status === '下架').length;
+    
+    // 统计品牌数量（去重）
+    const brandIds = [...new Set(data.map(item => item.brand_id))];
+    
+    return {
+      total,
+      normal,
+      off,
+      brands: brandIds.length
+    };
+  }, []);
 
   // 加载统计数据
   const loadStats = useCallback(async () => {
@@ -120,6 +139,13 @@ const ProductListPage: React.FC = () => {
           );
         }
         
+        // 保存所有过滤后的数据用于统计
+        setAllData(filteredData);
+        
+        // 计算并更新统计信息
+        const calculatedStats = calculateStats(filteredData);
+        setStats(calculatedStats);
+        
         setTotal(filteredData.length);
         
         // 前端分页
@@ -130,17 +156,21 @@ const ProductListPage: React.FC = () => {
         
         setData(items || []);
       } else {
+        setAllData([]);
         setData([]);
         setTotal(0);
+        setStats({ total: 0, normal: 0, off: 0, brands: 0 });
       }
     } catch (error) {
       globalErrorHandler.handle(error, globalMessage.error);
+      setAllData([]);
       setData([]);
       setTotal(0);
+      setStats({ total: 0, normal: 0, off: 0, brands: 0 });
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize]);
+  }, [page, pageSize, calculateStats]);
 
   // 刷新所有数据
   const refreshAll = () => {
@@ -154,15 +184,13 @@ const ProductListPage: React.FC = () => {
     setCurrentFilters(filters);
     setPage(1);
     loadData(filters);
-    loadStats();
   };
 
   // 初始化加载
   useEffect(() => {
     loadOptions();
-    loadStats();
     loadData({});
-  }, [loadData, loadOptions, loadStats]);
+  }, [loadData, loadOptions]);
 
   // 搜索处理
   const onSearch = (values: any) => { 
@@ -484,6 +512,9 @@ const ProductListPage: React.FC = () => {
               prefix={<AppstoreOutlined />} 
               valueStyle={{ fontSize: 20 }} 
             />
+            <div style={{ fontSize: 10, color: '#999', marginTop: 4 }}>
+              当前筛选: {stats.total} 件
+            </div>
           </Card>
         </Col>
         <Col span={6}>
@@ -501,6 +532,9 @@ const ProductListPage: React.FC = () => {
                 color: '#52c41a' 
               }} 
             />
+            <div style={{ fontSize: 10, color: '#999', marginTop: 4 }}>
+              占比: {stats.total > 0 ? ((stats.normal / stats.total) * 100).toFixed(1) : 0}%
+            </div>
           </Card>
         </Col>
         <Col span={6}>
@@ -518,6 +552,9 @@ const ProductListPage: React.FC = () => {
                 color: '#faad14' 
               }} 
             />
+            <div style={{ fontSize: 10, color: '#999', marginTop: 4 }}>
+              占比: {stats.total > 0 ? ((stats.off / stats.total) * 100).toFixed(1) : 0}%
+            </div>
           </Card>
         </Col>
         <Col span={6}>
@@ -527,11 +564,14 @@ const ProductListPage: React.FC = () => {
             bodyStyle={{ padding: 12 }}
           >
             <Statistic 
-              title={<span style={{ fontSize: 11 }}>合作品牌</span>} 
+              title={<span style={{ fontSize: 11 }}>品牌数</span>} 
               value={stats.brands || 0} 
               prefix={<TagsOutlined />} 
               valueStyle={{ fontSize: 20 }} 
             />
+            <div style={{ fontSize: 10, color: '#999', marginTop: 4 }}>
+              当前筛选包含
+            </div>
           </Card>
         </Col>
       </Row>
