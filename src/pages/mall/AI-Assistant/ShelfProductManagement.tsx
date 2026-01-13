@@ -98,7 +98,12 @@ const ShelfProductManagement = () => {
     loading: productsLoading, 
     run: fetchShelfProducts 
   } = useRequest(
-    () => getShelfProducts(filters),
+    () => {
+      const params: { category_id?: string; status?: string } = {};
+      if (filters.category_id) params.category_id = filters.category_id;
+      if (filters.status) params.status = filters.status;
+      return getShelfProducts(params);
+    },
     {
       refreshDeps: [filters],
       onError: (error) => globalErrorHandler.handle(error, globalMessage.error)
