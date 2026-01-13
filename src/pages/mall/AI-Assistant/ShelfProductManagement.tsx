@@ -1,4 +1,6 @@
-import { useState } from 'react';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import { useState, useEffect, useMemo } from 'react';
 import {
   Card,
   Table,
@@ -18,7 +20,9 @@ import {
   Popconfirm,
   Tooltip,
   Upload,
-  InputNumber
+  InputNumber,
+  Spin,
+  message
 } from 'antd';
 import {
   PlusOutlined,
@@ -29,7 +33,8 @@ import {
   UploadOutlined,
   InboxOutlined,
   SettingOutlined,
-  PictureOutlined
+  PictureOutlined,
+  ReloadOutlined
 } from '@ant-design/icons';
 import { useRequest } from 'ahooks';
 import type { 
@@ -91,6 +96,11 @@ const ShelfProductManagement = () => {
   const [productSearch, setProductSearch] = useState('');
   const [productList, setProductList] = useState<ProductListItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<ProductListItem | null>(null);
+  const [productFilters, setProductFilters] = useState({
+    category_id: '',
+    brand_id: '',
+    keyword: ''
+  });
 
   // 规格管理相关状态
   const [itemModalVisible, setItemModalVisible] = useState(false);
@@ -98,6 +108,10 @@ const ShelfProductManagement = () => {
   const [productConfigs, setProductConfigs] = useState<ProductConfigResponse[]>([]);
   const [configLoading, setConfigLoading] = useState(false);
   const [itemForm] = Form.useForm();
+
+  // 商品图片映射缓存
+  const [productImageMap, setProductImageMap] = useState<Record<string, string>>({});
+  const [allProducts, setAllProducts] = useState<ProductListItem[]>([]);
 
   // 获取上架商品列表
   const { 
@@ -129,6 +143,81 @@ const ShelfProductManagement = () => {
     }
   );
 
+  // 初始化加载所有商品
+  useEffect(() => {
+    const loadAllProducts = async () => {
+      try {
+        const products = await getProducts({ status: '正常' });
+        setAllProducts(products);
+        
+        // 构建商品图片映射
+        const imageMap: Record<string, string> = {};
+        products.forEach(product => {
+          if (product.main_image) {
+            imageMap[product.product_id] = product.main_image;
+          }
+        });
+        setProductImageMap(imageMap);
+      } catch (error) {
+        console.error('加载商品列表失败:', error);
+      }
+    };
+    
+    loadAllProducts();
+  }, []);
+
+  // 前端过滤函数：获取未上架商品
+  const fetchUnshelfedProducts = async (searchParams = productFilters) => {
+    setProductFetchLoading(true);
+    try {
+      // 1. 从所有正常商品中筛选
+      let filteredProducts = [...allProducts];
+      
+      // 按分类筛选
+      if (searchParams.category_id) {
+        filteredProducts = filteredProducts.filter(
+          product => product.category_id === searchParams.category_id
+        );
+      }
+      
+      // 按品牌筛选
+      if (searchParams.brand_id) {
+        filteredProducts = filteredProducts.filter(
+          product => product.brand_id === searchParams.brand_id
+        );
+      }
+      
+      // 按关键词搜索
+      if (searchParams.keyword) {
+        const keyword = searchParams.keyword.toLowerCase();
+        filteredProducts = filteredProducts.filter(
+          product => 
+            product.name.toLowerCase().includes(keyword) ||
+            product.product_id.toLowerCase().includes(keyword) ||
+            (product.brand_name && product.brand_name.toLowerCase().includes(keyword))
+        );
+      }
+      
+      // 2. 获取已上架商品的product_id集合
+      const shelfProducts = await getShelfProducts();
+      const shelfProductIds = new Set(shelfProducts.map(sp => sp.product_id));
+      
+      // 3. 过滤出未上架的商品
+      const unshelfedProducts = filteredProducts.filter(
+        product => !shelfProductIds.has(product.product_id)
+      );
+      
+      setProductList(unshelfedProducts);
+      return unshelfedProducts;
+    } catch (error) {
+      globalErrorHandler.handle(error, globalMessage.error);
+      setProductList([]);
+      return [];
+    } finally {
+      setProductFetchLoading(false);
+    }
+  };
+
   const handleAdd = () => {
     setEditingProduct(null);
     setSelectedProduct(null);
@@ -154,10 +243,10 @@ const ShelfProductManagement = () => {
       category_id: product.category_id,
       category_name: product.category_name,
       status: '正常' as ProductStatus,
-      main_image: product.main_image || null,
+      main_image: productImageMap[product.product_id] || null,
       created_at: '',
       sub_title: '',
-      updated_at: (): unknown => undefined
+      updated_at: () => undefined
     };
     
     setSelectedProduct(selectedProductItem);
@@ -174,50 +263,47 @@ const ShelfProductManagement = () => {
   };
 
   // 商品选择器相关函数
-  const fetchAvailableProducts = async () => {
-    setProductFetchLoading(true);
-    try {
-      // 同时调用两个API
-      const [allProducts, shelfProducts] = await Promise.all([
-        getProducts(),
-        getShelfProducts()
-      ]);
-      
-      // 获取已上架商品的product_id集合
-      const shelfProductIds = new Set(shelfProducts.map(sp => sp.product_id));
-      
-      // 筛选出未上架的商品
-      const availableProducts = allProducts.filter(product => 
-        !shelfProductIds.has(product.product_id)
-      );
-      
-      setProductList(availableProducts);
-    } catch (error) {
-      globalErrorHandler.handle(error, globalMessage.error);
-      setProductList([]);
-    } finally {
-      setProductFetchLoading(false);
-    }
-  };
-
-  const openProductPicker = () => {
+  const openProductPicker = async () => {
     setProductModalOpen(true);
-    fetchAvailableProducts();
+    setProductSearch('');
+    setProductFilters({ category_id: '', brand_id: '', keyword: '' });
+    await fetchUnshelfedProducts();
   };
 
   const confirmProduct = () => {
-    if (!selectedProduct) return;
+    if (!selectedProduct) {
+      globalMessage.error('请选择一个商品');
+      return;
+    }
+    
+    // 设置商品ID和名称到表单
     form.setFieldsValue({
       product_id: selectedProduct.product_id,
-      product_name: selectedProduct.name,
+      product_name: selectedProduct.name
     });
+    
+    // 自动选择对应的分类
+    const categoryId = selectedProduct.category_id;
+    if (categoryId) {
+      form.setFieldValue('category_id', categoryId);
+    }
+    
     setProductModalOpen(false);
   };
 
-  const filteredProducts = productList.filter(product => 
-    product.name?.toLowerCase().includes(productSearch.toLowerCase()) ||
-    product.product_id?.toLowerCase().includes(productSearch.toLowerCase())
-  );
+  // 获取商品图片函数
+  const getProductImage = (productId: string, shelfProduct?: ShelfProductResponse) => {
+    // 优先级：1. 轮播图 2. 商品主图（从映射中获取） 3. 默认图片
+    if (shelfProduct?.carousel_image) {
+      return shelfProduct.carousel_image;
+    }
+    
+    if (productImageMap[productId]) {
+      return productImageMap[productId];
+    }
+    
+    return null;
+  };
 
   const onFinish = async (values: any) => {
     try {
@@ -264,6 +350,9 @@ const ShelfProductManagement = () => {
       
       setIsModalVisible(false);
       fetchShelfProducts();
+      
+      // 刷新商品列表
+      await fetchUnshelfedProducts();
     } catch (error) {
       globalErrorHandler.handle(error, globalMessage.error);
     }
@@ -275,6 +364,9 @@ const ShelfProductManagement = () => {
       await updateShelfStatus(shelfProductId, { status: '下架' });
       globalMessage.success('商品已下架');
       fetchShelfProducts();
+      
+      // 刷新商品列表
+      await fetchUnshelfedProducts();
     } catch (error) {
       globalErrorHandler.handle(error, globalMessage.error);
     }
@@ -392,10 +484,7 @@ const ShelfProductManagement = () => {
       key: 'product_image',
       width: 80,
       render: (_: any, record: ShelfProductResponse) => {
-        // 优先使用轮播图，如果没有则使用商品主图
-        const imageUrl = record.carousel_image || 
-                        (record as any).main_image || 
-                        (record as any).product_image;
+        const imageUrl = getProductImage(record.product_id, record);
         return (
           <Image 
             width={60} 
@@ -563,11 +652,18 @@ const ShelfProductManagement = () => {
               <Button icon={<UploadOutlined />} onClick={() => setImportModalVisible(true)}>
                 导入商品
               </Button>
+              <Button 
+                icon={<ReloadOutlined />} 
+                onClick={fetchShelfProducts}
+                loading={productsLoading}
+              >
+                刷新列表
+              </Button>
             </Space>
           </Col>
         </Row>
 
-        {/* 筛选条件 - 调整为文档一的样式 */}
+        {/* 筛选条件 */}
         <Row gutter={16} style={{ marginBottom: 16 }}>
           <Col span={6}>
             <Select
@@ -867,67 +963,111 @@ const ShelfProductManagement = () => {
       {/* 商品选择模态框 */}
       <Modal
         open={productModalOpen}
-        title="选择商品"
+        title="选择未上架商品"
         onCancel={() => setProductModalOpen(false)}
         onOk={confirmProduct}
         okButtonProps={{ disabled: !selectedProduct, loading: productFetchLoading }}
         destroyOnClose
         width={900}
       >
-        <Space style={{ marginBottom: 12 }}>
-          <Input
-            placeholder="输入关键词搜索（名称或ID）"
-            value={productSearch}
-            onChange={e => setProductSearch(e.target.value)}
-            style={{ width: 260 }}
-            allowClear
+        <Row gutter={16} style={{ marginBottom: 16 }}>
+          <Col span={8}>
+            <Input
+              placeholder="搜索商品名称或ID"
+              value={productSearch}
+              onChange={e => {
+                setProductSearch(e.target.value);
+                setProductFilters({...productFilters, keyword: e.target.value});
+              }}
+              onPressEnter={() => fetchUnshelfedProducts()}
+              allowClear
+            />
+          </Col>
+          <Col span={8}>
+            <Select
+              placeholder="按分类筛选"
+              style={{ width: '100%' }}
+              allowClear
+              value={productFilters.category_id}
+              onChange={(value) => {
+                setProductFilters({...productFilters, category_id: value || ''});
+                fetchUnshelfedProducts({...productFilters, category_id: value || ''});
+              }}
+            >
+              <Option value="">全部分类</Option>
+              {categories.map(cat => (
+                <Option key={cat.category_id} value={cat.category_id}>
+                  {cat.name}
+                </Option>
+              ))}
+            </Select>
+          </Col>
+          <Col span={8}>
+            <Space>
+              <Button 
+                type="primary" 
+                onClick={() => fetchUnshelfedProducts()} 
+                loading={productFetchLoading}
+                icon={<SearchOutlined />}
+              >
+                搜索
+              </Button>
+              <Button onClick={() => {
+                setProductSearch('');
+                setProductFilters({ category_id: '', brand_id: '', keyword: '' });
+                fetchUnshelfedProducts({ category_id: '', brand_id: '', keyword: '' });
+              }}>
+                重置
+              </Button>
+            </Space>
+          </Col>
+        </Row>
+        
+        <Spin spinning={productFetchLoading}>
+          <Table
+            rowKey="product_id"
+            dataSource={productList}
+            pagination={{ pageSize: 8 }}
+            rowSelection={{
+              type: 'radio',
+              selectedRowKeys: selectedProduct ? [selectedProduct.product_id] : [],
+              onChange: (_, rows) => setSelectedProduct(rows[0]),
+            }}
+            columns={[
+              { 
+                title: '商品图片', 
+                dataIndex: 'main_image', 
+                width: 80,
+                render: (image: string | null) => (
+                  <Image 
+                    width={40} 
+                    height={40} 
+                    src={image ? getImageUrl(image) : '/placeholder-image.png'} 
+                    alt="商品图片"
+                    style={{ objectFit: 'cover', borderRadius: '4px' }}
+                  />
+                )
+              },
+              { title: '商品ID', dataIndex: 'product_id', width: 140 },
+              { title: '名称', dataIndex: 'name' },
+              { title: '品牌', dataIndex: 'brand_name', width: 140 },
+              { title: '分类', dataIndex: 'category_name', width: 160 },
+              { 
+                title: '状态', 
+                dataIndex: 'status', 
+                width: 100,
+                render: (status: ProductStatus) => {
+                  const statusMap = {
+                    '下架': 'red',
+                    '正常': 'green',
+                    '删除': 'gray'
+                  };
+                  return <Tag color={statusMap[status]}>{status}</Tag>;
+                }
+              },
+            ]}
           />
-          <Button onClick={fetchAvailableProducts} loading={productFetchLoading}>刷新列表</Button>
-        </Space>
-        <Table
-          rowKey="product_id"
-          dataSource={filteredProducts}
-          loading={productFetchLoading}
-          pagination={{ pageSize: 8 }}
-          rowSelection={{
-            type: 'radio',
-            selectedRowKeys: selectedProduct ? [selectedProduct.product_id] : [],
-            onChange: (_, rows) => setSelectedProduct(rows[0]),
-          }}
-          columns={[
-            { 
-              title: '商品图片', 
-              dataIndex: 'main_image', 
-              width: 80,
-              render: (image: string | null) => (
-                <Image 
-                  width={40} 
-                  height={40} 
-                  src={image ? getImageUrl(image) : '/placeholder-image.png'} 
-                  alt="商品图片"
-                  style={{ objectFit: 'cover', borderRadius: '4px' }}
-                />
-              )
-            },
-            { title: '商品ID', dataIndex: 'product_id', width: 140 },
-            { title: '名称', dataIndex: 'name' },
-            { title: '品牌', dataIndex: 'brand_name', width: 140 },
-            { title: '分类', dataIndex: 'category_name', width: 160 },
-            { 
-              title: '状态', 
-              dataIndex: 'status', 
-              width: 100,
-              render: (status: ProductStatus) => {
-                const statusMap = {
-                  '下架': 'red',
-                  '正常': 'green',
-                  '删除': 'gray'
-                };
-                return <Tag color={statusMap[status]}>{status}</Tag>;
-              }
-            },
-          ]}
-        />
+        </Spin>
       </Modal>
 
       {/* 导入商品模态框 */}

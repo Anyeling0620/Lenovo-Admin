@@ -279,6 +279,38 @@ export const getHomePush = () => request.get<HomePushResponse[]>('/shelf/home-pu
 export const getNewPush = () => request.get<NewPushResponse[]>('/shelf/new-push');
 export const updateShelfStatus = (shelfProductId: string, data: ShelfStatusRequest) =>
   request.patch<null>(`/shelf/products/${shelfProductId}/status`, data);
+// 新增：获取未上架商品（前端过滤方案）
+export const getUnshelfedProducts = async (params?: {
+  category_id?: string;
+  brand_id?: string;
+  status?: string;
+  keyword?: string;
+}) => {
+  try {
+    // 1. 获取所有正常状态的商品
+    const allProducts = await request.get<ProductListItem[]>('products', {
+      params: { 
+        status: '正常',
+        category_id: params?.category_id,
+        brand_id: params?.brand_id,
+        keyword: params?.keyword
+      }
+    });
+    
+    // 2. 获取已上架商品
+    const shelfProducts = await request.get<ShelfProductResponse[]>('shelf/products');
+    
+    // 3. 获取已上架商品的product_id集合
+    const shelfProductIds = new Set(shelfProducts.map(sp => sp.product_id));
+    
+    // 4. 过滤出未上架的商品
+    return allProducts.filter(product => !shelfProductIds.has(product.product_id));
+  } catch (error) {
+    console.error('获取未上架商品失败:', error);
+    return [];
+  }
+};
+
 
 // 营销
 export const getCoupons = () => request.get<CouponResponse[]>('/marketing/coupons');
