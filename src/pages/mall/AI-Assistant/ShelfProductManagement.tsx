@@ -37,7 +37,11 @@ import type {
   ProductListItem, 
   ShelfProductStatus,
   ProductConfigResponse,
-  ShelfProductItemResponse
+  ShelfProductItemResponse,
+  ProductStatus,
+  ShelfProductCreateRequest,
+  ShelfFlagsRequest,
+  ShelfStatusRequest
 } from '../../../services/api-type';
 import { 
   getShelfProducts, 
@@ -65,7 +69,7 @@ const shelfProductSchema = z.object({
   category_id: z.string().min(1, '请选择分类'),
   is_self_operated: z.boolean().default(false),
   is_customizable: z.boolean().default(false),
-  installment: z.boolean().default(false),
+  installment: z.number().default(0),
   status: z.enum(['下架', '在售', '售罄']).default('在售')
 });
 
@@ -93,6 +97,7 @@ const ShelfProductManagement = () => {
   const [configLoading, setConfigLoading] = useState(false);
   const [itemForm] = Form.useForm();
 
+  // 获取上架商品列表
   const { 
     data: shelfProducts = [], 
     loading: productsLoading, 
@@ -110,6 +115,7 @@ const ShelfProductManagement = () => {
     }
   );
 
+  // 获取分类列表
   const { 
     data: categories = [], 
     loading: categoriesLoading 
@@ -124,26 +130,41 @@ const ShelfProductManagement = () => {
     setEditingProduct(null);
     setSelectedProduct(null);
     form.resetFields();
+    form.setFieldsValue({
+      status: '在售',
+      is_self_operated: false,
+      is_customizable: false,
+      installment: 0
+    });
     setIsModalVisible(true);
   };
 
   const handleEdit = (product: ShelfProductResponse) => {
     setEditingProduct(product);
+    
     // 在编辑模式下，设置已选择的商品信息
-    setSelectedProduct({
+    const selectedProductItem: ProductListItem = {
       product_id: product.product_id,
       name: product.product_name,
-      brand_name: product.brand_name,
+      brand_name: product.brand_name || '',
+      brand_id: '',
+      category_id: product.category_id,
       category_name: product.category_name,
-      status: product.status
-    } as ProductListItem);
+      status: '正常' as ProductStatus,
+      main_image: null,
+      created_at: '',
+      sub_title: '',
+      updated_at: (): unknown => undefined
+    };
+    
+    setSelectedProduct(selectedProductItem);
     form.setFieldsValue({
       product_id: product.product_id,
       product_name: product.product_name,
       category_id: product.category_id,
       is_self_operated: product.is_self_operated,
       is_customizable: product.is_customizable,
-      installment: product.installment > 0,
+      installment: product.installment,
       status: product.status
     });
     setIsModalVisible(true);
@@ -187,29 +208,46 @@ const ShelfProductManagement = () => {
   const onFinish = async (values: any) => {
     try {
       const data = shelfProductSchema.parse(values);
+      
       if (editingProduct) {
-        await updateShelfFlags(editingProduct.shelf_product_id, {
+        // 编辑模式：更新标记和状态
+        const flagsData: ShelfFlagsRequest = {
           is_self_operated: data.is_self_operated,
           is_customizable: data.is_customizable,
-          installment: data.installment ? 1 : 0,
-        });
-        await updateShelfStatus(editingProduct.shelf_product_id, { status: data.status });
+          installment: data.installment
+        };
+        
+        await updateShelfFlags(editingProduct.shelf_product_id, flagsData);
+        
+        if (data.status !== editingProduct.status) {
+          const statusData: ShelfStatusRequest = { status: data.status };
+          await updateShelfStatus(editingProduct.shelf_product_id, statusData);
+        }
+        
         globalMessage.success('商品更新成功');
       } else {
-        const createResponse = await createShelfProduct({
+        // 创建模式：创建货架商品并设置标记和状态
+        const createData: ShelfProductCreateRequest = {
           product_id: data.product_id,
           category_id: data.category_id
-        });
+        };
         
-        await updateShelfFlags(createResponse.shelf_product_id, {
+        const createResponse = await createShelfProduct(createData);
+        
+        const flagsData: ShelfFlagsRequest = {
           is_self_operated: data.is_self_operated,
           is_customizable: data.is_customizable,
-          installment: data.installment ? 1 : 0,
-        });
-        await updateShelfStatus(createResponse.shelf_product_id, { status: data.status });
+          installment: data.installment
+        };
+        
+        await updateShelfFlags(createResponse.shelf_product_id, flagsData);
+        
+        const statusData: ShelfStatusRequest = { status: data.status };
+        await updateShelfStatus(createResponse.shelf_product_id, statusData);
         
         globalMessage.success('商品上架成功');
       }
+      
       setIsModalVisible(false);
       fetchShelfProducts();
     } catch (error) {
@@ -219,15 +257,10 @@ const ShelfProductManagement = () => {
 
   const handleDelete = async (shelfProductId: string) => {
     try {
-      // API 目前的 deleteShelfItem 可能是删除 Item 而不是 Product？
-      // 假设我们要下架整个商品，可能需要调用 updateShelfStatus('下架')
-      // 如果要物理删除，看API定义。这里假设 deleteShelfItem 是删除 item。
-      // 如果要删除 shelfProduct，可能需要先下架。
-      // 检查 api.ts，deleteShelfItem 是 `/shelf/items/${itemId}`
-      // 没有 deleteShelfProduct API。只能下架。
-       await updateShelfStatus(shelfProductId, { status: '下架' });
-       globalMessage.success('商品已下架');
-       fetchShelfProducts();
+      // 下架商品
+      await updateShelfStatus(shelfProductId, { status: '下架' });
+      globalMessage.success('商品已下架');
+      fetchShelfProducts();
     } catch (error) {
       globalErrorHandler.handle(error, globalMessage.error);
     }
@@ -258,20 +291,7 @@ const ShelfProductManagement = () => {
       });
       globalMessage.success('规格添加成功');
       itemForm.resetFields();
-      fetchShelfProducts(); // 刷新列表以更新 items
-      // 更新当前选中的 shelfProduct (因为 items 变了，需要重新获取或者手动更新状态，简单起见重新 fetch)
-      // 注意：这里 fetchShelfProducts 是异步的，可能 currentShelfProduct 不会马上更新。
-      // 更好的做法是重新获取单个 shelfProduct 详情，或者重新 fetch 列表后在列表里找到它。
-      // 这里的列表刷新会更新表格，但 Modal 里的 currentShelfProduct 需要手动同步。
-      // 由于没有 getShelfProductDetail API，只能依赖列表刷新。
-      // 我们可以先关闭 Modal 或者手动把新 item 加进去 (如果后端返回了完整 item)。
-      // addShelfItem 返回 { shelf_product_item_id }。
-      setIsModalVisible(false); // 简单处理：添加完关闭，让用户重开或刷新
-      // 实际上不需要关闭，只要能刷新 items 列表即可。
-      // 由于我们依赖 fetchShelfProducts 更新数据，而 currentShelfProduct 是个 state，不会自动变。
-      // 我们需要在 fetchShelfProducts 完成后更新 currentShelfProduct。
-      // 暂时方案：重新 fetch 并关闭 Modal 提示用户。
-      setItemModalVisible(false);
+      fetchShelfProducts();
     } catch (error) {
       globalErrorHandler.handle(error, globalMessage.error);
     }
@@ -292,13 +312,6 @@ const ShelfProductManagement = () => {
       await deleteShelfItem(itemId);
       globalMessage.success('规格删除成功');
       fetchShelfProducts();
-      // 手动移除 currentShelfProduct.items 中的对应项，以更新 UI
-      if (currentShelfProduct) {
-        setCurrentShelfProduct({
-          ...currentShelfProduct,
-          items: currentShelfProduct.items.filter(i => i.shelf_product_item_id !== itemId)
-        });
-      }
     } catch (error) {
       globalErrorHandler.handle(error, globalMessage.error);
     }
@@ -333,11 +346,7 @@ const ShelfProductManagement = () => {
     const { file, onSuccess, onError } = options;
     
     try {
-      // 模拟文件上传和数据处理过程
       globalMessage.loading('正在处理文件...');
-      
-      // 这里应该调用后端API进行文件上传和数据处理
-      // 在实际项目中，这里需要实现Excel文件解析和批量导入逻辑
       
       // 模拟处理时间
       await new Promise(resolve => setTimeout(resolve, 2000));
@@ -345,7 +354,7 @@ const ShelfProductManagement = () => {
       globalMessage.success('文件导入成功！');
       onSuccess('文件导入成功', file);
       setImportModalVisible(false);
-      fetchShelfProducts(); // 刷新数据
+      fetchShelfProducts();
       
     } catch (error) {
       globalMessage.error('文件导入失败，请检查文件格式或联系管理员');
@@ -365,21 +374,6 @@ const ShelfProductManagement = () => {
 
   const columns = [
     {
-      title: '商品图片',
-      dataIndex: 'product_image',
-      key: 'product_image',
-      width: 80,
-      render: (image: string) => (
-        <Image 
-          width={60} 
-          height={60} 
-          src={getImageUrl(image)} 
-          alt="商品图片"
-          style={{ objectFit: 'cover' }}
-        />
-      )
-    },
-    {
       title: '商品名称',
       dataIndex: 'product_name',
       key: 'product_name',
@@ -393,9 +387,18 @@ const ShelfProductManagement = () => {
       width: 120
     },
     {
+      title: '品牌',
+      dataIndex: 'brand_name',
+      key: 'brand_name',
+      width: 100,
+      render: (brand: string) => (
+        <Tag color="cyan">{brand || '未设置'}</Tag>
+      )
+    },
+    {
       title: '分类',
-      dataIndex: 'name',
-      key: 'name',
+      dataIndex: 'category_name',
+      key: 'category_name',
       width: 120,
       render: (name: string) => (
         <Tag color="blue">{name}</Tag>
@@ -435,9 +438,9 @@ const ShelfProductManagement = () => {
       dataIndex: 'installment',
       key: 'installment',
       width: 80,
-      render: (installment: boolean) => (
-        <Tag color={installment ? 'purple' : 'default'}>
-          {installment ? '支持' : '不支持'}
+      render: (installment: number) => (
+        <Tag color={installment > 0 ? 'purple' : 'default'}>
+          {installment > 0 ? `支持(${installment}期)` : '不支持'}
         </Tag>
       )
     },
@@ -448,7 +451,7 @@ const ShelfProductManagement = () => {
       render: (_: any, record: ShelfProductResponse) => (
         <Space size="small">
           <Tooltip title="管理规格">
-             <Button 
+            <Button 
               type="link" 
               icon={<SettingOutlined />} 
               size="small"
@@ -513,7 +516,7 @@ const ShelfProductManagement = () => {
               placeholder="选择分类"
               allowClear
               value={filters.category_id}
-              onChange={(value) => setFilters({...filters, category_id: value})}
+              onChange={(value) => setFilters({...filters, category_id: value || ''})}
               loading={categoriesLoading}
               style={{ width: '100%' }}
             >
@@ -530,7 +533,7 @@ const ShelfProductManagement = () => {
               placeholder="选择状态"
               allowClear
               value={filters.status}
-              onChange={(value) => setFilters({...filters, status: value})}
+              onChange={(value) => setFilters({...filters, status: value || ''})}
               style={{ width: '100%' }}
             >
               <Option value="">全部状态</Option>
@@ -564,6 +567,7 @@ const ShelfProductManagement = () => {
         onCancel={() => setIsModalVisible(false)}
         footer={null}
         width={600}
+        destroyOnClose
       >
         <Form
           form={form}
@@ -574,10 +578,12 @@ const ShelfProductManagement = () => {
             <Col span={12}>
               <Form.Item label="选择商品" required style={{ minWidth: 260 }}>
                 <Space>
-                  <Button onClick={openProductPicker}>选择商品</Button>
-                  {selectedProduct && (
+                  {!editingProduct && (
+                    <Button onClick={openProductPicker}>选择商品</Button>
+                  )}
+                  {(selectedProduct || editingProduct) && (
                     <Typography.Text type="secondary">
-                      已选：{selectedProduct.name}（ID: {selectedProduct.product_id}）
+                      已选：{editingProduct?.product_name || selectedProduct?.name}（ID: {editingProduct?.product_id || selectedProduct?.product_id}）
                     </Typography.Text>
                   )}
                 </Space>
@@ -630,11 +636,16 @@ const ShelfProductManagement = () => {
             </Col>
             <Col span={8}>
               <Form.Item
-                label="支持分期"
+                label="分期期数"
                 name="installment"
-                valuePropName="checked"
               >
-                <Switch />
+                <Select placeholder="选择分期">
+                  <Option value={0}>不支持分期</Option>
+                  <Option value={3}>3期</Option>
+                  <Option value={6}>6期</Option>
+                  <Option value={12}>12期</Option>
+                  <Option value={24}>24期</Option>
+                </Select>
               </Form.Item>
             </Col>
           </Row>
@@ -675,41 +686,42 @@ const ShelfProductManagement = () => {
         onCancel={() => setItemModalVisible(false)}
         footer={null}
         width={800}
+        destroyOnClose
       >
         <Space direction="vertical" style={{ width: '100%' }}>
           {/* 添加规格表单 */}
           <Card size="small" title="添加上架规格">
-             <Form
+            <Form
               form={itemForm}
               layout="inline"
               onFinish={handleAddItem}
-             >
-                <Form.Item 
-                  name="config_id" 
-                  rules={[{ required: true, message: '请选择配置' }]} 
-                  style={{ width: 300 }}
-                >
-                  <Select
-                    placeholder="选择商品配置"
-                    loading={configLoading}
-                    options={productConfigs.map(cfg => ({
-                      label: `${cfg.config1} / ${cfg.config2}${cfg.config3 ? ' / ' + cfg.config3 : ''}（原价¥${cfg.original_price}）`,
-                      value: cfg.product_config_id,
-                    }))}
-                  />
-                </Form.Item>
-                <Form.Item 
-                  name="shelf_num" 
-                  rules={[{ required: true, message: '请输入上架数量' }]}
-                >
-                   <InputNumber min={0} placeholder="上架数量" />
-                </Form.Item>
-                <Form.Item>
-                   <Button type="primary" htmlType="submit" icon={<PlusOutlined />}>
-                      添加
-                   </Button>
-                </Form.Item>
-             </Form>
+            >
+              <Form.Item 
+                name="config_id" 
+                rules={[{ required: true, message: '请选择配置' }]} 
+                style={{ width: 300 }}
+              >
+                <Select
+                  placeholder="选择商品配置"
+                  loading={configLoading}
+                  options={productConfigs.map(cfg => ({
+                    label: `${cfg.config1} / ${cfg.config2}${cfg.config3 ? ' / ' + cfg.config3 : ''}（原价¥${cfg.original_price}）`,
+                    value: cfg.product_config_id,
+                  }))}
+                />
+              </Form.Item>
+              <Form.Item 
+                name="shelf_num" 
+                rules={[{ required: true, message: '请输入上架数量' }]}
+              >
+                <InputNumber min={0} placeholder="上架数量" />
+              </Form.Item>
+              <Form.Item>
+                <Button type="primary" htmlType="submit" icon={<PlusOutlined />}>
+                  添加
+                </Button>
+              </Form.Item>
+            </Form>
           </Card>
           
           <Divider>已上架规格列表</Divider>
@@ -720,49 +732,50 @@ const ShelfProductManagement = () => {
             rowKey="shelf_product_item_id"
             pagination={false}
             columns={[
-               { 
-                 title: '配置', 
-                 key: 'config',
-                 render: (_, record: ShelfProductItemResponse) => (
-                   <Space direction="vertical" size={0}>
-                     <Text>{record.config1} / {record.config2}</Text>
-                     {record.config3 && <Text type="secondary">{record.config3}</Text>}
-                   </Space>
-                 )
-               },
-               {
-                 title: '上架数量',
-                 dataIndex: 'shelf_num',
-                 key: 'shelf_num',
-                 render: (num, record) => (
-                    <InputNumber 
-                      defaultValue={num} 
-                      onBlur={(e) => {
-                         const val = parseInt(e.target.value);
-                         if (!isNaN(val) && val !== num) {
-                           handleUpdateItemQuantity(record.shelf_product_item_id, val);
-                         }
-                      }}
-                    />
-                 )
-               },
-               {
-                 title: '锁定数量',
-                 dataIndex: 'lock_num',
-                 key: 'lock_num',
-               },
-               {
-                 title: '操作',
-                 key: 'action',
-                 render: (_, record) => (
-                   <Popconfirm
-                      title="确定要删除该规格吗？"
-                      onConfirm={() => handleDeleteItem(record.shelf_product_item_id)}
-                   >
-                     <Button type="link" danger size="small" icon={<DeleteOutlined />}>删除</Button>
-                   </Popconfirm>
-                 )
-               }
+              { 
+                title: '配置', 
+                key: 'config',
+                render: (_, record: ShelfProductItemResponse) => (
+                  <Space direction="vertical" size={0}>
+                    <Text>{record.config1} / {record.config2}</Text>
+                    {record.config3 && <Text type="secondary">{record.config3}</Text>}
+                  </Space>
+                )
+              },
+              {
+                title: '上架数量',
+                dataIndex: 'shelf_num',
+                key: 'shelf_num',
+                render: (num, record) => (
+                  <InputNumber 
+                    defaultValue={num} 
+                    min={0}
+                    onBlur={(e) => {
+                      const val = parseInt(e.target.value);
+                      if (!isNaN(val) && val !== num) {
+                        handleUpdateItemQuantity(record.shelf_product_item_id, val);
+                      }
+                    }}
+                  />
+                )
+              },
+              {
+                title: '锁定数量',
+                dataIndex: 'lock_num',
+                key: 'lock_num',
+              },
+              {
+                title: '操作',
+                key: 'action',
+                render: (_, record) => (
+                  <Popconfirm
+                    title="确定要删除该规格吗？"
+                    onConfirm={() => handleDeleteItem(record.shelf_product_item_id)}
+                  >
+                    <Button type="link" danger size="small" icon={<DeleteOutlined />}>删除</Button>
+                  </Popconfirm>
+                )
+              }
             ]}
           />
         </Space>
@@ -803,7 +816,19 @@ const ShelfProductManagement = () => {
             { title: '名称', dataIndex: 'name' },
             { title: '品牌', dataIndex: 'brand_name', width: 140 },
             { title: '分类', dataIndex: 'category_name', width: 160 },
-            { title: '状态', dataIndex: 'status', width: 100 },
+            { 
+              title: '状态', 
+              dataIndex: 'status', 
+              width: 100,
+              render: (status: ProductStatus) => {
+                const statusMap = {
+                  '下架': 'red',
+                  '正常': 'green',
+                  '删除': 'gray'
+                };
+                return <Tag color={statusMap[status]}>{status}</Tag>;
+              }
+            },
           ]}
         />
       </Modal>
@@ -858,7 +883,8 @@ const ShelfProductManagement = () => {
               <li>请使用下载的模板文件进行数据填写</li>
               <li>商品ID和分类ID必须为有效值</li>
               <li>状态字段只能填写：在售、下架、售罄</li>
-              <li>自营、可定制、分期字段请填写：是/否 或 true/false</li>
+              <li>自营、可定制字段请填写：是/否 或 true/false</li>
+              <li>分期字段请填写期数：0、3、6、12、24</li>
               <li>每次导入最多支持1000条数据</li>
             </ul>
           </div>
