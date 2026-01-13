@@ -257,7 +257,6 @@ const Seckill: React.FC = () => {
     <Space direction="vertical" size={12} style={{ width: '100%' }}>
       <Flex align="center" justify="space-between">
         <Title level={4} style={{ margin: 0 }}>秒杀活动</Title>
-        <Text type="secondary">后端未连通时将使用本地模拟数据</Text>
       </Flex>
 
       <Card size="small" title="创建秒杀轮次">

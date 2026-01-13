@@ -340,8 +340,8 @@ const HeaderBar: React.FC = () => {
                 />
                 <Title
                     level={2}
-                    className="m-0 select-none mt-2! font-normal!"
-                    style={{ letterSpacing: '-1px' }} // 减小压缩间距，避免文字重叠
+                    className="m-0  select-none mt-3! font-normal!"
+                    style={{ letterSpacing: '-4px' }} // 减小压缩间距，避免文字重叠
                 >
                     LenovoAdmin
                 </Title>
