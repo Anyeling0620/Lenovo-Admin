@@ -35,12 +35,12 @@ const _menuItems: MenuItem[] = [
         icon: <DashboardOutlined />,
         path: '/dashboard',
     },
-    {
-        key: '2',
-        label: '工作台',
-        icon: <DesktopOutlined />,
-        path: '/workbench',
-    },
+    // {
+    //     key: '2',
+    //     label: '工作台',
+    //     icon: <DesktopOutlined />,
+    //     path: '/workbench',
+    // },
     //     {
     //     key: '3',
     //     label: '广播通知',
