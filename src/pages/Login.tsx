@@ -25,7 +25,7 @@ const Login = () => {
 
 
   if (isLogin) {
-    return <Navigate to="/index" state={{ from: location.pathname }} replace />;
+    return <Navigate to="/" state={{ from: location.pathname }} replace />;
   }
 
   const sliderWidth = 320;
