@@ -42,6 +42,7 @@ import AfterSaleHandle from "./pages/sell/afterSale/handle.tsx";
 import ComplaintManagement from "./pages/sell/complaint/index.tsx";
 import ComplaintHandle from "./pages/sell/complaint/handle.tsx";
 import useAuthLifecycle from "./hooks/useAuth";
+import useRouteTitle from "./hooks/useRouteTitle";
 
 
 
@@ -74,6 +75,7 @@ import TagListPage from "./pages/goods/Productmanage/tag/TagListPage.tsx";
 
 export default function App() {
   useAuthLifecycle();
+  useRouteTitle();
   return (
     <>
       <Routes>

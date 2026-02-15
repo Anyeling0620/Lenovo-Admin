@@ -22,7 +22,7 @@ export const routeNameMap: Record<string, string> = {
   '/goods/tag/create': '新建标签',
   '/goods/tag/edit/:id': '编辑标签',
   '/goods/stock': '库存管理',
-  '/goods/stock/edit/:id': '编辑库存',
+  '/goods/stock/edit/:stockId': '编辑库存',
   '/goods/configs': '配置管理',
   '/goods/shelf': '上架管理',
   '/goods/analytics': '数据分析',
