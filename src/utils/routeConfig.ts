@@ -1,5 +1,7 @@
 // 路由路径与标签名称的映射配置
 export const routeNameMap: Record<string, string> = {
+  '/login': '登录页面',
+  '/not-permission': '无权限',
   '/': '首页',
   '/dashboard': '数据总览',
   '/workbench': '工作台',
@@ -47,6 +49,9 @@ export const routeNameMap: Record<string, string> = {
   '/account/info': '个人信息',
   '/account/permission': '个人权限详情',
   '/account/security': '账号安全',
+  // 兜底页面（你项目里 403/404 组件不一定走固定路径，但保留映射方便未来扩展）
+  '/403': '无权限',
+  '/404': '页面不存在',
 };
 
 // 获取路由对应的标签名称
