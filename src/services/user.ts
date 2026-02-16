@@ -376,6 +376,20 @@ export const updateAdmin = async (adminId: string, data: Partial<CreateAdminPara
 };
 
 /**
+ * 管理员邮箱：发送验证码（管理员端）
+ */
+export const sendAdminEmailCode = async (email: string, mode: 'bind_admin_email' | 'update_admin_email' = 'update_admin_email'): Promise<void> => {
+  await request.post(`/account/email/send-code`, { email, mode });
+};
+
+/**
+ * 管理员邮箱：超级/系统管理员修改其他管理员邮箱（需验证码）
+ */
+export const updateAdminEmailByCode = async (adminId: string, payload: { email: string; code: string }): Promise<void> => {
+  await request.patch(`/system/admins/${adminId}/email`, { email: payload.email, code: payload.code });
+};
+
+/**
  * 删除管理员
  * @param adminId 管理员ID
  * @returns Promise<void>

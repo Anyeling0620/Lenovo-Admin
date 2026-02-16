@@ -45,6 +45,20 @@ export const updateAccountProfile = (data: UpdateAdminProfileRequest & { avatarF
     Pick<AdminProfileResponse, 'admin_id' | 'name' | 'nickname' | 'gender' | 'email' | 'avatar'>
   >('/account/profile', fd);
 };
+
+/**
+ * 管理员邮箱：发送验证码（个人绑定/修改）
+ */
+export const sendMyAdminEmailCode = async (email: string): Promise<void> => {
+  await request.post('/account/email/send-code', { email, mode: 'bind_admin_email' });
+};
+
+/**
+ * 管理员邮箱：绑定/修改自己的邮箱（验证码校验）
+ */
+export const bindMyAdminEmail = async (payload: { email: string; code: string }): Promise<void> => {
+  await request.post('/account/email/bind', payload);
+};
 export const getAccountPermissions = () =>
   request.get<AdminPermissionResponse>('/account/permissions');
 export const changeAccountPassword = (data: { old_password: string; new_password: string }) =>

@@ -38,6 +38,8 @@ import {
   resetAdminPassword,
   getIdentityList,
   updateAdmin,
+  updateAdminEmailByCode,
+  sendAdminEmailCode,
   deleteAdmin,
   type Admin,
   type AdminListParams,
@@ -79,6 +81,7 @@ const AdminListPage: React.FC = () => {
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editForm] = Form.useForm();
   const [editingAdmin, setEditingAdmin] = useState<Admin | null>(null);
+  const [sendingEditEmailCode, setSendingEditEmailCode] = useState(false);
 
   // 获取当前登录管理员的身份信息
   const getIdentityCodes = useAdminProfileStore((state) => state.getIdentityCodes);
@@ -260,6 +263,7 @@ const AdminListPage: React.FC = () => {
       name: admin.name,
       nickname: admin.nickname,
       email: admin.email,
+  emailCode: '',
       identityIds: admin.identities?.map((i: IdName) => i.id) || [],
       categoryIds: admin.productCategories?.map((c: IdName) => c.id) || [],
     });
@@ -273,15 +277,29 @@ const AdminListPage: React.FC = () => {
     try {
       const values = await editForm.validateFields();
       
+      const nextEmail = (values.email || '').trim();
+      const oldEmail = (editingAdmin.email || '').trim();
+
+      // 1) 先更新除 email 外字段
       const params: Partial<CreateAdminParams> = {
         name: values.name,
-        email: values.email,
+        // email 不走 updateAdmin，避免直接改邮箱
+        email: oldEmail || undefined,
         nickname: values.nickname,
         identityIds: values.identityIds || [],
         categoryIds: values.categoryIds || [],
       };
-      
       await updateAdmin(editingAdmin.id, params);
+
+      // 2) 若邮箱变更：必须验证码校验
+      if (nextEmail !== oldEmail) {
+        const code = String(values.emailCode || '').trim();
+        if (!code) {
+          globalMessage.warning('请输入邮箱验证码');
+          return;
+        }
+        await updateAdminEmailByCode(editingAdmin.id, { email: nextEmail, code });
+      }
       globalMessage.success('管理员信息更新成功');
       setEditModalVisible(false);
       editForm.resetFields();
@@ -289,6 +307,23 @@ const AdminListPage: React.FC = () => {
       loadAdminList();
     } catch (error) {
       globalErrorHandler.handle(error, globalMessage.error);
+    }
+  };
+
+  const handleSendEditEmailCode = async () => {
+    try {
+      const email = String(editForm.getFieldValue('email') || '').trim();
+      if (!email) {
+        globalMessage.warning('请先输入邮箱');
+        return;
+      }
+      setSendingEditEmailCode(true);
+      await sendAdminEmailCode(email, 'update_admin_email');
+      globalMessage.success('验证码已发送');
+    } catch (e) {
+      globalErrorHandler.handle(e, globalMessage.error);
+    } finally {
+      setSendingEditEmailCode(false);
     }
   };
 
@@ -661,7 +696,24 @@ const AdminListPage: React.FC = () => {
                   { type: 'email', message: '请输入有效的邮箱地址' }
                 ]}
               >
-                <Input placeholder="请输入邮箱（可选）" />
+                <Space.Compact style={{ width: '100%' }}>
+                  <Input placeholder="请输入邮箱（修改需验证码）" />
+                  <Button onClick={handleSendEditEmailCode} loading={sendingEditEmailCode}>
+                    发送验证码
+                  </Button>
+                </Space.Compact>
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col span={24}>
+              <Form.Item
+                label="邮箱验证码"
+                name="emailCode"
+                tooltip="仅当邮箱发生变更时需要填写"
+              >
+                <Input placeholder="请输入邮箱验证码" />
               </Form.Item>
             </Col>
           </Row>

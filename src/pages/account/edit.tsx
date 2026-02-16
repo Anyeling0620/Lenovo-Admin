@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Form, Input, Select, Button, Upload, Avatar, Space, message } from 'antd';
+import { Card, Form, Input, Select, Button, Upload, Avatar, Space } from 'antd';
 import { UserOutlined, UploadOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { Link, useNavigate } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { getAccountProfile, updateAccountProfile } from '../../services/api';
-import type { AdminProfileResponse, Gender } from '../../services/api-type';
+import { bindMyAdminEmail, getAccountProfile, sendMyAdminEmailCode, updateAccountProfile } from '../../services/api';
+import type { AdminProfileResponse } from '../../services/api-type';
 import { getImageUrl } from '../../utils/imageUrl';
 import { globalMessage } from '../../utils/globalMessage';
 import { globalErrorHandler } from '../../utils/globalAxiosErrorHandler';
 import { mockAdminProfile } from './mockData';
-import type { UploadFile } from 'antd/es/upload/interface';
+// import type { UploadFile } from 'antd/es/upload/interface';
 import useAdminProfileStore from '../../store/adminInfo';
 
 const { Option } = Select;
@@ -28,6 +28,8 @@ type ProfileForm = z.infer<typeof profileFormSchema>;
 
 const AccountEdit: React.FC = () => {
   const [loading, setLoading] = useState(false);
+  const [sendingEmailCode, setSendingEmailCode] = useState(false);
+  const [emailCode, setEmailCode] = useState('');
   const [profile, setProfile] = useState<AdminProfileResponse | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
@@ -78,6 +80,7 @@ const AccountEdit: React.FC = () => {
 
   useEffect(() => {
     loadProfile();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleAvatarChange = (file: File) => {
@@ -93,13 +96,24 @@ const AccountEdit: React.FC = () => {
   const onSubmit = async (data: ProfileForm) => {
     setLoading(true);
     try {
+      // 1) 先更新非邮箱字段
       await updateAccountProfile({
         name: data.name,
-        nickname: data.nickname || null,
+  nickname: data.nickname || undefined,
         gender: data.gender,
-        email: data.email || null,
+        // 邮箱不再走 profile patch，避免“直接保存即可改邮箱”
+  email: profile?.email || undefined,
         avatarFile: avatarFile || undefined,
       });
+
+      // 2) 若邮箱有变化，必须验证码校验完成绑定
+      const nextEmail = (data.email || '').trim();
+      const oldEmail = (profile?.email || '').trim();
+      if (nextEmail !== oldEmail) {
+        if (!nextEmail) throw new Error('邮箱不能为空');
+        if (!emailCode.trim()) throw new Error('请输入邮箱验证码');
+        await bindMyAdminEmail({ email: nextEmail, code: emailCode.trim() });
+      }
       globalMessage.success('个人信息更新成功');
       
       // 更新全局 store
@@ -111,6 +125,25 @@ const AccountEdit: React.FC = () => {
       globalErrorHandler.handle(error, globalMessage.error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSendEmailCode = async () => {
+    // react-hook-form 这里直接从 profile+当前输入兜底取值
+    // 注意：不强依赖 watch，避免引入额外状态。
+    const targetEmail = (document.querySelector('input[type="email"]') as HTMLInputElement | null)?.value?.trim() || '';
+    if (!targetEmail) {
+      globalMessage.warning('请先输入邮箱');
+      return;
+    }
+    setSendingEmailCode(true);
+    try {
+      await sendMyAdminEmailCode(targetEmail);
+      globalMessage.success('验证码已发送');
+    } catch (e) {
+      globalErrorHandler.handle(e, globalMessage.error);
+    } finally {
+      setSendingEmailCode(false);
     }
   };
 
@@ -196,13 +229,26 @@ const AccountEdit: React.FC = () => {
             validateStatus={errors.email ? 'error' : ''}
             help={errors.email?.message}
           >
-            <Controller
-              name="email"
-              control={control}
-              render={({ field }) => (
-                <Input {...field} type="email" placeholder="请输入邮箱（可选）" />
-              )}
-            />
+            <Space.Compact style={{ width: '100%' }}>
+              <Controller
+                name="email"
+                control={control}
+                render={({ field }) => (
+                  <Input {...field} type="email" placeholder="请输入邮箱" />
+                )}
+              />
+              <Button onClick={handleSendEmailCode} loading={sendingEmailCode}>
+                发送验证码
+              </Button>
+            </Space.Compact>
+            <div style={{ marginTop: 8 }}>
+              <Input
+                value={emailCode}
+                onChange={(e) => setEmailCode(e.target.value)}
+                placeholder="请输入邮箱验证码"
+                style={{ maxWidth: 240 }}
+              />
+            </div>
           </Form.Item>
 
           <Form.Item>
